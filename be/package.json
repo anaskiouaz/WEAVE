@@ -1,0 +1,23 @@
+{
+  "name": "weave-api",
+  "version": "1.0.3",
+  "type": "module",
+  "main": "src/server.js",
+  "scripts": {
+    "dev": "nodemon src/server.js",
+    "start": "node src/server.js"
+  },
+  "dependencies": {
+    "express": "^4.x",
+    "cors": "^2.x",
+    "dotenv": "^16.x",
+    "pg": "^8.x",
+    "jsonwebtoken": "^9.x",
+    "bcryptjs": "^2.x",
+    "helmet": "^7.x",
+    "morgan": "^1.x"
+  },
+  "devDependencies": {
+    "nodemon": "^3.x"
+  }
+}

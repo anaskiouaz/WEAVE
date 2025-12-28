@@ -1,0 +1,59 @@
+version: "3.9"
+
+services:
+  postgres:
+    image: postgres:14.19
+    container_name: postgres14
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: weave_user
+      POSTGRES_PASSWORD: "!QAZ1qaz23Q#"  # On ajoute le # pour matcher l'API
+      POSTGRES_DB: weave_local
+    ports:
+      - "5432:5432" # On utilise le port standard 5432
+    volumes:
+      - pgdata14:/var/lib/postgresql/data
+    networks:
+      - weave-net
+  api:
+    image: node:22.21.1
+    container_name: weave-api
+    working_dir: /app
+    restart: unless-stopped
+    volumes:
+      - ./be:/app
+    command: sh -c "npm install && npm start"
+    environment:
+      PORT: "4000"
+      DATABASE_URL: "postgres://weave_user:!QAZ1qaz23Q#@postgres:5432/weave_local"
+      JWT_SECRET: "super-secret"
+    ports:
+      - "4000:4000"
+    depends_on:
+      - postgres
+    networks:
+      - weave-net
+
+  frontend:
+    image: node:22.21.1
+    container_name: weave-fe
+    working_dir: /app
+    restart: unless-stopped
+    volumes:
+      - ./fe:/app
+    command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
+    environment:
+      VITE_API_BASE_URL: "http://localhost:4000/api"
+    ports:
+      - "5173:5173"
+      - "5174:5174"
+    depends_on:
+      - api
+    networks:
+      - weave-net
+
+volumes:
+  pgdata14:
+
+networks:
+  weave-net:
