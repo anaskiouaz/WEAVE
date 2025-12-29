@@ -1,3 +1,4 @@
+name: Discord Notification
 on:
   push:
     paths:
@@ -9,6 +10,6 @@ jobs:
     steps:
       - name: Send Webhook
         run: |
-          curl -H "Content-Type: application/json" \
-          -d '{"content": "🚀 Mise à jour dans le dossier fr !"}' \
-          ${{ secrets.DISCORD_WEBHOOK }}
+          curl -X POST -H "Content-Type: application/json" \
+          -d '{"content": "🚀 Mise à jour détectée dans le dossier **fr** !"}' \
+          "https://discord.com/api/webhooks/1455117693957967973/gmMDLb3DVinz_kwp1HyvszxRGjwFvYiKfnchhQ-RP51kBpaS-jT2IbV3UH1bR6rblUsY"
