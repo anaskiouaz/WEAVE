@@ -12,5 +12,5 @@ jobs:
       - name: Send Message
         run: |
           curl -X POST -H "Content-Type: application/json" \
-          -d '{"content": "🚀 Mise à jour détectée dans le dossier **fr** !"}' \
+          -d "{\"content\": \"🚀 **Mise à jour dans le dossier /fr**\n👤 **Auteur :** ${{ github.actor }}\"}" \
           ${{ secrets.DISCORD_WEBHOOK }}
