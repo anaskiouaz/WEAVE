@@ -1,0 +1,22 @@
+name: Discord Notification BE
+
+on:
+  push:
+    # Déclenche l'action uniquement si des fichiers dans "be" sont modifiés
+    paths:
+      - 'be/**'
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Discord Message
+        uses: appleboy/discord-action@master
+        with:
+          webhook_id: ${{ secrets.DISCORD_WEBHOOK }}
+          # Personnalise le message ci-dessous
+          message: |
+            **Nouvelle activité sur le Backend (dossier /be)**
+            **Auteur:** ${{ github.actor }}
+            **Message:** ${{ github.event.head_commit.message }}
+            **Lien:** https://github.com/${{ github.repository }}/commit/${{ github.sha }}
