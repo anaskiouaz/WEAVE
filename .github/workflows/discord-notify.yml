@@ -1,0 +1,15 @@
+name: Discord Notification
+on:
+  push:
+    paths:
+      - 'fr/**' # Ne s'active que si ce dossier change
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send Webhook
+        run: |
+          curl -H "Content-Type: application/json" \
+          -d '{"content": "🚀 Mise à jour dans le dossier fe !"}' \
+          ${{ secrets.https://discord.com/api/webhooks/1455117693957967973/gmMDLb3DVinz_kwp1HyvszxRGjwFvYiKfnchhQ-RP51kBpaS-jT2IbV3UH1bR6rblUsY/github }}
