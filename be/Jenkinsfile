@@ -5,6 +5,8 @@ def slackFailure(String msg) {
         color: 'danger',
         message: msg
     )
+
+    
 }
 
 
