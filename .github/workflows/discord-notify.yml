@@ -1,3 +1,5 @@
+name: Discord Notification
+
 on:
   push:
     paths:
@@ -7,8 +9,8 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Send Webhook
+      - name: Send Message
         run: |
-          curl -H "Content-Type: application/json" \
-          -d '{"content": "🚀 Mise à jour dans le dossier fr !"}' \
+          curl -X POST -H "Content-Type: application/json" \
+          -d '{"content": "🚀 Mise à jour détectée dans le dossier **fr** !"}' \
           ${{ secrets.DISCORD_WEBHOOK }}
