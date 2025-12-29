@@ -7,13 +7,6 @@ def slackInfo(String msg) {
     )
 }
 
-def slackSuccess(String msg) {
-    slackSend(
-        channel: '#weave-ci-be',
-        color: 'good',
-        message: msg
-    )
-}
 
 def slackFailure(String msg) {
     slackSend(
