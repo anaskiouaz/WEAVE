@@ -9,8 +9,9 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Send Discord Message
+      - name: Send Webhook
         run: |
-          curl -X POST -H "Content-Type: application/json" \
-          -d "{\"content\": \"🚀 **Mise à jour dans le dossier /fr**\n👤 **Auteur :** ${{ github.actor }}\"}" \
-          ${{ secrets.DISCORD_WEBHOOK }}  
+          curl -X POST \
+            -H "Content-Type: application/json" \
+            -d '{"content":"🚀 Mise à jour dans le dossier fr !\n👤 Auteur : ${{ github.actor }}"}' \
+            "${{ secrets.DISCORD_WEBHOOK }}"
