@@ -3,17 +3,17 @@ name: Discord Notification
 on:
   push:
     paths:
-      - 'be/**'
+      - 'weave-db/**'
   pull_request:
     paths:
-      - 'be/**'
+      - 'weave-db/**'
     types: [opened, synchronize, reopened, closed, merged]
   pull_request_target:
     paths:
-      - 'be/**'
+      - 'weave-db/**'
   merge_group:
     paths:
-      - 'be/**'
+      - 'weave-db/**'
   workflow_dispatch:
 
 jobs:
@@ -23,7 +23,7 @@ jobs:
       - name: Send Discord notification
         uses: appleboy/discord-action@master
         with:
-          webhook_url: ${{ secrets.DISCORD_WEBHOOK }}
+          webhook_url: ${{ secrets.DISCORD_WEBHOOK_DB }}
           message: |
             **📊 WEAVE - Backend Deployment Status**
             
