@@ -2,7 +2,18 @@ name: Discord Notification
 
 on:
   push:
+    paths:
+      - 'be/**'
   pull_request:
+    paths:
+      - 'be/**'
+    types: [opened, synchronize, reopened, closed, merged]
+  pull_request_target:
+    paths:
+      - 'be/**'
+  merge_group:
+    paths:
+      - 'be/**'
   workflow_dispatch:
 
 jobs:
@@ -14,7 +25,13 @@ jobs:
         with:
           webhook_url: ${{ secrets.DISCORD_WEBHOOK }}
           message: |
-            🚀 **Événement GitHub**
-            📌 Type : ${{ github.event_name }}
-            👤 Auteur : ${{ github.actor }}
-            🌿 Branche : ${{ github.ref_name }}
+            **📊 WEAVE - Backend Deployment Status**
+            
+            **Event:** ${{ github.event_name }}
+            **Branch:** `${{ github.ref_name }}`
+            **Commit:** ${{ github.sha }}
+            **Author:** ${{ github.actor }}
+            **Repository:** ${{ github.repository }}
+            **Timestamp:** ${{ github.event.head_commit.timestamp }}
+            
+            **Commit Message:** ${{ github.event.head_commit.message }}
