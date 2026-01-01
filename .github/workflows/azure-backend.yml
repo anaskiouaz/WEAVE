@@ -1,0 +1,7 @@
+- name: Build and push container image to registry
+        uses: docker/build-push-action@v3
+        with:
+          push: true
+          tags: ${{ secrets.AZURE_APPSERVICE_CONTAINER_REGISTRY_PASSWORD_... }} # Ne touche pas à cette ligne
+          file: ./be/Dockerfile    # <--- AJOUTE: On précise que le fichier est dans 'be'
+          context: ./be            # <--- AJOUTE: On précise que le dossier de travail est 'be'
