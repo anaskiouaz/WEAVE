@@ -1,4 +1,5 @@
 // src/app.js
+console.log(">>> DÉMARRAGE DU SCRIPT SERVER.JS <<<"); // Ligne cruciale pour tester
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
