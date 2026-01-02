@@ -1,0 +1,32 @@
+name: Build and Deploy Backend
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - 'be/**' # Se lance uniquement si on touche au dossier 'be'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      # 1. Récupérer le code
+      - name: Check out the repo
+        uses: actions/checkout@v4
+
+      # 2. Se connecter à Docker Hub (avec tes nouveaux secrets)
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKER_USERNAME }}
+          password: ${{ secrets.DOCKER_PASSWORD }}
+
+      # 3. Construire et envoyer l'image
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: ./be
+          file: ./be/Dockerfile
+          push: true
+          # ATTENTION : Ce nom doit correspondre à celui dans ta config Azure (image_8b337e.png)
+          tags: anask2313/weave_hub_repo:latest
