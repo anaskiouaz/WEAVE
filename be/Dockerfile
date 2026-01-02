@@ -19,5 +19,5 @@ COPY . .
 EXPOSE 4000
 
 # 7. Commande de démarrage
-CMD ["node", "src/index.js"] 
+CMD ["node", "src/server.js"] 
 # (Assure-toi que ton index.js est bien là, ou ajuste selon ton "main" dans package.json)
