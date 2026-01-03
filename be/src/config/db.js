@@ -17,7 +17,7 @@ pool.connect((err, client, release) => {
     console.log('✅ Connexion à la base de données établie avec succès');
     release();
   }
-});
+}); 
 
 export default {
   query: (text, params) => pool.query(text, params),
