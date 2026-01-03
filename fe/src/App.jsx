@@ -12,8 +12,8 @@ function App() {
       .then(setHealth)
       .catch((err) => setError(err.message));
 
-    // Récupère les utilisateurs
-    apiGet('/users')
+    // Test connexion DB
+    apiGet('/test-db')
       .then(setUsers)
       .catch((err) => setError(err.message));
   }, []);
