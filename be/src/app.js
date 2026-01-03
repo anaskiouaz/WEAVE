@@ -4,7 +4,8 @@ import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-// test
+import routes from './routes/index.js';
+
 const app = express();
 
 /**
@@ -61,17 +62,8 @@ app.get(['/health', '/api/health'], (req, res) => {
   });
 });
 
-/**
- * 👉 Mount your existing routers HERE, BEFORE the 404 handler.
- * Examples (adjust to your actual file names / paths):
- *
- * import authRoutes from './routes/auth.js';
- * import userRoutes from './routes/users.js';
- *
- * // These will be reachable as /api/auth/... and /api/users/...
- * app.use('/api/auth', authRoutes);
- * app.use('/api/users', userRoutes);
- */
+// Mount all API routes
+app.use('/api', routes);
 
 // 404 handler (keep this LAST before error handler)
 app.use((req, res, next) => {
