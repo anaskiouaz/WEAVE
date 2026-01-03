@@ -12,7 +12,7 @@ function App() {
       .then(setHealth)
       .catch((err) => setError(err.message));
 
-    // Test connexion DB
+    // Test connexion DB (payload: { status, message, user_count, data })
     apiGet('/test-db')
       .then(setUsers)
       .catch((err) => setError(err.message));
@@ -28,7 +28,7 @@ function App() {
         {health && (
           <pre
             style={{
-              backgroundColor: '#f0f0f0',
+              backgroundColor: '#000000ff',
               padding: '10px',
               borderRadius: '4px',
               overflow: 'auto',
@@ -44,8 +44,8 @@ function App() {
         <h2>👥 Utilisateurs (DB)</h2>
         {users ? (
           <div>
-            <p><strong>Total:</strong> {users.count} utilisateurs</p>
-            {users.users && users.users.length > 0 ? (
+            <p><strong>Total:</strong> {users.user_count ?? 0} utilisateurs</p>
+            {users.data && users.data.length > 0 ? (
               <table
                 style={{
                   borderCollapse: 'collapse',
@@ -54,14 +54,14 @@ function App() {
                 }}
               >
                 <thead>
-                  <tr style={{ backgroundColor: '#f0f0f0' }}>
-                    <th style={{ border: '1px solid #ddd', padding: '8px' }}>ID</th>
-                    <th style={{ border: '1px solid #ddd', padding: '8px' }}>Email</th>
-                    <th style={{ border: '1px solid #ddd', padding: '8px' }}>Créé le</th>
+                  <tr style={{ backgroundColor: '#000000ff' }}>
+                    <th style={{ border: '1px solid #000000ff', padding: '8px' }}>ID</th>
+                    <th style={{ border: '1px solid #000000ff', padding: '8px' }}>Email</th>
+                    <th style={{ border: '1px solid #000000ff', padding: '8px' }}>Créé le</th>
                   </tr>
                 </thead>
                 <tbody>
-                  {users.users.map((user) => (
+                  {users.data.map((user) => (
                     <tr key={user.id}>
                       <td style={{ border: '1px solid #ddd', padding: '8px' }}>
                         {user.id}
