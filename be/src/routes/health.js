@@ -1,12 +1,11 @@
-import pkg from "../package.json" assert { type: "json" };
+import { Router } from 'express';
 
-router.get("/health", (req, res) => {
+const router = Router();
+
+router.get("/", (req, res) => {
   res.json({
     status: "ok",
     env: process.env.NODE_ENV,
-    version: pkg.version,
-    commit: process.env.GIT_COMMIT_HASH,  // 👈 new
-    build: process.env.BUILD_ID,          // 👈 new
     time: new Date(),
   });
 });
