@@ -114,6 +114,3 @@ WEAVE/
 │   └── migrations/       # Scripts SQL (01_initial_schema.sql...)
 └── docker-compose.yml    # Orchestration locale
 
-## ✅ Statut Git
-
-Tout est push dans le main.
