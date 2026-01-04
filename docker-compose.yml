@@ -25,7 +25,12 @@ services:
     command: sh -c "npm install && npm start"
     environment:
       PORT: "4000"
-      DATABASE_URL: "postgres://weave_user:!QAZ1qaz23Q#@postgres:5432/weave_local"
+      PGHOST: "postgres"
+      PGPORT: "5432"
+      PGUSER: "weave_user"
+      PGPASSWORD: "!QAZ1qaz23Q#"
+      PGDATABASE: "weave_local"
+      ALLOWED_ORIGINS: "http://localhost:5173"
       JWT_SECRET: "super-secret"
     ports:
       - "4000:4000"
