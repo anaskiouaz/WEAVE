@@ -1,62 +1,64 @@
-import { X, Phone, AlertCircle } from 'lucide-react';
+import React from 'react';
+import { createPortal } from 'react-dom';
+import { X, Phone } from 'lucide-react';
 
+// J'ai renommé la prop 'isOpen' en 'open' pour qu'elle corresponde à ton App.jsx
 export default function EmergencyDialog({ open, onClose }) {
+  // Si la modale n'est pas ouverte, on ne rend rien
   if (!open) return null;
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-      <div className="bg-white rounded-lg max-w-md w-full p-6">
-        <div className="flex justify-between items-start mb-6">
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 bg-orange-100 rounded-full flex items-center justify-center">
-              <AlertCircle className="w-6 h-6 text-orange-600" />
-            </div>
-            <h2 className="text-orange-600">Alerte d'urgence</h2>
-          </div>
+  const emergencyContacts = [
+    { name: "SAMU", label: "Urgence médicale", number: "15", color: "bg-red-600" },
+    { name: "Police", label: "Secours", number: "17", color: "bg-blue-600" },
+    { name: "Pompiers", label: "Incendie/Accident", number: "18", color: "bg-red-600" },
+    { name: "Europe", label: "Urgence", number: "112", color: "bg-orange-500" },
+  ];
+
+  const modalContent = (
+    <div className="fixed inset-0 bg-black/70 flex items-center justify-center z-[9999] p-4 backdrop-blur-sm" onClick={onClose}>
+      <div 
+        className="bg-white rounded-2xl max-w-sm w-full p-6 shadow-2xl animate-in fade-in zoom-in duration-200"
+        onClick={e => e.stopPropagation()}
+      >
+        <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-100">
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <Phone className="w-6 h-6 text-red-600" />
+            Numéros d'Urgence
+          </h2>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600"
+            className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors"
           >
-            <X className="w-6 h-6" />
+            <X className="w-5 h-5 text-gray-500" />
           </button>
         </div>
 
-        <div className="space-y-4">
-          <p className="text-gray-700">
-            Une notification d'urgence va être envoyée à tous les membres du cercle d'aidants.
-          </p>
-
-          <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
-            <div className="flex items-center gap-2 mb-2">
-              <Phone className="w-5 h-5 text-orange-600" />
-              <span className="text-orange-900">Numéros d'urgence</span>
+        <div className="space-y-3">
+          {emergencyContacts.map((contact) => (
+            <div key={contact.number} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+              <div>
+                <p className="font-bold text-gray-900">{contact.name}</p>
+                <p className="text-sm text-gray-500">{contact.label}</p>
+              </div>
+              
+              {/* Le lien tel: fonctionne sur mobile et ouvre l'app d'appel */}
+              <a 
+                href={`tel:${contact.number}`}
+                className={`${contact.color} text-white px-5 py-2.5 rounded-full font-bold text-lg hover:opacity-90 transition-opacity flex items-center gap-2`}
+              >
+                📞 {contact.number}
+              </a>
             </div>
-            <div className="space-y-1 text-orange-800">
-              <p>SAMU : 15</p>
-              <p>Police : 17</p>
-              <p>Pompiers : 18</p>
-            </div>
-          </div>
-
-          <div className="flex gap-3 pt-4">
-            <button
-              onClick={onClose}
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
-            >
-              Annuler
-            </button>
-            <button
-              onClick={() => {
-                alert('Alerte envoyée à tous les aidants');
-                onClose();
-              }}
-              className="flex-1 px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
-            >
-              Envoyer l'alerte
-            </button>
-          </div>
+          ))}
         </div>
+
+        <p className="mt-6 text-center text-xs text-gray-400">
+          Appuyez sur un numéro pour appeler
+        </p>
       </div>
     </div>
   );
+
+  // Le Portal garantit que ça s'affiche par-dessus tout le reste
+  return createPortal(modalContent, document.body);
 }
