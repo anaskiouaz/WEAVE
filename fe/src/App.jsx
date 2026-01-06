@@ -13,6 +13,7 @@ import EmergencyDialog from './components/EmergencyDialog';
 function AppLayout({ children }) {
   const location = useLocation();
   const [emergencyOpen, setEmergencyOpen] = useState(false);
+  
 
   const navItems = [
     { path: '/', icon: Home, label: 'Accueil' },
