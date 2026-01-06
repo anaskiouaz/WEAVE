@@ -11,6 +11,7 @@ export async function getTasks(req, res) {
          t.title,
          t.task_type,
          t.helper_name,
+         t.required_helpers,
          c.senior_name
        FROM tasks t
        LEFT JOIN care_circles c ON c.id = t.circle_id
@@ -33,7 +34,8 @@ export async function getTasks(req, res) {
 
 export async function createTask(req, res) {
   try {
-    const { date, time, title, task_type, helper_name, circle_id } = req.body;
+    // 1. On récupère required_helpers en plus des autres champs
+    const { date, time, title, task_type, helper_name, circle_id, required_helpers } = req.body;
     
     if (!date || !time || !title || !task_type) {
       return res.status(400).json({
@@ -75,6 +77,9 @@ export async function createTask(req, res) {
 
     const helperName = helper_name || 'À pourvoir';
     
+    // 2. On s'assure que le quota est un entier (par défaut 1 si non fourni)
+    const quota = required_helpers ? parseInt(required_helpers, 10) : 1;
+    
     const result = await db.query(
       `INSERT INTO tasks (circle_id, title, task_type, date, time, required_helpers, helper_name)
        VALUES ($1, $2, $3, $4, $5, $6, $7)
@@ -85,7 +90,7 @@ export async function createTask(req, res) {
         task_type,
         date,
         time,
-        1,
+        quota, // 3. ICI : on utilise la variable quota au lieu de "1" en dur
         helperName,
       ]
     );
