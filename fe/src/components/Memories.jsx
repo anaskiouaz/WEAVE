@@ -27,14 +27,7 @@ export default function Memories() {
       image: 'https://images.unsplash.com/photo-1576091160550-2173dba999ef?w=400',
       likes: 7,
     },
-    {
-      id: 4,
-      author: 'Pierre Dubois',
-      date: '31 décembre 2025',
-      content: 'Magnifique réveillon en famille. Marguerite a chanté avec nous et semblait très heureuse.',
-      image: 'https://images.unsplash.com/photo-1482575832494-771f74bf6857?w=400',
-      likes: 12,
-    },
+  
   ];
 
   const handleDownloadPDF = () => {
