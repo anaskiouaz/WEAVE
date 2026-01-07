@@ -1,6 +1,9 @@
 import { BrowserRouter, Routes, Route, Link, useLocation } from 'react-router-dom';
 import { Home, Calendar, Heart, MessageSquare, User, Settings, AlertCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Ajout de useEffect
+import { PushNotifications } from '@capacitor/push-notifications'; // Ajout plugin notif
+import { Capacitor } from '@capacitor/core'; // Pour vérifier si on est sur mobile
+import { apiPost } from './api/client'; // Import correct de ta fonction API
 
 import Dashboard from './components/Dashboard';
 import CalendarView from './components/CalendarView';
@@ -13,6 +16,55 @@ import EmergencyDialog from './components/EmergencyDialog';
 function AppLayout({ children }) {
   const location = useLocation();
   const [emergencyOpen, setEmergencyOpen] = useState(false);
+
+  // --- DÉBUT MODIFICATION NOTIFICATIONS ---
+  useEffect(() => {
+    // On ne lance la logique de notif que si on est sur une vraie app mobile (Android/iOS)
+    if (Capacitor.isNativePlatform()) {
+      
+      // 1. Demander la permission à l'utilisateur
+      PushNotifications.requestPermissions().then(result => {
+        if (result.receive === 'granted') {
+          // Si autorisé, on enregistre l'appareil auprès de Google/Apple
+          PushNotifications.register();
+        }
+      });
+
+      // 2. Écouter le succès de l'enregistrement pour récupérer le token
+      const registrationListener = PushNotifications.addListener('registration', (token) => {
+        console.log('Push Token reçu:', token.value);
+        
+        // 3. Envoyer ce token à ton backend pour le sauvegarder
+        // (Ici on met userId: 1 en dur pour le test, à remplacer plus tard par le vrai ID user)
+        apiPost('/users/device-token', { 
+          userId: 1, 
+          token: token.value 
+        }).then(() => {
+          console.log('Token envoyé au serveur avec succès');
+        }).catch(err => {
+          console.error('Erreur envoi token serveur:', err);
+        });
+      });
+
+      // 4. Gérer les erreurs d'enregistrement
+      const errorListener = PushNotifications.addListener('registrationError', (error) => {
+        console.error('Erreur inscription notifs:', error);
+      });
+
+      // 5. Optionnel : Écouter les notifs reçues pendant que l'app est ouverte
+      const notificationListener = PushNotifications.addListener('pushNotificationReceived', (notification) => {
+        alert(`🔔 Nouvelle notif : ${notification.title}`);
+      });
+
+      // Nettoyage des écouteurs quand le composant est démonté
+      return () => {
+        registrationListener.remove();
+        errorListener.remove();
+        notificationListener.remove();
+      };
+    }
+  }, []);
+  // --- FIN MODIFICATION NOTIFICATIONS ---
 
   const navItems = [
     { path: '/', icon: Home, label: 'Accueil' },
