@@ -71,17 +71,18 @@ export async function createJournalEntry(req, res) {
 
     // 3. Insertion en base de données
     const result = await db.query(
-      `INSERT INTO journal_entries (circle_id, author_id, mood, text_content, photo_url)
-       VALUES ($1, $2, $3, $4, $5)
-       RETURNING id, circle_id, author_id, mood, text_content, photo_url, created_at`,
-      [
-        resolvedCircleId,
-        author_id,
-        mood || null, // Null si pas d'humeur
-        text_content,
-        photo_url || null // Null si pas de photo
-      ]
-    );
+  `INSERT INTO journal_entries (circle_id, author_id, mood, text_content, photo_url, comments)
+   VALUES ($1, $2, $3, $4, $5, $6) -- On ajoute $6 pour les commentaires
+   RETURNING id, circle_id, author_id, mood, text_content, photo_url, created_at`,
+  [
+    resolvedCircleId,
+    author_id,
+    mood || null,
+    text_content,
+    photo_url || null,
+    '[]' // On initialise avec un tableau vide JSON
+  ]
+);
 
     // Petit bonus : On récupère le nom de l'auteur pour le renvoyer au frontend immédiatement
     const authorResult = await db.query(`SELECT name FROM users WHERE id = $1`, [author_id]);
