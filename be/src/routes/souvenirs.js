@@ -1,5 +1,6 @@
 // src/controllers/souvenirs.js
 import db from '../config/db.js';
+import crypto from 'crypto';
 
 // Récupérer les souvenirs
 export async function getJournalEntries(req, res) {
@@ -9,7 +10,7 @@ export async function getJournalEntries(req, res) {
 
     const result = await db.query(
       `SELECT 
-         j.id, j.circle_id, j.text_content, j.photo_url, j.mood, j.created_at, j.comments,
+         j.*, 
          u.name as author_name
        FROM journal_entries j
        LEFT JOIN users u ON j.author_id = u.id
