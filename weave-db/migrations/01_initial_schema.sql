@@ -88,7 +88,8 @@ CREATE TABLE journal_entries (
                                  text_content TEXT,
                                  photo_url VARCHAR(2048),
                                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                 
+                                 comments JSONB DEFAULT '[]'::jsonb,
+
                                  -- Contraintes
                                  CONSTRAINT fk_journal_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE,
                                  CONSTRAINT fk_journal_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL

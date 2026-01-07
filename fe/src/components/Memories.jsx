@@ -1,91 +1,95 @@
 import { useState, useEffect } from 'react';
-import { Download, Image, Heart, MessageCircle, Calendar, Loader2 } from 'lucide-react';
+import { Download, Image, Heart, MessageCircle, Calendar, Loader2, Send } from 'lucide-react';
 import { jsPDF } from 'jspdf';
-import { apiGet } from '../api/client'; // Import du client API
+import { apiGet, apiPost } from '../api/client';
+import CalendarView from './CalendarView';
 
 export default function Memories() {
   const [memories, setMemories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+  
+  // États pour la gestion des commentaires
+  const [activeCommentId, setActiveCommentId] = useState(null);
+  const [newComment, setNewComment] = useState("");
+  const [isSending, setIsSending] = useState(false);
 
-  // ID du cercle (famille) à récupérer (à dynamiser selon l'utilisateur connecté)
-  const CIRCLE_ID = "d0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44"; // Exemple d'ID de cercle (utiliser useState du login plus tard)
+  // ID du cercle à adapter selon l'utilisateur connecté
+  const CIRCLE_ID = "d0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44";
 
-  // Récupération des données depuis la base de données
   useEffect(() => {
-    // src/pages/Memories.jsx (ou composant équivalent)
+    fetchMemories();
+  }, []);
 
-    async function fetchMemories() {
-      try {
-        setLoading(true);
-        // On récupère la réponse complète de l'API
-        const response = await apiGet(`/souvenirs?circle_id=${CIRCLE_ID}`);
-
-        // CORRECTION ICI : On cible .data car ton backend renvoie { status: 'ok', data: [...] }
-        if (response && response.data) {
-          setMemories(response.data);
-        } else {
-          // Fallback si jamais la réponse est vide ou mal formatée
-          setMemories([]);
-        }
-
-      } catch (err) {
-        console.error("Erreur chargement souvenirs:", err);
-        setError("Impossible de charger les souvenirs.");
-        setMemories([]); // Sécurité en cas d'erreur
-      } finally {
-        setLoading(false);
+  const fetchMemories = async () => {
+    try {
+      setLoading(true);
+      // Récupération des souvenirs via l'endpoint configuré dans index.js
+      const response = await apiGet(`/souvenirs?circle_id=${CIRCLE_ID}`);
+      
+      if (response && response.data) {
+        setMemories(response.data);
       }
-    } fetchMemories();
-  }, [CIRCLE_ID]);
+    } catch (err) {
+      console.error("Erreur chargement souvenirs:", err);
+      setError("Impossible de charger le journal de bord.");
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // Fonction d'export PDF avec les données réelles
+  const handleSendComment = async (entryId) => {
+    if (!newComment.trim()) return;
+    
+    setIsSending(true);
+    try {
+      // Envoi du commentaire vers la liste JSONB de l'entrée concernée
+      await apiPost(`/souvenirs/${entryId}/comments`, {
+        author_name: "Famille", // À dynamiser avec l'utilisateur réel
+        content: newComment
+      });
+      
+      setNewComment("");
+      // On rafraîchit la liste pour voir le nouveau message apparaître
+      await fetchMemories();
+    } catch (err) {
+      console.error("Erreur lors de l'envoi du commentaire:", err);
+    } finally {
+      setIsSending(false);
+    }
+  };
+
   const handleDownloadPDF = () => {
     const doc = new jsPDF();
-
     doc.setFontSize(20);
-    doc.text('Journal de bord - Souvenirs Partagés', 20, 20);
-
-    doc.setFontSize(12);
+    doc.text('Journal de bord - Souvenirs', 20, 20);
+    
     let yPosition = 40;
-
     memories.forEach((memory, index) => {
-      // Gestion du saut de page
       if (yPosition > 250) {
         doc.addPage();
         yPosition = 20;
       }
-
-      const dateStr = new Date(memory.created_at).toLocaleDateString('fr-FR');
-      const authorStr = memory.author_name || "Auteur inconnu";
-
       doc.setFontSize(10);
-      doc.setTextColor(100);
-      doc.text(`${dateStr} - Par ${authorStr}`, 20, yPosition);
+      doc.text(`${new Date(memory.created_at).toLocaleDateString()} - ${memory.author_name}`, 20, yPosition);
       yPosition += 7;
-
       doc.setFontSize(11);
-      doc.setTextColor(0);
-      // Utilisation du champ text_content de la DB
-      const lines = doc.splitTextToSize(memory.text_content || '', 170);
+      const lines = doc.splitTextToSize(memory.text_content, 170);
       doc.text(lines, 20, yPosition);
       yPosition += (lines.length * 7) + 10;
-
       if (index < memories.length - 1) {
-        doc.setDrawColor(200);
         doc.line(20, yPosition, 190, yPosition);
         yPosition += 10;
       }
     });
-
-    doc.save(`journal-souvenirs-${new Date().toISOString().split('T')[0]}.pdf`);
+    doc.save('souvenirs-weave.pdf');
   };
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-2" />
-        <p className="text-gray-600">Chargement du journal de bord...</p>
+      <div className="flex flex-col items-center justify-center min-h-[400px] gap-4">
+        <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+        <p className="text-gray-500">Chargement de vos souvenirs...</p>
       </div>
     );
   }
@@ -95,14 +99,12 @@ export default function Memories() {
       <div className="max-w-4xl mx-auto">
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Journal de bord</h1>
-            <p className="text-gray-600">
-              Les moments précieux partagés au sein du cercle
-            </p>
+            <h1 className="text-2xl font-bold text-gray-900 mb-2">Journal de bord</h1>
+            <p className="text-gray-600">Les moments partagés avec Marguerite</p>
           </div>
           <button
             onClick={handleDownloadPDF}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
           >
             <Download className="w-5 h-5" />
             Télécharger PDF
@@ -110,53 +112,28 @@ export default function Memories() {
         </div>
 
         {error && (
-          <div className="p-4 mb-6 bg-red-50 text-red-600 rounded-lg border border-red-100">
+          <div className="mb-6 p-4 bg-red-50 text-red-600 rounded-lg">
             {error}
           </div>
         )}
 
-        {/* Formulaire d'ajout (Interface maintenue) */}
-        <div className="mb-8 bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex gap-4">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <span className="text-blue-600 font-bold">V</span>
-            </div>
-            <div className="flex-1">
-              <textarea
-                placeholder="Partagez une nouvelle ou un souvenir..."
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                rows={3}
-              />
-              <div className="flex justify-between items-center mt-3">
-                <button className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors text-sm">
-                  <Image className="w-5 h-5" />
-                  <span>Ajouter une photo</span>
-                </button>
-                <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
-                  Publier
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Flux des souvenirs réels */}
+        {/* Memories Feed */}
         <div className="space-y-6">
           {memories.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
-              <p className="text-gray-500">Aucun souvenir n'a encore été partagé.</p>
+            <div className="text-center py-12 bg-white rounded-lg border-2 border-dashed">
+              <p className="text-gray-500">Aucun souvenir partagé pour le moment.</p>
             </div>
           ) : (
             memories.map((memory) => (
-              <div key={memory.id} className="bg-white rounded-lg shadow-sm border p-6">
+              <div key={memory.id} className="bg-white rounded-lg shadow p-6">
                 <div className="flex items-center gap-3 mb-4">
                   <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
                     <span className="text-blue-600 font-bold">
-                      {memory.author_name ? memory.author_name.charAt(0).toUpperCase() : '?'}
+                      {memory.author_name?.charAt(0) || 'U'}
                     </span>
                   </div>
                   <div>
-                    <p className="text-gray-900 font-semibold">{memory.author_name || "Membre du cercle"}</p>
+                    <p className="font-medium text-gray-900">{memory.author_name}</p>
                     <div className="flex items-center gap-2 text-gray-500 text-sm">
                       <Calendar className="w-4 h-4" />
                       <span>{new Date(memory.created_at).toLocaleDateString('fr-FR')}</span>
@@ -181,14 +158,82 @@ export default function Memories() {
                     <Heart className="w-5 h-5" />
                     <span>{memory.mood ? `Humeur: ${memory.mood}/10` : 'Aimer'}</span>
                   </button>
-                  <button className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors">
+                  <button 
+                    onClick={() => setActiveCommentId(activeCommentId === memory.id ? null : memory.id)}
+                    className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors"
+                  >
                     <MessageCircle className="w-5 h-5" />
-                    <span>Commenter</span>
+                    <span>Commenter ({memory.comments?.length || 0})</span>
                   </button>
                 </div>
+
+                {/* Section Liste de messages (Commentaires récupérables) */}
+                {activeCommentId === memory.id && (
+                  <div className="mt-4 pt-4 border-t border-gray-50 animate-in fade-in slide-in-from-top-2">
+                    <div className="space-y-3 mb-4 max-h-60 overflow-y-auto pr-2">
+                      {memory.comments && memory.comments.length > 0 ? (
+                        memory.comments.map((comment, idx) => (
+                          <div key={idx} className="bg-gray-50 p-3 rounded-lg text-sm">
+                            <p className="font-semibold text-blue-700 mb-1">{comment.author}</p>
+                            <p className="text-gray-700">{comment.content}</p>
+                          </div>
+                        ))
+                      ) : (
+                        <p className="text-center text-gray-400 text-sm py-2">Aucun message pour le moment.</p>
+                      )}
+                    </div>
+                    
+                    <div className="flex gap-2">
+                      <input
+                        type="text"
+                        value={newComment}
+                        onChange={(e) => setNewComment(e.target.value)}
+                        placeholder="Répondre ou commenter..."
+                        className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendComment(memory.id)}
+                      />
+                      <button 
+                        onClick={() => handleSendComment(memory.id)}
+                        disabled={isSending || !newComment.trim()}
+                        className="p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors"
+                      >
+                        <Send className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )}
               </div>
             ))
           )}
+        </div>
+
+        {/* Formulaire pour ajouter un nouveau souvenir (Publier) */}
+        <div className="mt-8 bg-white rounded-lg shadow p-6">
+          <div className="flex gap-4">
+            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
+              <span className="text-blue-600 font-bold">V</span>
+            </div>
+            <div className="flex-1">
+              <textarea
+                placeholder="Partagez un moment ou une nouvelle..."
+                className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                rows={3}
+              />
+              <div className="flex justify-between items-center mt-3">
+                <button className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors text-sm font-medium">
+                  <Image className="w-5 h-5" />
+                  <span>Ajouter une photo</span>
+                </button>
+                <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
+                  Publier
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div className="mt-12">
+          <CalendarView />
         </div>
       </div>
     </div>
