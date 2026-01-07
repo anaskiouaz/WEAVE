@@ -8,7 +8,13 @@ export default function Memories() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // --- ÉTATS AJOUTÉS POUR LES COMMENTAIRES ---
+// --- ÉTATS POUR LE NOUVEAU SOUVENIR ---
+  const [newText, setNewText] = useState("");
+  const [newMood, setNewMood] = useState(5); // Valeur par défaut
+  const [newPhotoUrl, setNewPhotoUrl] = useState("");
+  const [isPublishing, setIsPublishing] = useState(false);
+
+  // --- ÉTATS EXISTANTS POUR LES COMMENTAIRES ---
   const [activeCommentId, setActiveCommentId] = useState(null);
   const [commentText, setCommentText] = useState("");
   const [isSending, setIsSending] = useState(false);
@@ -39,6 +45,35 @@ export default function Memories() {
   useEffect(() => {
     fetchMemories();
   }, [CIRCLE_ID]);
+
+  // --- FONCTION POUR PUBLIER UN SOUVENIR ---
+  const handleAddMemory = async () => {
+    if (!newText.trim()) return;
+
+    setIsPublishing(true);
+    try {
+      await apiPost('/souvenirs', {
+        circle_id: CIRCLE_ID,
+        author_id: CURRENT_USER_ID,
+        text_content: newText,
+        mood: newMood,
+        photo_url: newPhotoUrl || null
+      });
+
+      // Reset du formulaire
+      setNewText("");
+      setNewPhotoUrl("");
+      setNewMood(5);
+      
+      // Rafraîchir la liste
+      await fetchMemories();
+    } catch (err) {
+      console.error("Erreur lors de la publication:", err);
+      alert("Erreur lors de la publication du souvenir.");
+    } finally {
+      setIsPublishing(false);
+    }
+  };
 
   // --- FONCTION AJOUTÉE POUR ENVOYER UN COMMENTAIRE ---
   const handleSendComment = async (entryId) => {
@@ -125,25 +160,62 @@ export default function Memories() {
           </div>
         )}
 
-        {/* Formulaire d'ajout */}
+        {/* --- FORMULAIRE D'AJOUT DYNAMISÉ --- */}
         <div className="mb-8 bg-white rounded-lg shadow-sm border p-6">
           <div className="flex gap-4">
             <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <span className="text-blue-600 font-bold">V</span>
+              <span className="text-blue-600 font-bold">U</span>
             </div>
             <div className="flex-1">
               <textarea
+                value={newText}
+                onChange={(e) => setNewText(e.target.value)}
                 placeholder="Partagez une nouvelle ou un souvenir..."
                 className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 rows={3}
               />
+              
+              {/* Optionnel: Input pour URL de photo (en attendant un upload réel) */}
+              {newPhotoUrl !== "" || isPublishing ? null : (
+                 <input 
+                  type="text" 
+                  placeholder="URL de l'image (optionnel)" 
+                  className="w-full mt-2 text-xs p-1 border-b"
+                  value={newPhotoUrl}
+                  onChange={(e) => setNewPhotoUrl(e.target.value)}
+                 />
+              )}
+
               <div className="flex justify-between items-center mt-3">
-                <button className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors text-sm">
-                  <Image className="w-5 h-5" />
-                  <span>Ajouter une photo</span>
-                </button>
-                <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
-                  Publier
+                <div className="flex gap-4">
+                   <button 
+                    onClick={() => {
+                      const url = prompt("Collez l'URL d'une image :");
+                      if(url) setNewPhotoUrl(url);
+                    }}
+                    className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors text-sm"
+                   >
+                    <Image className="w-5 h-5" />
+                    <span>{newPhotoUrl ? "Photo ajoutée" : "Ajouter une photo"}</span>
+                  </button>
+                  <div className="flex items-center gap-2 text-gray-600 text-sm">
+                    <Smile className="w-4 h-4" />
+                    <select 
+                      value={newMood} 
+                      onChange={(e) => setNewMood(parseInt(e.target.value))}
+                      className="bg-transparent outline-none cursor-pointer"
+                    >
+                      {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>Humeur: {n}/10</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={handleAddMemory}
+                  disabled={isPublishing || !newText.trim()}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
+                >
+                  {isPublishing ? "Publication..." : "Publier"}
                 </button>
               </div>
             </div>
