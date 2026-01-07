@@ -1,5 +1,4 @@
 import db from '../config/db.js';
-import db from '../config/db.js';
 import admin from '../config/firebase.js';
 
 export async function createTask(req, res) {
