@@ -8,10 +8,10 @@ services:
     environment:
       POSTGRES_USER: weave_user
       # Ici, on garde le # normal car ce n'est pas une URL
-      POSTGRES_PASSWORD: "!QAZ1qaz23Q#"
+      POSTGRES_PASSWORD: "password123"
       POSTGRES_DB: weave_local
     ports:
-      - "5435:5435"
+      - "5435:5432"
     volumes:
       - pgdata14:/var/lib/postgresql/data
     networks:
@@ -40,7 +40,7 @@ services:
       # 2. On remplace le "#" par "%23" dans le mot de passe pour l'URL.
       DATABASE_URL: "postgres://weave_user:!QAZ1qaz23Q%23@postgres:5432/weave_local"
 
-      ALLOWED_ORIGINS: "http://localhost:5173"
+      ALLOWED_ORIGINS: "http://localhost:5175"
       JWT_SECRET: "super-secret"
     ports:
       - "4000:4000"
