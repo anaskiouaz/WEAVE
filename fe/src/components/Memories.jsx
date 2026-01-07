@@ -9,44 +9,53 @@ export default function Memories() {
   const [error, setError] = useState(null);
 
   // ID du cercle (famille) à récupérer (à dynamiser selon l'utilisateur connecté)
-  const CIRCLE_ID = "0"; // Exemple d'ID de cercle (utiliser useState du login plus tard)
+  const CIRCLE_ID = "d0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44"; // Exemple d'ID de cercle (utiliser useState du login plus tard)
 
   // Récupération des données depuis la base de données
   useEffect(() => {
+    // src/pages/Memories.jsx (ou composant équivalent)
+
     async function fetchMemories() {
       try {
         setLoading(true);
-        // On utilise la route définie dans le backend pour le journal de bord
-        const data = await apiGet(`/souvenirs?circle_id=${CIRCLE_ID}`);
-        setMemories(data);
+        // On récupère la réponse complète de l'API
+        const response = await apiGet(`/souvenirs?circle_id=${CIRCLE_ID}`);
+
+        // CORRECTION ICI : On cible .data car ton backend renvoie { status: 'ok', data: [...] }
+        if (response && response.data) {
+          setMemories(response.data);
+        } else {
+          // Fallback si jamais la réponse est vide ou mal formatée
+          setMemories([]);
+        }
+
       } catch (err) {
         console.error("Erreur chargement souvenirs:", err);
-        setError("Impossible de charger les souvenirs de la famille.");
+        setError("Impossible de charger les souvenirs.");
+        setMemories([]); // Sécurité en cas d'erreur
       } finally {
         setLoading(false);
       }
-    }
-
-    fetchMemories();
+    } fetchMemories();
   }, [CIRCLE_ID]);
 
   // Fonction d'export PDF avec les données réelles
   const handleDownloadPDF = () => {
     const doc = new jsPDF();
-    
+
     doc.setFontSize(20);
     doc.text('Journal de bord - Souvenirs Partagés', 20, 20);
-    
+
     doc.setFontSize(12);
     let yPosition = 40;
-    
+
     memories.forEach((memory, index) => {
       // Gestion du saut de page
       if (yPosition > 250) {
         doc.addPage();
         yPosition = 20;
       }
-      
+
       const dateStr = new Date(memory.created_at).toLocaleDateString('fr-FR');
       const authorStr = memory.author_name || "Auteur inconnu";
 
@@ -54,21 +63,21 @@ export default function Memories() {
       doc.setTextColor(100);
       doc.text(`${dateStr} - Par ${authorStr}`, 20, yPosition);
       yPosition += 7;
-      
+
       doc.setFontSize(11);
       doc.setTextColor(0);
       // Utilisation du champ text_content de la DB
       const lines = doc.splitTextToSize(memory.text_content || '', 170);
       doc.text(lines, 20, yPosition);
       yPosition += (lines.length * 7) + 10;
-      
+
       if (index < memories.length - 1) {
         doc.setDrawColor(200);
         doc.line(20, yPosition, 190, yPosition);
         yPosition += 10;
       }
     });
-    
+
     doc.save(`journal-souvenirs-${new Date().toISOString().split('T')[0]}.pdf`);
   };
 
