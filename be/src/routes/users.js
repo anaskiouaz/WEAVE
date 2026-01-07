@@ -2,7 +2,7 @@ import { Router } from 'express';
 import db from '../config/db.js';
 import { encrypt } from '../utils/crypto.js';
 import checkRole from '../middleware/checkRole.js';
-import { logAudit } from '../utils/audits.js'; // <--- NOUVEL IMPORT
+import { logAudit } from '../utils/audits.js'; 
 
 const router = Router();
 
