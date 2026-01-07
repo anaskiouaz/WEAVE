@@ -4,25 +4,12 @@ import db from '../config/db.js';
 // Récupérer les souvenirs
 export async function getJournalEntries(req, res) {
   try {
-    // On récupère l'ID du cercle depuis les paramètres d'URL (ex: ?circle_id=...)
     const { circle_id } = req.query;
+    if (!circle_id) return res.status(400).json({ status: 'error', message: 'circle_id is required' });
 
-    if (!circle_id) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'circle_id parameter is required',
-      });
-    }
-
-    // Requête SQL avec JOIN pour avoir le nom de l'auteur directement
     const result = await db.query(
       `SELECT 
-         j.id,
-         j.circle_id,
-         j.text_content,
-         j.photo_url,
-         j.mood,
-         j.created_at,
+         j.id, j.circle_id, j.text_content, j.photo_url, j.mood, j.created_at, j.comments,
          u.name as author_name
        FROM journal_entries j
        LEFT JOIN users u ON j.author_id = u.id
@@ -31,18 +18,9 @@ export async function getJournalEntries(req, res) {
       [circle_id]
     );
 
-    res.json({
-      status: 'ok',
-      data: result.rows,
-      count: result.rows.length,
-    });
-
+    res.json({ status: 'ok', data: result.rows, count: result.rows.length });
   } catch (err) {
-    console.error('Error fetching journal entries:', err);
-    res.status(500).json({
-      status: 'error',
-      message: err.message,
-    });
+    res.status(500).json({ status: 'error', message: err.message });
   }
 }
 
@@ -123,5 +101,36 @@ export async function createJournalEntry(req, res) {
       status: 'error',
       message: err.message,
     });
+  }
+}
+
+export async function addCommentToEntry(req, res) {
+  try {
+    const { id } = req.params; // ID du souvenir
+    const { author_name, content } = req.body;
+
+    if (!content || !author_name) {
+      return res.status(400).json({ status: 'error', message: 'Author and content required' });
+    }
+
+    const newMessage = {
+      id: crypto.randomUUID(),
+      author: author_name,
+      content: content,
+      created_at: new Date().toISOString()
+    };
+
+    // On utilise l'opérateur || pour ajouter l'objet au tableau JSONB existant
+    const result = await db.query(
+      `UPDATE journal_entries 
+       SET comments = comments || $1::jsonb 
+       WHERE id = $2 
+       RETURNING comments`,
+      [JSON.stringify([newMessage]), id]
+    );
+
+    res.json({ status: 'ok', data: result.rows[0].comments });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
   }
 }
