@@ -231,10 +231,6 @@ export default function Memories() {
             </div>
           </div>
         </div>
-
-        <div className="mt-12">
-          <CalendarView />
-        </div>
       </div>
     </div>
   );
