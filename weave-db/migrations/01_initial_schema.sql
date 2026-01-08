@@ -1,17 +1,20 @@
 -- 1. DEFINITION DES TYPES (ENUMS)
 CREATE TYPE global_role_type AS ENUM ('SUPERADMIN', 'USER');
-CREATE TYPE circle_role_type AS ENUM ('ADMIN', 'HELPER', 'PC');
+CREATE TYPE circle_role_type AS ENUM ('ADMIN', 'HELPER', 'PC'); -- PC = Person Cared For (Bénéficiaire)
 CREATE TYPE incident_status_type AS ENUM ('OPEN', 'ESCALATED', 'RESOLVED');
 CREATE TYPE severity_type AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
 
 -- 2. TABLE UTILISATEURS
 CREATE TABLE users (
-                       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                       name VARCHAR(255) NOT NULL,
-                       email VARCHAR(255) UNIQUE NOT NULL,
-                       password_hash VARCHAR(255) NOT NULL,
-                       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                       role_global global_role_type
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    password_hash VARCHAR(255) NOT NULL,
+    phone VARCHAR(50),                     -- NOUVEAU : Téléphone (Optionnel)
+    birth_date DATE,                       -- NOUVEAU : Date de naissance
+    onboarding_role circle_role_type,      -- NOUVEAU : Rôle souhaité dans le cercle
+    role_global global_role_type DEFAULT 'USER',
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
 -- 3. CERCLES DE SOINS
