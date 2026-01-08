@@ -60,6 +60,7 @@ app.get('/', (req, res) => {
   `);
 });
 
+app.use('/api', routes);
 // --- 2. Routes API Spécifiques ---
 app.use('/test-db', dbTestRouter);
 app.use('/health', healthRoutes); // Ou '/api/health' selon ta préférence
@@ -68,7 +69,6 @@ app.use('/auth', authRoutes);
 
 // --- 3. Routeur Principal (si tu as un index global) ---
 // Toutes les routes définies dans routes/index.js seront préfixées par /api
-app.use('/api', routes);
 
 // --- Gestion des Erreurs (DOIT être à la fin) ---
 

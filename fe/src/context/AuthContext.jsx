@@ -12,7 +12,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     setLoading(true);
     try {
-      const data = await apiPost('/auth/login', { email, password });
+      const data = await apiPost('./../auth/login', { email, password });
       if (data.success) {
         // Sauvegarde du token et de l'user
         localStorage.setItem('weave_token', data.token);

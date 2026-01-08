@@ -1,4 +1,4 @@
-const API_BASE_URL = "http://localhost:4000";
+const API_BASE_URL = "http://localhost:4000/api";
 
 // src/api/client.js
 
@@ -9,7 +9,7 @@ export async function apiGet(path) {
     },
   });
 
-  if (!res.ok) {
+  if (!res.ok) {  
     throw new Error(`API error: ${res.status}`);
   }
 
