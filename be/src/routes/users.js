@@ -95,17 +95,20 @@ router.put('/:id/availability', async (req, res) => {
     await db.query('DELETE FROM user_availability WHERE user_id = $1', [id]);
 
     // On insère les nouvelles
-    if (Array.isArray(availability)) {
+if (Array.isArray(availability)) {
         for (const item of availability) {
             if (item.day && item.slots) {
                 await db.query(
                 'INSERT INTO user_availability (user_id, day_of_week, slots) VALUES ($1, $2, $3)',
-                [id, item.day, item.slots]
+                [
+                    id, 
+                    item.day, 
+                    JSON.stringify(item.slots) // <--- AJOUTEZ JSON.stringify() ICI
+                ]
                 );
             }
         }
-    }
-    
+    }    
     await db.query('COMMIT');
     res.json({ success: true, message: "Disponibilités mises à jour" });
   } catch (error) {
