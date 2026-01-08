@@ -15,13 +15,9 @@ CREATE TABLE users (
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
-    
-    -- Champs ajoutés de la version 1
-    phone VARCHAR(50),                     -- Téléphone
-    address TEXT,                          -- Adresse (demandé dans votre routeur JS)
-    birth_date DATE,                       -- Date de naissance
-    onboarding_role circle_role_type,      -- Rôle souhaité
-
+    phone VARCHAR(50),                     -- NOUVEAU : Téléphone (Optionnel)
+    birth_date DATE,                       -- NOUVEAU : Date de naissance
+    onboarding_role circle_role_type,      -- NOUVEAU : Rôle souhaité dans le cercle
     role_global global_role_type DEFAULT 'USER',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
