@@ -16,6 +16,6 @@ app.use(express.json());
 
 app.use('/health', healthRoutes);
 app.use('/users', usersRoutes);
-app.use('/auth', authRoutes);
+app.use('/auth', authRoutes); // <--- IMPORTANT
 
 export default app;
