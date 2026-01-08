@@ -105,11 +105,19 @@ CREATE TABLE messages (
 
 -- 9. JOURNAL DE BORD (Fusionnée : Version riche avec Auteur et Commentaires)
 CREATE TABLE journal_entries (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    circle_id UUID NOT NULL,
-    
-    -- Ajout version 2 (Auteur)
-    author_id UUID NOT NULL,
+     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+     circle_id UUID NOT NULL,
+     author_id UUID NOT NULL, -- Nouvelle colonne pour identifier l'auteur
+     mood INT CHECK (mood BETWEEN 1 AND 10),
+     text_content TEXT,
+     photo_url VARCHAR(2048),
+     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+     comments JSONB DEFAULT '[]'::jsonb,
+
+     -- Contraintes
+     CONSTRAINT fk_journal_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE,
+     CONSTRAINT fk_journal_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL
+);
 
     mood INT CHECK (mood BETWEEN 1 AND 10),
     text_content TEXT,
