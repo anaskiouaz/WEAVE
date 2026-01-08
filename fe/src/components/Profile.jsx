@@ -2,7 +2,7 @@ import { useState, useEffect, useRef } from 'react';
 import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, Heart, LogOut, Camera, ChevronDown, ChevronUp } from 'lucide-react';
 import { apiGet, apiPut } from '../api/client';
 
-// ⚠️ REMPLACE CECI PAR TON VRAI UUID
+// ⚠️ Assure-toi que cet ID existe bien dans ta base de données
 const USER_ID = "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380c33";
 
 export default function Profile() {
@@ -33,7 +33,6 @@ export default function Profile() {
   const [skillsForm, setSkillsForm] = useState([]);
 
   const weekDays = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
-  // Génération des heures de 00:00 à 23:00
   const hours = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
   
   const availableSkillsList = ['Courses', 'Cuisine', 'Accompagnement médical', 'Promenade', 'Lecture', 'Jardinage', 'Bricolage'];
@@ -45,7 +44,9 @@ export default function Profile() {
 
   const fetchData = async () => {
     try {
-      const data = await apiGet(`/users/${USER_ID}`);
+      // 👇 CHANGEMENT ICI : on appelle /profile au lieu de /users
+      const data = await apiGet(`/profile/${USER_ID}`);
+      
       if (data.success) {
         const user = data.user;
         const createdDate = new Date(user.created_at);
@@ -96,7 +97,8 @@ export default function Profile() {
   
   const saveProfile = async () => {
     try {
-      const data = await apiPut(`/users/${USER_ID}`, profileForm);
+      // 👇 CHANGEMENT ICI : /profile
+      const data = await apiPut(`/profile/${USER_ID}`, profileForm);
       if (data.success) { setUserInfo({ ...userInfo, ...profileForm }); setIsEditingProfile(false); }
     } catch (err) { console.error(err); }
   };
@@ -109,7 +111,6 @@ export default function Profile() {
   const saveSkills = async () => { setSkills(skillsForm); setIsEditingSkills(false); };
 
   const startEditAvail = () => { 
-    // Initialise le formulaire. Si slots est vide, on met un défaut "08:00 - 18:00"
     const initialForm = availability.length > 0 
       ? availability.map(a => ({...a})) 
       : [{ day: 'Lundi', slots: '08:00 - 18:00' }];
@@ -117,11 +118,9 @@ export default function Profile() {
     setIsEditingAvailability(true); 
   };
 
-  // Fonction utilitaire pour mettre à jour l'heure de début ou de fin
   const updateTimeSlot = (index, type, value) => {
     const newAvail = [...availForm];
     const currentSlots = newAvail[index].slots || '08:00 - 18:00';
-    // On essaie de séparer "Début - Fin". Si le format n'est pas bon, on prend des défauts.
     let [start, end] = currentSlots.includes(' - ') ? currentSlots.split(' - ') : ['08:00', '18:00'];
 
     if (type === 'start') start = value;
@@ -149,7 +148,8 @@ export default function Profile() {
   const saveAvailability = async () => {
     try {
       const dataToSend = availForm.map(item => ({ day: item.day, slots: item.slots }));
-      const data = await apiPut(`/users/${USER_ID}/availability`, { availability: dataToSend });
+      // 👇 CHANGEMENT ICI : /profile/.../availability
+      const data = await apiPut(`/profile/${USER_ID}/availability`, { availability: dataToSend });
       if (data.success) { setAvailability(availForm); setIsEditingAvailability(false); }
     } catch (err) { console.error(err); }
   };
@@ -249,7 +249,7 @@ export default function Profile() {
           )}
         </div>
 
-        {/* DISPONIBILITÉS (MODIFIÉ AVEC SÉLECTEURS D'HEURE) */}
+        {/* DISPONIBILITÉS */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
            <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -270,7 +270,6 @@ export default function Profile() {
               {isEditingAvailability ? (
                   <div className="space-y-3">
                       {availForm.map((item, index) => {
-                          // Extraction sécurisée des heures pour l'affichage dans les selects
                           let [start, end] = item.slots && item.slots.includes(' - ') 
                             ? item.slots.split(' - ') 
                             : ['08:00', '18:00'];

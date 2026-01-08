@@ -11,6 +11,7 @@ import Profile from './components/Profile';
 import Admin from './components/Admin';
 import EmergencyDialog from './components/EmergencyDialog';
 
+
 // Nouvelles pages d'authentification et d'accueil
 import LandingPage from './components/LandingPage';
 import LoginPage from './components/auth/LoginPage';
