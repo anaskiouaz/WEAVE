@@ -31,6 +31,24 @@ export async function apiPost(path, data) {
   return res.json();
 }
 
+// --- C'est cette fonction qu'il te manquait ---
+export async function apiPut(path, data) {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(data),
+  });
+
+  if (!res.ok) {
+    throw new Error(`API error: ${res.status}`);
+  }
+
+  return res.json();
+}
+// ----------------------------------------------
+
 export async function apiDelete(path) {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'DELETE',
@@ -45,4 +63,3 @@ export async function apiDelete(path) {
 
   return res.json();
 }
-
