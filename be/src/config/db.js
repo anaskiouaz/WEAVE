@@ -6,7 +6,7 @@ dotenv.config();
 const { Pool } = pg;
 
 // Support pour DATABASE_URL (production) ou variables PG* séparées (développement)
-const poolConfig = process.env.DATABASE_URL
+const poolConfig = process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== ''
   ? { connectionString: process.env.DATABASE_URL }
   : {
       host: process.env.PGHOST || 'localhost',
