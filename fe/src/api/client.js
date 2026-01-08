@@ -1,5 +1,6 @@
-// src/api/client.js
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+// src/api/client.js
 
 export async function apiGet(path) {
   const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -8,7 +9,7 @@ export async function apiGet(path) {
     },
   });
 
-  if (!res.ok) {
+  if (!res.ok) {  
     throw new Error(`API error: ${res.status}`);
   }
 
