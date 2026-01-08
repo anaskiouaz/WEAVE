@@ -7,19 +7,40 @@ const router = Router();
 
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
+  
+  console.log('--- Tentative de connexion ---');
+  console.log('Email reçu:', email);
+
   try {
+    // 1. Chercher l'utilisateur
     const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
-    if (result.rows.length === 0) return res.status(401).json({ success: false, error: "Email/Mot de passe incorrect." });
+    
+    if (result.rows.length === 0) {
+      console.log('❌ Échec: Email introuvable dans la base de données.');
+      return res.status(401).json({ success: false, error: "Email incorrect." });
+    }
 
     const user = result.rows[0];
+    console.log('✅ Utilisateur trouvé:', user.name);
+    console.log('Hachage en base:', user.password_hash ? 'Présent' : 'MANQUANT !');
+
+    // 2. Vérifier le mot de passe
     const isMatch = await bcrypt.compare(password, user.password_hash);
-    if (!isMatch) return res.status(401).json({ success: false, error: "Email/Mot de passe incorrect." });
+    
+    if (!isMatch) {
+      console.log('❌ Échec: Le mot de passe ne correspond pas au hachage.');
+      return res.status(401).json({ success: false, error: "Mot de passe incorrect." });
+    }
+
+    console.log('✅ Succès: Mot de passe validé.');
 
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET || 'secret', { expiresIn: '30d' });
     delete user.password_hash;
     
     res.json({ success: true, token, user });
+
   } catch (error) {
+    console.error('❌ ERREUR CRITIQUE:', error);
     res.status(500).json({ success: false, error: "Erreur serveur." });
   }
 });
