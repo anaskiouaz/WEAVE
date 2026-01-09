@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs'; // Assure-toi d'avoir installé bcryptjs ou bcrypt
 import db from '../config/db.js';
 import { encrypt } from '../utils/crypto.js'; // Vérifie le chemin de ton fichier crypto
-// import checkRole from '../middleware/checkRole.js'; // Décommente si tu as ce middleware
+import checkRole from '../middleware/checkRole.js'; // Décommente si tu as ce middleware
 import { logAudit } from '../utils/audits.js'; 
 
 const router = Router();
