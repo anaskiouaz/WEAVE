@@ -5,14 +5,10 @@ buildscript {
         google()
         mavenCentral()
     }
-    // fe/android/build.gradle
-
     dependencies {
-        // Remets la version 8.2.1 qui est stable et compatible avec Capacitor par défaut
-        classpath 'com.android.tools.build:gradle:8.2.1'
-        // Garde ton plugin Google Services
+        classpath 'com.android.tools.build:gradle:8.13.0'
         classpath 'com.google.gms:google-services:4.4.4'
-}
+    }
 }
 
 apply from: "variables.gradle"
@@ -26,4 +22,13 @@ allprojects {
 
 task clean(type: Delete) {
     delete rootProject.buildDir
+}
+
+try {
+    def servicesJSON = file('google-services.json')
+    if (servicesJSON.text) {
+        apply plugin: 'com.google.gms.google-services'
+    }
+} catch(Exception e) {
+    logger.info("google-services.json not found, google-services plugin not applied. Push Notifications won't work")
 }
