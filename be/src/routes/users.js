@@ -1,84 +1,51 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import db from '../config/db.js';
-import { encrypt } from '../utils/crypto.js'; // On garde ton module de chiffrement
+import { encrypt } from '../utils/crypto.js'; // <-- Import de notre outil
 
 const router = Router();
 
-// 1. Route pour RÉCUPÉRER les utilisateurs
+// GET /api/users
 router.get('/', async (req, res) => {
   try {
-    const result = await db.query('SELECT * FROM users ORDER BY created_at DESC');
-    res.json({ success: true, users: result.rows });
+    const result = await db.query('SELECT id, name, email, role_global, created_at FROM users ORDER BY created_at DESC');
+    res.json({ success: true, count: result.rows.length, users: result.rows });
   } catch (error) {
+    console.error('❌ Erreur GET users:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// 2. Route pour l'INSCRIPTION (Modifiée pour le Consentement)
+// POST /api/users (Inscription)
 router.post('/', async (req, res) => {
   try {
-    // On récupère "consent" (vrai/faux) en plus des autres infos
-    const { name, email, role, medical_info, consent } = req.body;
+    const { name, email, role, medical_info } = req.body;
 
-    let finalMedicalInfo = null;
-    let finalConsent = false;
+    // 🔒 ÉTAPE CLÉ : On chiffre les infos médicales avant d'enregistrer
+    const encryptedMedicalInfo = encrypt(medical_info);
 
-    // LOGIQUE CLÉ : On ne garde les données médicales QUE si le consentement est VRAI
-    if (consent === true && medical_info) {
-        finalMedicalInfo = encrypt(medical_info); // On chiffre
-        finalConsent = true;
-    }
-
-    // On insère en base (avec les nouvelles colonnes)
     const query = `
-      INSERT INTO users (name, email, role_global, medical_info, privacy_consent) 
-      VALUES ($1, $2, $3, $4, $5) 
+      INSERT INTO users (name, email, role, medical_info) 
+      VALUES ($1, $2, $3, $4) 
       RETURNING *;
     `;
     
-    const result = await db.query(query, [name, email, role, finalMedicalInfo, finalConsent]);
+    const result = await db.query(query, [name, email, role, encryptedMedicalInfo]);
 
     res.status(201).json({
       success: true,
-      message: finalConsent ? "Utilisateur créé avec données sécurisées." : "Utilisateur créé (données médicales ignorées faute de consentement).",
       user: result.rows[0]
     });
 
   } catch (error) {
-    console.error('Erreur inscription:', error);
-    res.status(500).json({ success: false, error: error.message });
+    console.error('❌ Erreur POST users:', error);
+    res.status(500).json({
+      success: false,
+      error: error.message,
+    });
   }
 });
 
-// 3. Route pour CHANGER LE CONSENTEMENT (Le droit à l'oubli)
-router.patch('/:id/consent', async (req, res) => {
-    try {
-        const { id } = req.params;
-        const { consent } = req.body; // true ou false
-
-        if (consent === false) {
-            // 🚨 CAS IMPORTANT : L'utilisateur retire son accord.
-            // On met consent à FALSE et on EFFACE (NULL) les données médicales pour toujours.
-            await db.query(
-                `UPDATE users SET privacy_consent = FALSE, medical_info = NULL WHERE id = $1`,
-                [id]
-            );
-            res.json({ success: true, message: "Consentement retiré. Vos données sensibles ont été supprimées de la base." });
-        
-        } else {
-            // L'utilisateur donne son accord (il devra ressaisir ses infos plus tard)
-            await db.query(
-                `UPDATE users SET privacy_consent = TRUE WHERE id = $1`,
-                [id]
-            );
-            res.json({ success: true, message: "Consentement enregistré." });
-        }
-
-    } catch (error) {
-        console.error('Erreur mise à jour consentement:', error);
-        res.status(500).json({ success: false, error: error.message });
-    }
     res.status(500).json({ success: false, error: error.message });
   }
 });
