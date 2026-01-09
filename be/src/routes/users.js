@@ -1,121 +1,155 @@
 import { Router } from 'express';
+import bcrypt from 'bcryptjs'; // Assure-toi d'avoir installé bcryptjs ou bcrypt
 import db from '../config/db.js';
+import { encrypt } from '../utils/crypto.js'; // Vérifie le chemin de ton fichier crypto
+// import checkRole from '../middleware/checkRole.js'; // Décommente si tu as ce middleware
+import { logAudit } from '../utils/audits.js'; 
 
 const router = Router();
 
-// GET /users - Récupère tous les utilisateurs (Route existante)
-router.get('/', async (req, res) => {
+// ==================================================================
+// 1. GESTION DES UTILISATEURS (ADMIN)
+// ==================================================================
+
+// Récupérer tous les utilisateurs (Protégé + Audité)
+// Si tu n'as pas encore le middleware checkRole, enlève "checkRole('SUPERADMIN'),"
+router.get('/', /* checkRole('SUPERADMIN'), */ async (req, res) => {
   try {
-    const result = await db.query('SELECT * FROM users ORDER BY created_at DESC');
-    res.json({
-      success: true,
-      count: result.rows.length,
-      users: result.rows,
-    });
+    const currentUserId = req.headers['x-user-id'] || 'ANONYMOUS';
+
+    // 📝 Audit : On note qui a consulté la liste
+    await logAudit(currentUserId, 'ACCESS_ALL_USERS', 'Consultation de la liste complète');
+
+    const result = await db.query('SELECT id, name, email, role_global, created_at, privacy_consent FROM users ORDER BY created_at DESC');
+    res.json({ success: true, count: result.rows.length, users: result.rows });
   } catch (error) {
-    console.error('❌ Erreur récupération users:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// GET /users/:id - Récupère UN profil spécifique et ses disponibilités
-router.get('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-
-    // 1. Infos utilisateur
-    const userResult = await db.query(
-      'SELECT id, name, email, phone, address, created_at FROM users WHERE id = $1',
-      [id]
-    );
-
-    if (userResult.rows.length === 0) {
-      return res.status(404).json({ success: false, message: "Utilisateur introuvable" });
-    }
-
-    // 2. Disponibilités (nécessite la table user_availability)
-    // On utilise un try/catch silencieux ici au cas où la table n'existerait pas encore
-    let availResult = { rows: [] };
+// Consulter les Journaux d'Audit (Réservé Admin)
+router.get('/audit-logs', /* checkRole('SUPERADMIN'), */ async (req, res) => {
     try {
-        availResult = await db.query(
-        'SELECT day_of_week, slots FROM user_availability WHERE user_id = $1',
-        [id]
-        );
-    } catch (e) {
-        console.warn("Table user_availability manquante ou vide, on continue sans.");
-    }
+        const { userId } = req.query; 
+        
+        let query = `
+            SELECT audit_logs.*, users.name as user_name 
+            FROM audit_logs 
+            LEFT JOIN users ON audit_logs.user_id = users.id
+        `;
+        const params = [];
 
-    res.json({
-      success: true,
-      user: userResult.rows[0],
-      availability: availResult.rows
-    });
-  } catch (error) {
-    console.error('❌ Erreur GET user:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// PUT /users/:id - Met à jour les infos personnelles
-router.put('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { name, phone, address } = req.body;
-
-    const result = await db.query(
-      `UPDATE users 
-       SET name = COALESCE($1, name), 
-           phone = COALESCE($2, phone), 
-           address = COALESCE($3, address)
-       WHERE id = $4 
-       RETURNING id, name, email, phone, address`,
-      [name, phone, address, id]
-    );
-
-    if (result.rows.length === 0) {
-        return res.status(404).json({ success: false, message: "Utilisateur introuvable" });
-    }
-
-    res.json({ success: true, user: result.rows[0] });
-  } catch (error) {
-    console.error('❌ Erreur UPDATE user:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
-
-// PUT /users/:id/availability - Met à jour les disponibilités
-router.put('/:id/availability', async (req, res) => {
-  try {
-    const { id } = req.params;
-    const { availability } = req.body; // Doit être un tableau
-
-    await db.query('BEGIN');
-    
-    // On nettoie les anciennes dispos
-    await db.query('DELETE FROM user_availability WHERE user_id = $1', [id]);
-
-    // On insère les nouvelles
-if (Array.isArray(availability)) {
-        for (const item of availability) {
-            if (item.day && item.slots) {
-                await db.query(
-                'INSERT INTO user_availability (user_id, day_of_week, slots) VALUES ($1, $2, $3)',
-                [
-                    id, 
-                    item.day, 
-                    JSON.stringify(item.slots) // <--- AJOUTEZ JSON.stringify() ICI
-                ]
-                );
-            }
+        if (userId) {
+            query += ` WHERE audit_logs.user_id = $1`;
+            params.push(userId);
         }
-    }    
-    await db.query('COMMIT');
-    res.json({ success: true, message: "Disponibilités mises à jour" });
+
+        query += ` ORDER BY audit_logs.created_at DESC LIMIT 50`;
+
+        const result = await db.query(query, params);
+        res.json({ success: true, logs: result.rows });
+
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ==================================================================
+// 2. INSCRIPTION (FUSION : HASH + CRYPTO)
+// ==================================================================
+
+router.post('/', async (req, res) => {
+  // On récupère TOUS les champs (Backoffice + RGPD)
+  const { name, email, password, phone, birth_date, onboarding_role, medical_info, consent } = req.body;
+
+  // Validation simple
+  if (!name || !email || !password) {
+    return res.status(400).json({ success: false, error: "Nom, Email et Mot de passe sont obligatoires." });
+  }
+
+  try {
+    // ÉTAPE A : Hachage du mot de passe (Sécurité Ami) 🔑
+    const salt = await bcrypt.genSalt(10);
+    const passwordHash = await bcrypt.hash(password, salt);
+
+    // ÉTAPE B : Chiffrement RGPD (Ta Sécurité) 🏥
+    let finalMedicalInfo = null;
+    let finalConsent = false;
+
+    // On ne chiffre que si le consentement est EXPLICITE (true)
+    if (consent === true && medical_info) {
+        finalMedicalInfo = encrypt(medical_info);
+        finalConsent = true;
+    }
+
+    // ÉTAPE C : Insertion en Base 💾
+    // Attention : Vérifie que ta table 'users' a bien toutes ces colonnes !
+    const query = `
+      INSERT INTO users (
+          name, email, password_hash, phone, birth_date, role_global, 
+          medical_info, privacy_consent
+      ) 
+      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+      RETURNING id, name, email, role_global, created_at, privacy_consent;
+    `;
+    
+    const result = await db.query(query, [
+        name, email, passwordHash, phone, birth_date, onboarding_role, 
+        finalMedicalInfo, finalConsent
+    ]);
+
+    // Audit optionnel
+    // await logAudit(result.rows[0].id, 'USER_REGISTERED', 'Nouvelle inscription');
+
+    res.status(201).json({
+      success: true,
+      message: finalConsent ? "Compte créé et données médicales sécurisées." : "Compte créé (Sans données médicales).",
+      user: result.rows[0]
+    });
+
   } catch (error) {
-    await db.query('ROLLBACK');
-    console.error('❌ Erreur UPDATE availability:', error);
+    console.error('Erreur inscription:', error);
+    if (error.code === '23505') {
+        return res.status(409).json({ success: false, error: "Cet email est déjà utilisé." });
+    }
     res.status(500).json({ success: false, error: error.message });
   }
+});
+
+// ==================================================================
+// 3. GESTION DU CONSENTEMENT (RGPD)
+// ==================================================================
+
+router.patch('/:id/consent', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { consent } = req.body;
+
+        if (consent === false) {
+            // DROIT À L'OUBLI : On efface les données médicales
+            await db.query(
+                `UPDATE users SET privacy_consent = FALSE, medical_info = NULL WHERE id = $1`,
+                [id]
+            );
+            
+            await logAudit(id, 'CONSENT_REVOKED', 'Retrait consentement + Suppression données');
+            res.json({ success: true, message: "Consentement retiré. Données médicales effacées." });
+        
+        } else {
+            // Ajout du consentement (Note : ça ne restaure pas les données perdues !)
+            await db.query(
+                `UPDATE users SET privacy_consent = TRUE WHERE id = $1`,
+                [id]
+            );
+            
+            await logAudit(id, 'CONSENT_GIVEN', 'Consentement accordé');
+            res.json({ success: true, message: "Consentement enregistré." });
+        }
+
+    } catch (error) {
+        console.error('Erreur mise à jour consentement:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
 });
 
 export default router;
