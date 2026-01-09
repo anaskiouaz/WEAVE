@@ -105,3 +105,14 @@ CREATE TABLE incidents (
                            CONSTRAINT fk_incident_reporter FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
+-- 10. JOURNAUX D'AUDIT (Pour savoir qui a fait quoi)
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID,                                  
+    action VARCHAR(50) NOT NULL,                   
+    details TEXT,                                 
+    ip_address VARCHAR(45),                      
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+

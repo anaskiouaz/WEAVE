@@ -33,12 +33,12 @@ services:
       PGPORT: "5432"
       PGUSER: "weave_user"
       PGPASSWORD: "!QAZ1qaz23Q#"
-      PGDATABASE: "weave_local"
+      PGDATABASE: "weave_db"
 
       # CORRECTION CRITIQUE ICI :
       # 1. On utilise "postgres" comme hôte (nom du service).
       # 2. On remplace le "#" par "%23" dans le mot de passe pour l'URL.
-      DATABASE_URL: "postgres://weave_user:!QAZ1qaz23Q%23@postgres:5432/weave_local"
+      DATABASE_URL: "postgres://weave_user:!QAZ1qaz23Q%23@postgres:5432/weave_db"
 
       ALLOWED_ORIGINS: "http://localhost:5173"
       JWT_SECRET: "super-secret"
@@ -50,7 +50,7 @@ services:
       - weave-net
 
   frontend:
-    image: node:22.21.1
+    image: node:22-alpine
     container_name: weave-fe
     working_dir: /app
     restart: unless-stopped
