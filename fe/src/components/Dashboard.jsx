@@ -1,6 +1,73 @@
-import { Calendar, Heart, MessageSquare, Users, TrendingUp, Clock } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { Calendar, Heart, MessageSquare, Users, Clock } from 'lucide-react';
+import { PushNotifications } from '@capacitor/push-notifications';
+import { apiPost } from '../api/client';
 
 export default function Dashboard() {
+  const [debugLog, setDebugLog] = useState("En attente d'action...");
+
+  // Fonction pour ajouter des logs à l'écran
+  const log = (msg) => {
+    console.log(msg);
+    setDebugLog(prev => prev + "\n" + msg);
+  };
+
+  const activerNotifs = async () => {
+    log("--- Démarrage Activer Notifs ---");
+    try {
+        const storedUser = localStorage.getItem('user');
+        const userId = storedUser ? JSON.parse(storedUser).id : null;
+
+        await PushNotifications.removeAllListeners(); 
+
+        await PushNotifications.addListener('registration', async (token) => {
+            log(`✅ EVENT REÇU ! Token: ${token.value.substring(0, 6)}...`);
+            try {
+                // CORRECTION ICI : On enlève le "/api" au début
+                // Si apiPost ajoute déjà la base URL, ceci devrait suffire :
+                await apiPost('/users/device-token', { userId, token: token.value });
+                
+                log("🚀 Token envoyé au serveur avec SUCCÈS !");
+                alert("SUCCÈS TOTAL ! Vous pouvez tester.");
+            } catch (err) {
+                // Si ça rate encore, essayons sans le slash du tout, au cas où
+                try {
+                    console.log("Tentative alternative...");
+                    await apiPost('users/device-token', { userId, token: token.value });
+                } catch (e2) {
+                     log(`❌ Erreur API (Double check): ${err.message}`);
+                }
+            }
+        });
+
+        await PushNotifications.addListener('registrationError', (error) => {
+            log(`❌ ERREUR FIREBASE: ${JSON.stringify(error)}`);
+            alert("Erreur Firebase (voir logs écran)");
+        });
+
+        // 2. PERMISSION
+        log("Demande permission...");
+        let perm = await PushNotifications.checkPermissions();
+        if (perm.receive === 'prompt') {
+            perm = await PushNotifications.requestPermissions();
+        }
+        
+        if (perm.receive !== 'granted') {
+            log("❌ Permission REFUSÉE par l'utilisateur.");
+            return;
+        }
+        log("✅ Permission accordée.");
+
+        // 3. ENREGISTREMENT
+        log("Appel de register()...");
+        await PushNotifications.register();
+        log("Register appelé. En attente de réponse...");
+
+    } catch (e) {
+        log(`❌ CRASH JS: ${e.message}`);
+    }
+  };
+
   const upcomingTasks = [
     { id: 1, title: 'Visite médicale', time: '14:00', helper: 'Marie Dupont', type: 'medical' },
     { id: 2, title: 'Courses alimentaires', time: '16:30', helper: 'À pourvoir', type: 'shopping' },
@@ -17,14 +84,28 @@ export default function Dashboard() {
   return (
     <div className="p-8">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
-          <h1 className="text-gray-900 mb-2">Tableau de bord</h1>
-          <p className="text-gray-600">
-            Bienvenue sur votre espace d'entraide
-          </p>
+        
+        {/* SECTION DE DEBUG VISIBLE */}
+        <div className="mb-8 p-4 bg-gray-100 rounded-lg border-2 border-indigo-200">
+            <div className="flex justify-between items-center mb-2">
+                <h3 className="font-bold text-indigo-700">Zone de Test Notifications</h3>
+                <button 
+                    onClick={activerNotifs}
+                    className="bg-indigo-600 text-white px-4 py-2 rounded shadow hover:bg-indigo-700 font-bold"
+                >
+                    🔔 LANCER LA SYNCHRO
+                </button>
+            </div>
+            <pre className="bg-black text-green-400 p-3 rounded text-xs overflow-auto h-32 whitespace-pre-wrap">
+                {debugLog}
+            </pre>
         </div>
 
-        {/* Stats Grid */}
+        <div className="mb-8">
+          <h1 className="text-gray-900 mb-2">Tableau de bord</h1>
+          <p className="text-gray-600">Bienvenue sur votre espace d'entraide</p>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {stats.map((stat) => {
             const Icon = stat.icon;
@@ -49,66 +130,6 @@ export default function Dashboard() {
               </div>
             );
           })}
-        </div>
-
-        {/* État de la personne aidée */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 className="text-gray-900 mb-4">État de santé</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <div>
-                <p className="text-gray-900">Moral</p>
-                <p className="text-gray-600">Bon</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <div>
-                <p className="text-gray-900">Santé générale</p>
-                <p className="text-gray-600">Stable</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-              <div>
-                <p className="text-gray-900">Dernier contact</p>
-                <p className="text-gray-600">Aujourd'hui 10:00</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Prochaines interventions */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-gray-900">Prochaines interventions</h2>
-            <Clock className="w-5 h-5 text-gray-400" />
-          </div>
-
-          <div className="space-y-4">
-            {upcomingTasks.map((task) => {
-              const typeColor = {
-                medical: 'bg-red-50 border-red-200',
-                shopping: 'bg-blue-50 border-blue-200',
-                activity: 'bg-green-50 border-green-200',
-              }[task.type];
-
-              return (
-                <div key={task.id} className={`border rounded-lg p-4 ${typeColor}`}>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-gray-900 mb-1">{task.title}</p>
-                      <p className="text-gray-600">{task.time}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-gray-700">{task.helper}</p>
-                    </div>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
         </div>
       </div>
     </div>
