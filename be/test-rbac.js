@@ -23,7 +23,11 @@ async function testRBAC() {
     });
     console.log(`   Résultat : ${res3.status} (Attendu: 200 OK)`);
     
-    if(res3.status === 200) console.log("   ✅ SUCCÈS : Le système sécurisé fonctionne !");
+    if (res3.status === 200) {
+        console.log("   ✅ SUCCÈS : Le système sécurisé fonctionne !");
+    } else {
+        console.error(`   ❌ ERREUR : accès refusé (${res3.status}). Vérifie que Thomas a bien le rôle SUPERADMIN et que l'API tourne.`);
+    }
 }
 
 testRBAC();
