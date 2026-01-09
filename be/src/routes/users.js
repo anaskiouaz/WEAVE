@@ -1,13 +1,22 @@
 import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import db from '../config/db.js';
-import { encrypt } from '../utils/crypto.js'; // On garde ton module de chiffrement
+import { encrypt } from '../utils/crypto.js';
+import checkRole from '../middleware/checkRole.js';
+import { logAudit } from '../utils/audits.js'; 
 
 const router = Router();
 
 // 1. Route pour RÉCUPÉRER les utilisateurs
-router.get('/', async (req, res) => {
+// Protection : SUPERADMIN uniquement
+// Audit : On note qui a consulté la liste
+router.get('/', checkRole('SUPERADMIN'), async (req, res) => {
   try {
+    const currentUserId = req.headers['x-user-id'];
+
+    // 📝 On enregistre l'action dans le journal
+    await logAudit(currentUserId, 'ACCESS_ALL_USERS', 'Consultation de la liste complète des utilisateurs');
+
     const result = await db.query('SELECT * FROM users ORDER BY created_at DESC');
     res.json({ success: true, users: result.rows });
   } catch (error) {
@@ -15,22 +24,49 @@ router.get('/', async (req, res) => {
   }
 });
 
-// 2. Route pour l'INSCRIPTION (Modifiée pour le Consentement)
+// 2. NOUVELLE ROUTE : Consulter les Journaux d'Audit
+// Protection : SUPERADMIN uniquement
+router.get('/audit-logs', checkRole('SUPERADMIN'), async (req, res) => {
+    try {
+        const { userId } = req.query; // Permet de filtrer ?userId=...
+        
+        let query = `
+            SELECT audit_logs.*, users.name as user_name 
+            FROM audit_logs 
+            LEFT JOIN users ON audit_logs.user_id = users.id
+        `;
+        
+        const params = [];
+
+        // Si on veut filtrer pour un utilisateur précis
+        if (userId) {
+            query += ` WHERE audit_logs.user_id = $1`;
+            params.push(userId);
+        }
+
+        query += ` ORDER BY audit_logs.created_at DESC LIMIT 50`;
+
+        const result = await db.query(query, params);
+        res.json({ success: true, logs: result.rows });
+
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// 3. Route pour l'INSCRIPTION (Crypto + Consentement)
 router.post('/', async (req, res) => {
   try {
-    // On récupère "consent" (vrai/faux) en plus des autres infos
     const { name, email, role, medical_info, consent } = req.body;
 
     let finalMedicalInfo = null;
     let finalConsent = false;
 
-    // LOGIQUE CLÉ : On ne garde les données médicales QUE si le consentement est VRAI
     if (consent === true && medical_info) {
-        finalMedicalInfo = encrypt(medical_info); // On chiffre
+        finalMedicalInfo = encrypt(medical_info);
         finalConsent = true;
     }
 
-    // On insère en base (avec les nouvelles colonnes)
     const query = `
       INSERT INTO users (name, email, role_global, medical_info, privacy_consent) 
       VALUES ($1, $2, $3, $4, $5) 
@@ -39,9 +75,12 @@ router.post('/', async (req, res) => {
     
     const result = await db.query(query, [name, email, role, finalMedicalInfo, finalConsent]);
 
+    // Optionnel : On pourrait aussi auditer les inscriptions
+    // await logAudit(result.rows[0].id, 'USER_REGISTERED', 'Nouvelle inscription');
+
     res.status(201).json({
       success: true,
-      message: finalConsent ? "Utilisateur créé avec données sécurisées." : "Utilisateur créé (données médicales ignorées faute de consentement).",
+      message: finalConsent ? "Utilisateur créé avec données sécurisées." : "Utilisateur créé (données médicales ignorées).",
       user: result.rows[0]
     });
 
@@ -51,27 +90,32 @@ router.post('/', async (req, res) => {
   }
 });
 
-// 3. Route pour CHANGER LE CONSENTEMENT (Le droit à l'oubli)
+// 4. Route pour CHANGER LE CONSENTEMENT
 router.patch('/:id/consent', async (req, res) => {
     try {
         const { id } = req.params;
-        const { consent } = req.body; // true ou false
+        const { consent } = req.body;
 
         if (consent === false) {
-            // 🚨 CAS IMPORTANT : L'utilisateur retire son accord.
-            // On met consent à FALSE et on EFFACE (NULL) les données médicales pour toujours.
             await db.query(
                 `UPDATE users SET privacy_consent = FALSE, medical_info = NULL WHERE id = $1`,
                 [id]
             );
-            res.json({ success: true, message: "Consentement retiré. Vos données sensibles ont été supprimées de la base." });
+            
+            // 📝 On note que l'utilisateur a retiré son consentement
+            await logAudit(id, 'CONSENT_REVOKED', 'Retrait du consentement et suppression des données');
+
+            res.json({ success: true, message: "Consentement retiré. Données effacées." });
         
         } else {
-            // L'utilisateur donne son accord (il devra ressaisir ses infos plus tard)
             await db.query(
                 `UPDATE users SET privacy_consent = TRUE WHERE id = $1`,
                 [id]
             );
+            
+            // 📝 On note le nouveau consentement
+            await logAudit(id, 'CONSENT_GIVEN', 'Consentement accordé');
+
             res.json({ success: true, message: "Consentement enregistré." });
         }
 
