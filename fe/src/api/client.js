@@ -1,5 +1,6 @@
-// src/api/client.js
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+
+// src/api/client.js
 
 export async function apiGet(path) {
   const res = await fetch(`${API_BASE_URL}${path}`, {
@@ -8,7 +9,7 @@ export async function apiGet(path) {
     },
   });
 
-  if (!res.ok) {
+  if (!res.ok) {  
     throw new Error(`API error: ${res.status}`);
   }
 
@@ -31,6 +32,27 @@ export async function apiPost(path, data) {
   return res.json();
 }
 
+// --- C'est cette fonction qu'il te manquait ---
+// Dans client.js
+
+export async function apiPut(path, data) {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'PUT',
+    headers: {
+      'Content-Type': 'application/json', // <--- INDISPENSABLE
+    },
+    body: JSON.stringify(data), // <--- INDISPENSABLE : Convertir l'objet JS en texte JSON
+  });
+
+  if (!res.ok) {
+    // Cela nous aidera à voir l'erreur renvoyée par le backend (res.statusText ou le JSON d'erreur)
+    const errorData = await res.json().catch(() => ({})); 
+    throw new Error(`API error ${res.status}: ${errorData.error || res.statusText}`);
+  }
+
+  return res.json();
+}// ----------------------------------------------
+
 export async function apiDelete(path) {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'DELETE',
@@ -45,4 +67,3 @@ export async function apiDelete(path) {
 
   return res.json();
 }
-
