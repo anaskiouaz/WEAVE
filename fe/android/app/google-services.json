@@ -1,21 +1,21 @@
 {
   "project_info": {
-    "project_number": "576884040150",
-    "project_id": "weave-f7f25",
-    "storage_bucket": "weave-f7f25.firebasestorage.app"
+    "project_number": "677833976168",
+    "project_id": "weave-3a4bb",
+    "storage_bucket": "weave-3a4bb.firebasestorage.app"
   },
   "client": [
     {
       "client_info": {
-        "mobilesdk_app_id": "1:576884040150:android:0af257c7f55e24ce82c477",
+        "mobilesdk_app_id": "1:677833976168:android:a24ff12188cbf823f70edd",
         "android_client_info": {
-          "package_name": "com.anas.weave"
+          "package_name": "com.anaskiouaz.weave"
         }
       },
       "oauth_client": [],
       "api_key": [
         {
-          "current_key": "AIzaSyBRtIKVVRnhJqW0Jz5dViJuvAf23QibqV8"
+          "current_key": "AIzaSyCj6bOMQLPZohwWHCJJtDS8-X7ogwl0bl0"
         }
       ],
       "services": {
