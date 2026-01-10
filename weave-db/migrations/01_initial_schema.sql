@@ -11,15 +11,14 @@ CREATE TYPE severity_type AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
 
 -- 2. TABLE UTILISATEURS (Fusionnée : Profil riche)
 CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL,
-    phone VARCHAR(50),                     -- NOUVEAU : Téléphone (Optionnel)
-    birth_date DATE,                       -- NOUVEAU : Date de naissance
-    onboarding_role circle_role_type,      -- NOUVEAU : Rôle souhaité dans le cercle
-    role_global global_role_type DEFAULT 'USER',
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                       name VARCHAR(255) NOT NULL,
+                       email VARCHAR(255) UNIQUE NOT NULL,
+                       medical_info TEXT,                       -- Pour stocker les données chiffrées
+                       privacy_consent BOOLEAN DEFAULT FALSE,   -- Pour le consentement RGPD
+                       password_hash VARCHAR(255) NOT NULL,
+                       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                       role_global global_role_type
 );
 
 -- 3. CERCLES DE SOINS
@@ -128,7 +127,18 @@ CREATE TABLE journal_entries (
     CONSTRAINT fk_journal_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- 10. INCIDENTS
+-- 10. JOURNAUX D'AUDIT (Pour savoir qui a fait quoi)
+CREATE TABLE audit_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID,                                  
+    action VARCHAR(50) NOT NULL,                   
+    details TEXT,                                 
+    ip_address VARCHAR(45),                      
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+);
+
+-- 11. INCIDENTS
 CREATE TABLE incidents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     circle_id UUID NOT NULL,
