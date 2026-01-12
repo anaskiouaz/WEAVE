@@ -4,7 +4,7 @@
 -- ============================================================
 
 -- 1. DEFINITION DES TYPES (ENUMS)
-CREATE TYPE global_role_type AS ENUM ('SUPERADMIN', 'USER');
+CREATE TYPE global_role_type AS ENUM ('SUPERADMIN', 'ADMIN', 'HELPER', 'PC', 'USER');
 CREATE TYPE circle_role_type AS ENUM ('ADMIN', 'HELPER', 'PC'); -- PC = Person Cared For (Bénéficiaire)
 CREATE TYPE incident_status_type AS ENUM ('OPEN', 'ESCALATED', 'RESOLVED');
 CREATE TYPE severity_type AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
@@ -14,6 +14,8 @@ CREATE TABLE users (
                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                        name VARCHAR(255) NOT NULL,
                        email VARCHAR(255) UNIQUE NOT NULL,
+                       phone VARCHAR(20),
+                       birth_date DATE,
                        medical_info TEXT,                       -- Pour stocker les données chiffrées
                        privacy_consent BOOLEAN DEFAULT FALSE,   -- Pour le consentement RGPD
                        password_hash VARCHAR(255) NOT NULL,
@@ -112,19 +114,6 @@ CREATE TABLE journal_entries (
      -- Contraintes
      CONSTRAINT fk_journal_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE,
      CONSTRAINT fk_journal_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL
-);
-
-    mood INT CHECK (mood BETWEEN 1 AND 10),
-    text_content TEXT,
-    photo_url VARCHAR(2048),
-    
-    -- Ajout version 2 (Commentaires)
-    comments JSONB DEFAULT '[]'::jsonb,
-
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT fk_journal_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE,
-    CONSTRAINT fk_journal_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- 10. JOURNAUX D'AUDIT (Pour savoir qui a fait quoi)
