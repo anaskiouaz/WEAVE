@@ -21,9 +21,9 @@ export default function Dashboard() {
             try {
                 // Envoi au backend
                 await apiPost('/users/device-token', { userId, token: token.value });
-                console.log("🚀 Token envoyé au serveur avec SUCCÈS !");
+                console.log("Token envoyé au serveur avec SUCCÈS !");
             } catch (err) {
-                 console.error(`❌ Erreur API: ${err.message}`);
+                 console.error(`Erreur API: ${err.message}`);
             }
         });
 
@@ -47,7 +47,7 @@ export default function Dashboard() {
         await PushNotifications.register();
 
     } catch (e) {
-        console.error(`❌ Crash JS: ${e.message}`);
+        console.error(`Crash JS: ${e.message}`);
     }
   };
 
