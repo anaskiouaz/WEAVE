@@ -1,40 +1,44 @@
 // src/app.js
-console.log(">>> DÉMARRAGE DU SCRIPT SERVER.JS <<<"); // Ligne cruciale pour tester
+console.log(">>> DÉMARRAGE DU SCRIPT APP.JS <<<");
+
 import express from 'express';
 import cors from 'cors';
 import helmet from 'helmet';
 import morgan from 'morgan';
-import routes from './routes/index.js';
+import routes from './routes/index.js'; // C'est ici que sont gérées toutes tes routes
 import dbTestRouter from './routes/testDb.js';
+
 const app = express();
-app.use('/test-db', dbTestRouter);
-/**
- * CORS setup
- * ALLOWED_ORIGINS should be a comma-separated list, e.g.:
- *   https://myfrontend.com,https://admin.myfrontend.com
- */
+
+// --- CONFIGURATION CORS ---
 const rawAllowedOrigins = process.env.ALLOWED_ORIGINS || '';
 const allowedOrigins = rawAllowedOrigins
   .split(',')
   .map(o => o.trim())
   .filter(Boolean);
 
+// On ajoute ton Frontend local par défaut si la variable d'env est vide (pour le dev)
+if (allowedOrigins.length === 0) {
+    allowedOrigins.push('http://localhost:5173');
+}
+
 console.log('CORS allowed origins:', allowedOrigins);
 
 app.use(
   cors({
     origin(origin, callback) {
-      if (!origin) return callback(null, true); // Postman, curl, server-to-server
+      // Autoriser les requêtes sans origine (ex: Postman, scripts serveur)
+      if (!origin) return callback(null, true);
 
       if (allowedOrigins.length > 0) {
         if (allowedOrigins.includes(origin)) {
           return callback(null, true);
         }
-        console.warn(`CORS blocked origin: ${origin}`);
+        console.warn(`⛔ CORS blocked origin: ${origin}`);
         return callback(new Error('Not allowed by CORS'));
       }
 
-      // If no ALLOWED_ORIGINS configured, allow all
+      // Si aucune restriction n'est configurée, on autorise tout (mode dev permissif)
       return callback(null, true);
     },
     methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -43,37 +47,38 @@ app.use(
   })
 );
 
-// Core middleware
-app.use(express.json());
+// --- MIDDLEWARES ---
 app.use(helmet());
 app.use(morgan('dev'));
 
-/**
- * Health check route
- * Accessible at:
- *   GET /health
- *   GET /api/health
- */
-app.get(['/health', '/api/health'], (req, res) => {
-  res.json({
-    status: 'ok',
-    env: process.env.NODE_ENV,
-    time: new Date(),
-  });
+// IMPORTANT : Permet de lire le JSON envoyé par le React
+app.use(express.json()); 
+
+// --- DEBUG LOGGING ---
+// J'ajoute ceci pour que tu voies dans la console ce que le serveur reçoit
+app.use((req, res, next) => {
+    if (req.method === 'POST' || req.method === 'PUT') {
+        console.log(`📦 REÇU [${req.method}] ${req.path} :`, req.body);
+    }
+    next();
 });
 
-// Mount all API routes
-app.use('/api', routes);
+// --- ROUTES ---
+app.use('/test-db', dbTestRouter);
 
-// 404 handler (keep this LAST before error handler)
+// Toutes les routes API (dont conversations) sont montées ici
+app.use('/api', routes); 
+
+// --- GESTION DES ERREURS ---
+// 404 Not Found
 app.use((req, res, next) => {
-  res.status(404).json({ message: 'Not found', path: req.path });
+  res.status(404).json({ message: 'Route introuvable', path: req.path });
 });
 
 // Global error handler
 app.use((err, req, res, next) => {
-  console.error('Unhandled error:', err);
-  res.status(500).json({ message: 'Internal server error' });
+  console.error('❌ Unhandled error:', err);
+  res.status(500).json({ message: 'Erreur serveur interne', error: err.message });
 });
 
 export default app;

@@ -5,32 +5,38 @@ import { useState } from 'react';
 import Dashboard from './components/Dashboard';
 import CalendarView from './components/CalendarView';
 import Memories from './components/Memories';
-import Messages from './components/Messages';
+import Messages from './components/Messages'; // L'ancienne version (mock)
 import Profile from './components/Profile';
 import Admin from './components/Admin';
 import EmergencyDialog from './components/EmergencyDialog';
+
+// --- CORRECTION ICI ---
+// On importe le composant global "Messagerie", pas juste la "Sidebar"
+import Messagerie from './components/messagerie/messagerie'; 
 
 function AppLayout({ children }) {
   const location = useLocation();
   const [emergencyOpen, setEmergencyOpen] = useState(false);
   
-
   const navItems = [
     { path: '/', icon: Home, label: 'Accueil' },
     { path: '/calendar', icon: Calendar, label: 'Calendrier' },
     { path: '/memories', icon: Heart, label: 'Souvenirs' },
-    { path: '/messages', icon: MessageSquare, label: 'Messages' },
+    // J'ai renommé le label pour que ce soit clair
+    { path: '/messages', icon: MessageSquare, label: 'Messages (Vieux)' }, 
+    { path: '/chat', icon: MessageSquare, label: 'Messagerie (Live)' }, 
+
     { path: '/profile', icon: User, label: 'Profil' },
     { path: '/admin', icon: Settings, label: 'Administration' },
   ];
 
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* Sidebar */}
+      {/* Sidebar de navigation (Menu de gauche) */}
       <aside className="w-64 bg-white shadow-lg flex flex-col">
         <div className="p-6 border-b">
-          <h1 className="text-blue-600">Weave</h1>
-          <p className="text-gray-600 mt-1">Plateforme d'entraide</p>
+          <h1 className="text-blue-600 font-bold text-2xl">Weave</h1>
+          <p className="text-gray-600 mt-1 text-sm">Plateforme d'entraide</p>
         </div>
 
         <nav className="flex-1 p-4 space-y-2">
@@ -54,16 +60,16 @@ function AppLayout({ children }) {
         <div className="p-4 border-t">
           <button
             onClick={() => setEmergencyOpen(true)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors"
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors shadow-sm"
           >
             <AlertCircle className="w-5 h-5" />
-            <span>Urgence</span>
+            <span className="font-medium">Urgence</span>
           </button>
         </div>
       </aside>
 
       {/* Main Content */}
-      <main className="flex-1 overflow-auto">
+      <main className="flex-1 overflow-auto bg-gray-50 relative">
         {children}
       </main>
 
@@ -81,6 +87,11 @@ export default function App() {
           <Route path="/calendar" element={<CalendarView />} />
           <Route path="/memories" element={<Memories />} />
           <Route path="/messages" element={<Messages />} />
+          
+          {/* --- CORRECTION ICI --- */}
+          {/* On affiche le composant Messagerie complet */}
+          <Route path="/chat" element={<Messagerie />} />
+
           <Route path="/profile" element={<Profile />} />
           <Route path="/admin" element={<Admin />} />
         </Routes>

@@ -68,18 +68,38 @@ CREATE TABLE task_signups (
                               CONSTRAINT fk_signup_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- 7. MESSAGES
-CREATE TABLE messages (
-                          id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                          circle_id UUID NOT NULL,
-                          sender_id UUID NOT NULL,
-                          content TEXT NOT NULL,
-                          created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                          CONSTRAINT fk_message_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE,
-                          CONSTRAINT fk_message_sender FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE SET NULL
+-- 7. TYPES CONVERSATIONS
+-- Créer un type pour différencier les conversations
+CREATE TYPE type_conversation AS ENUM ('PRIVE', 'GROUPE');
+
+-- 8.CONVERSATION
+-- Elle est liée au CERCLE (pour savoir de quel senior on parle)
+CREATE TABLE conversation (
+    id SERIAL PRIMARY KEY,
+    nom VARCHAR(255), -- Ex: "Urgence Médicale" (NULL si c'est un chat privé)
+    type type_conversation NOT NULL,
+    cercle_id INT REFERENCES cercle_de_soins(id) ON DELETE CASCADE,
+    date_creation TIMESTAMP DEFAULT NOW()
 );
 
--- 8. JOURNAL DE BORD
+-- 9. PARTICIPANT_CONVERSATION
+CREATE TABLE participant_conversation (
+    conversation_id INT REFERENCES conversation(id) ON DELETE CASCADE,
+    utilisateur_id INT REFERENCES utilisateur(id) ON DELETE CASCADE,
+    date_lecture TIMESTAMP, -- Pour gérer les mesages "non lus"
+    PRIMARY KEY (conversation_id, utilisateur_id)
+);
+
+-- 10. La table MESSAGE
+CREATE TABLE message (
+    id SERIAL PRIMARY KEY,
+    conversation_id INT REFERENCES conversation(id) ON DELETE CASCADE,
+    auteur_id INT REFERENCES utilisateur(id), -- L'auteur est forcément un Humain connecté
+    contenu TEXT NOT NULL,
+    date_envoi TIMESTAMP DEFAULT NOW()
+);
+
+-- 11. JOURNAL DE BORD
 CREATE TABLE journal_entries (
                                  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                                  circle_id UUID NOT NULL,
@@ -90,7 +110,7 @@ CREATE TABLE journal_entries (
                                  CONSTRAINT fk_journal_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE
 );
 
--- 9. INCIDENTS
+-- 12. INCIDENTS
 CREATE TABLE incidents (
                            id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                            circle_id UUID NOT NULL,
