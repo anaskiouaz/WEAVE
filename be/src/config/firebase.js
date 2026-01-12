@@ -1,25 +1,26 @@
 import admin from 'firebase-admin';
-import { readFile } from 'fs/promises';
+import { createRequire } from 'module';
+const require = createRequire(import.meta.url);
 
+let serviceAccount;
 try {
-    const serviceAccount = JSON.parse(
-      await readFile(new URL('./service-account.json', import.meta.url))
-    );
+    serviceAccount = require('../../service-account.json');
+} catch (e) {
+    console.error("❌ ERREUR CRITIQUE: Impossible de trouver 'service-account.json' à la racine du backend !");
+    process.exit(1);
+}
 
+export const initFirebase = () => {
+  try {
     if (!admin.apps.length) {
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount)
       });
+      console.log("✅ Firebase Admin initialisé avec succès");
     }
-    console.log("✅ Firebase Admin initialisé");
-} catch (e) {
-    console.error("⚠️ ATTENTION : Fichier service-account.json manquant ou invalide.");
-    console.error("   -> Les notifications ne partiront pas, mais l'app ne plantera pas.");
-    
-    // Mock pour éviter le crash lors de l'appel
-    admin.messaging = () => ({
-        sendMulticast: async () => console.log(">> [Simulation] Notification envoyée (pas de config Firebase)")
-    });
-}
+  } catch (error) {
+    console.error("❌ Erreur initialisation Firebase:", error);
+  }
+};
 
 export default admin;

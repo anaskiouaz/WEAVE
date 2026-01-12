@@ -1,78 +1,55 @@
-import { useEffect, useState } from 'react';
-import { Calendar, Heart, MessageSquare, Users, Clock } from 'lucide-react';
+import { useState } from 'react';
+import { Calendar, Heart, MessageSquare, Users } from 'lucide-react';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { apiPost } from '../api/client';
 
 export default function Dashboard() {
-  const [debugLog, setDebugLog] = useState("En attente d'action...");
-
-  // Fonction pour ajouter des logs à l'écran
-  const log = (msg) => {
-    console.log(msg);
-    setDebugLog(prev => prev + "\n" + msg);
-  };
-
+  
+  // Fonction pour activer les notifications
   const activerNotifs = async () => {
-    log("--- Démarrage Activer Notifs ---");
+    console.log("--- Démarrage Activer Notifs ---");
     try {
         const storedUser = localStorage.getItem('user');
         const userId = storedUser ? JSON.parse(storedUser).id : null;
 
+        // Nettoyage des anciens écouteurs
         await PushNotifications.removeAllListeners(); 
 
+        // Écouter l'arrivée du token
         await PushNotifications.addListener('registration', async (token) => {
-            log(`✅ EVENT REÇU ! Token: ${token.value.substring(0, 6)}...`);
+            console.log(`✅ Token reçu : ${token.value}`);
             try {
-                // CORRECTION ICI : On enlève le "/api" au début
-                // Si apiPost ajoute déjà la base URL, ceci devrait suffire :
+                // Envoi au backend
                 await apiPost('/users/device-token', { userId, token: token.value });
-                
-                log("🚀 Token envoyé au serveur avec SUCCÈS !");
-                alert("SUCCÈS TOTAL ! Vous pouvez tester.");
+                console.log("🚀 Token envoyé au serveur avec SUCCÈS !");
             } catch (err) {
-                // Si ça rate encore, essayons sans le slash du tout, au cas où
-                try {
-                    console.log("Tentative alternative...");
-                    await apiPost('users/device-token', { userId, token: token.value });
-                } catch (e2) {
-                     log(`❌ Erreur API (Double check): ${err.message}`);
-                }
+                 console.error(`❌ Erreur API: ${err.message}`);
             }
         });
 
+        // Vérif
         await PushNotifications.addListener('registrationError', (error) => {
-            log(`❌ ERREUR FIREBASE: ${JSON.stringify(error)}`);
-            alert("Erreur Firebase (voir logs écran)");
+            console.error(`❌ Erreur Firebase: ${JSON.stringify(error)}`);
         });
 
-        // 2. PERMISSION
-        log("Demande permission...");
+        // Demander la permission à l'utilisateur
         let perm = await PushNotifications.checkPermissions();
         if (perm.receive === 'prompt') {
             perm = await PushNotifications.requestPermissions();
         }
         
         if (perm.receive !== 'granted') {
-            log("❌ Permission REFUSÉE par l'utilisateur.");
+            console.log("❌ Permission REFUSÉE.");
             return;
         }
-        log("✅ Permission accordée.");
 
-        // 3. ENREGISTREMENT
-        log("Appel de register()...");
+        // Enregistrement final auprès de Google
         await PushNotifications.register();
-        log("Register appelé. En attente de réponse...");
 
     } catch (e) {
-        log(`❌ CRASH JS: ${e.message}`);
+        console.error(`❌ Crash JS: ${e.message}`);
     }
   };
-
-  const upcomingTasks = [
-    { id: 1, title: 'Visite médicale', time: '14:00', helper: 'Marie Dupont', type: 'medical' },
-    { id: 2, title: 'Courses alimentaires', time: '16:30', helper: 'À pourvoir', type: 'shopping' },
-    { id: 3, title: 'Promenade au parc', time: 'Demain 10:00', helper: 'Jean Martin', type: 'activity' },
-  ];
 
   const stats = [
     { label: 'Aidants actifs', value: '8', icon: Users, color: 'blue' },
@@ -85,25 +62,18 @@ export default function Dashboard() {
     <div className="p-8">
       <div className="max-w-6xl mx-auto">
         
-        {/* SECTION DE DEBUG VISIBLE */}
-        <div className="mb-8 p-4 bg-gray-100 rounded-lg border-2 border-indigo-200">
-            <div className="flex justify-between items-center mb-2">
-                <h3 className="font-bold text-indigo-700">Zone de Test Notifications</h3>
-                <button 
-                    onClick={activerNotifs}
-                    className="bg-indigo-600 text-white px-4 py-2 rounded shadow hover:bg-indigo-700 font-bold"
-                >
-                    🔔 LANCER LA SYNCHRO
-                </button>
-            </div>
-            <pre className="bg-black text-green-400 p-3 rounded text-xs overflow-auto h-32 whitespace-pre-wrap">
-                {debugLog}
-            </pre>
-        </div>
-
-        <div className="mb-8">
-          <h1 className="text-gray-900 mb-2">Tableau de bord</h1>
-          <p className="text-gray-600">Bienvenue sur votre espace d'entraide</p>
+        <div className="flex justify-between items-center mb-8">
+          <div>
+            <h1 className="text-gray-900 mb-2">Tableau de bord</h1>
+            <p className="text-gray-600">Bienvenue sur votre espace d'entraide</p>
+          </div>
+          {/* Bouton discret pour réactiver les notifs si besoin (ex: après réinstallation) */}
+          <button 
+            onClick={activerNotifs}
+            className="text-indigo-600 hover:text-indigo-800 text-sm font-medium underline"
+          >
+            Activer les notifications
+          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
