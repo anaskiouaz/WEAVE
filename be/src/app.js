@@ -8,7 +8,6 @@ import dbTestRouter from './routes/testDb.js';
 
 const app = express();
 
-// --- 1. SOLUTION CORS MANUELLE ---
 // On force les headers sur TOUTES les requêtes, avant tout le reste.
 app.use((req, res, next) => {
   const origin = req.headers.origin;

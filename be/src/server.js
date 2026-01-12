@@ -15,7 +15,7 @@ app.use(cors());
 app.use(express.json());
 
 const initDB = async () => {
-  console.log("🔧 Vérification de la structure de la base de données...");
+  console.log("Vérification de la structure de la base de données...");
   try {
     // Création des tables de base
     await db.query(`
@@ -98,9 +98,9 @@ const initDB = async () => {
         await db.query(`ALTER TABLE tasks ALTER COLUMN task_type DROP NOT NULL;`);
         await db.query(`ALTER TABLE tasks ALTER COLUMN date DROP NOT NULL;`);
         await db.query(`ALTER TABLE tasks ALTER COLUMN time DROP NOT NULL;`);
-        console.log("✅ Base de données prête : Colonnes vérifiées et contraintes assouplies.");
+        console.log("Base de données prête : Colonnes vérifiées et contraintes assouplies.");
     } catch (e) {
-        console.log("ℹ️ Contraintes déjà ajustées.");
+        console.log("Contraintes déjà ajustées.");
     }
     
   } catch (err) {
