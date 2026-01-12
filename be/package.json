@@ -15,7 +15,8 @@
     "jsonwebtoken": "^9.x",
     "bcryptjs": "^2.x",
     "helmet": "^7.x",
-    "morgan": "^1.x"
+    "morgan": "^1.x",
+    "firebase-admin": "^12.0.0"
   },
   "devDependencies": {
     "nodemon": "^3.x"
