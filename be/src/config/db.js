@@ -21,9 +21,9 @@ const pool = new Pool(poolConfig);
 // Test de connexion à la base de données
 pool.connect((err, client, release) => {
   if (err) {
-    console.error('❌ Erreur de connexion à la base de données:', err.stack);
+    console.error('Erreur de connexion à la base de données:', err.stack);
   } else {
-    console.log('✅ Connexion à la base de données établie avec succès');
+    console.log('Connexion à la base de données établie avec succès');
     release();
   }
 }); 
