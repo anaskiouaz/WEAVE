@@ -1,5 +1,0 @@
-package com.anaskiouaz.weave;
-
-import com.getcapacitor.BridgeActivity;
-
-public class MainActivity extends BridgeActivity {}
