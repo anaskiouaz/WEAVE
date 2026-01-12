@@ -2,6 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import db from '../config/db.js';
 
+
 const router = Router();
 
 // Récupérer les utilisateurs

@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { Plus, X, ShoppingCart, Stethoscope, Activity, User, Users } from 'lucide-react'; // Ajout de l'icone Users
 import { apiGet, apiPost, apiDelete } from '../api/client';
 
+
 export default function CalendarView() {
   const [showAddTask, setShowAddTask] = useState(false);
   const [tasks, setTasks] = useState([]);
