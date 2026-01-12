@@ -71,29 +71,38 @@ export default function Memories() {
         const formData = new FormData();
         formData.append('image', newPhotoFile);
 
-        const uploadResponse = await fetch('/upload/image', {
+        // 1. On définit l'URL de base de l'API (Port 4000)
+        // Si vous avez configuré Vite, on utilise la variable d'env, sinon le lien en dur
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+
+        // 2. On fait l'appel vers la bonne route (ex: /api/upload/image)
+        const uploadResponse = await fetch(`${API_BASE_URL}/upload/image`, {
           method: 'POST',
-          body: formData
+          body: formData,
+          // Note : Ne JAMAIS mettre de header 'Content-Type' manuellement avec FormData
+          // Le navigateur le fait tout seul avec le "boundary" correct.
         });
 
         if (!uploadResponse.ok) {
-          throw new Error('Erreur lors de l\'upload de l\'image');
+          const errorData = await uploadResponse.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Erreur lors de l\'upload de l\'image');
         }
 
-        const uploadData = await uploadResponse.json();
-        if (uploadData.status !== 'ok') {
-          throw new Error(uploadData.message || 'Erreur upload');
-        }
+  const uploadData = await uploadResponse.json();
+  if (uploadData.status !== 'ok') {
+    throw new Error(uploadData.message || 'Erreur upload');
+  }
 
-        photoUrl = uploadData.data.url;
-      }
+  // 3. On récupère l'URL Azure renvoyée par le backend
+  photoUrl = uploadData.data.url;
+}
 
       await apiPost('/souvenirs', {
         circle_id: CIRCLE_ID,
         author_id: user.id,
         text_content: newText,
         mood: newMood,
-        photo_url: photoUrl
+        photo_data: photoUrl
       });
 
       // Reset du formulaire
@@ -326,9 +335,9 @@ export default function Memories() {
 
                 <p className="text-gray-700 mb-4 whitespace-pre-wrap">{memory.text_content}</p>
 
-                {memory.photo_url && (
+                {memory.photo_data && (
                   <div className="mb-4 rounded-lg overflow-hidden border">
-                    <img src={memory.photo_url} alt="Souvenir" className="w-full h-auto max-h-96 object-cover" />
+                    <img src={memory.photo_data} alt="Souvenir" className="w-full h-auto max-h-96 object-cover" />
                   </div>
                 )}
 

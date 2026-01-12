@@ -97,7 +97,7 @@ INSERT INTO tasks (circle_id, title, task_type, date, time, required_helpers, he
 );
 
 
-INSERT INTO journal_entries (circle_id, author_id, mood, text_content, photo_url, created_at) VALUES
+INSERT INTO journal_entries (circle_id, author_id, mood, text_content, photo_data, created_at) VALUES
 -- 1. Souvenir joyeux posté par Sophie (L'aide) : Moment thé/photos
 (
     'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44', -- Cercle de Monique

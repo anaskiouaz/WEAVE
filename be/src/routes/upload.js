@@ -4,15 +4,21 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
+import { BlobServiceClient } from '@azure/storage-blob';
 
 const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Créer le dossier uploads s'il n'existe pas
-const uploadsDir = path.join(__dirname, '../../uploads');
-if (!fs.existsSync(uploadsDir)) {
-  fs.mkdirSync(uploadsDir, { recursive: true });
+// Azure Storage configuration
+const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
+const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME || 'images';
+let blobServiceClient;
+
+if (connectionString) {
+  blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
+} else {
+  console.warn('AZURE_STORAGE_CONNECTION_STRING not set, uploads will fail');
 }
 
 // Fonction pour traiter l'upload sans dépendances externes
@@ -26,7 +32,7 @@ function processFileUpload(req, res, next) {
     body.push(chunk);
   });
 
-  req.on('end', () => {
+  req.on('end', async () => {
     try {
       console.log('Upload: processing multipart');
       const boundary = req.headers['content-type'].split('boundary=')[1];
@@ -104,21 +110,33 @@ function processFileUpload(req, res, next) {
           // Générer un nom unique
           const ext = path.extname(filename) || '.jpg';
           const uniqueName = crypto.randomBytes(16).toString('hex') + ext;
-          const filePath = path.join(uploadsDir, uniqueName);
 
-          // Sauvegarder le fichier
+          if (!blobServiceClient) {
+            req.fileError = 'Azure Storage not configured';
+            return next();
+          }
+
           try {
-            fs.writeFileSync(filePath, data);
+            // Upload to Azure Blob Storage
+            const containerClient = blobServiceClient.getContainerClient(containerName);
+            const blockBlobClient = containerClient.getBlockBlobClient(uniqueName);
+
+            await blockBlobClient.upload(data, data.length, {
+              blobHTTPHeaders: {
+                blobContentType: contentType,
+              },
+            });
+
             req.uploadedFile = {
               filename: uniqueName,
               originalname: filename,
               size: data.length,
-              url: `/uploads/${uniqueName}`
+              url: blockBlobClient.url
             };
-            console.log('File saved:', filePath);
+            console.log('File uploaded to Azure:', blockBlobClient.url);
           } catch (error) {
-            console.error('Error saving file:', error);
-            req.fileError = 'Erreur lors de la sauvegarde du fichier';
+            console.error('Error uploading to Azure:', error);
+            req.fileError = 'Erreur lors de l\'upload vers Azure';
           }
           break;
         }
