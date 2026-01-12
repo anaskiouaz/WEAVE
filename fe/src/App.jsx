@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Link, useLocation, Outlet } from 'react-router-dom';
-import { Home, Calendar, Heart, MessageSquare, User, Settings, AlertCircle } from 'lucide-react';
+import { Home, Calendar, Heart, MessageSquare, User, Settings, AlertCircle, Menu, X } from 'lucide-react';
 import { useState } from 'react';
 
 // Composants de l'application
@@ -21,10 +21,11 @@ import { AuthProvider } from './context/AuthContext';
 function ProtectedLayout() {
   const location = useLocation();
   const [emergencyOpen, setEmergencyOpen] = useState(false);
+  const [mobileNavOpen, setMobileNavOpen] = useState(false);
 
   // Note : J'ai changé le chemin de l'accueil de '/' vers '/dashboard'
   const navItems = [
-    { path: '/dashboard', icon: Home, label: 'Accueil' }, 
+    { path: '/dashboard', icon: Home, label: 'Accueil' },
     { path: '/calendar', icon: Calendar, label: 'Calendrier' },
     { path: '/memories', icon: Heart, label: 'Souvenirs' },
     { path: '/messages', icon: MessageSquare, label: 'Messages' },
@@ -35,10 +36,28 @@ function ProtectedLayout() {
   return (
     <div className="flex h-screen bg-gray-50">
       {/* Sidebar */}
-      <aside className="w-64 bg-white shadow-lg flex flex-col hidden md:flex z-50">
-        <div className="p-6 border-b">
-          <h1 className="text-blue-600 text-2xl font-bold">Weave</h1>
-          <p className="text-gray-600 mt-1 text-sm">Plateforme d'entraide</p>
+      {mobileNavOpen && (
+        <div
+          className="fixed inset-0 bg-black/40 z-40 md:hidden"
+          onClick={() => setMobileNavOpen(false)}
+        />
+      )}
+      <aside
+        className={`w-64 bg-white shadow-lg flex flex-col fixed inset-y-0 left-0 z-50 transform transition-transform duration-200 md:static md:translate-x-0 ${mobileNavOpen ? 'translate-x-0' : '-translate-x-full'
+          }`}
+      >
+        <div className="p-6 border-b flex items-center justify-between">
+          <div>
+            <h1 className="text-blue-600 text-2xl font-bold">Weave</h1>
+            <p className="text-gray-600 mt-1 text-sm">Plateforme d'entraide</p>
+          </div>
+          <button
+            className="md:hidden p-2 rounded-lg hover:bg-gray-100"
+            onClick={() => setMobileNavOpen(false)}
+            aria-label="Fermer le menu"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         <nav className="flex-1 p-4 space-y-2">
@@ -46,11 +65,11 @@ function ProtectedLayout() {
             <Link
               key={path}
               to={path}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-lg ${
-                location.pathname === path
-                  ? 'bg-blue-50 text-blue-600 font-medium'
-                  : 'text-gray-700 hover:bg-gray-50'
-              }`}
+              onClick={() => setMobileNavOpen(false)}
+              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-lg ${location.pathname === path
+                ? 'bg-blue-50 text-blue-600 font-medium'
+                : 'text-gray-700 hover:bg-gray-50'
+                }`}
             >
               <Icon className="w-6 h-6" />
               <span>{label}</span>
@@ -72,6 +91,19 @@ function ProtectedLayout() {
 
       {/* Contenu Principal */}
       <main className="flex-1 overflow-auto w-full relative">
+        <div className="md:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-4 bg-white border-b">
+          <div>
+            <p className="text-xs uppercase text-gray-500">Navigation</p>
+            <p className="text-lg font-semibold text-gray-900">Weave</p>
+          </div>
+          <button
+            className="p-2 rounded-lg border border-gray-200 hover:bg-gray-50"
+            onClick={() => setMobileNavOpen(true)}
+            aria-label="Ouvrir le menu"
+          >
+            <Menu className="w-5 h-5" />
+          </button>
+        </div>
         <Outlet />
       </main>
 
@@ -87,7 +119,7 @@ export default function App() {
         <Routes>
           {/* 1. La page que l'on voit en premier (Racine) */}
           <Route path="/" element={<LandingPage />} />
-          
+
           {/* 2. Les pages d'accès */}
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
