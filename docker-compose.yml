@@ -8,10 +8,9 @@ services:
       POSTGRES_PASSWORD: "toto"
       POSTGRES_DB: weave_local
     ports:
-      - "5435:5432"
+      - "5432:5432"
     volumes:
       - pgdata14:/var/lib/postgresql/data
-      - ../weave-db/migrations:/docker-entrypoint-initdb.d
     networks:
       - weave-net
 
@@ -22,7 +21,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./be:/app
-    command: sh -c "npm install && node src/server.js" 
+    command: sh -c "npm install && npm start"
     environment:
       PORT: "4000"
       PGHOST: "postgres"
@@ -60,7 +59,6 @@ services:
     networks:
       - weave-net
 
-# Section globale : on déclare juste le nom du volume
 volumes:
   pgdata14:
 
