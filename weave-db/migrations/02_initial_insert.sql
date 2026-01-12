@@ -116,14 +116,4 @@ INSERT INTO journal_entries (circle_id, author_id, mood, text_content, photo_url
     'Maman était un peu fatiguée après le déjeuner aujourd''hui. Je l''ai installée au jardin pour qu''elle profite du soleil sans trop d''effort. Elle s''est assoupie un moment.',
     'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?q=80&w=1000&auto=format&fit=crop', -- Image: Chaise de jardin paisible
     '2025-06-11 14:15:00'
-),
-
--- 3. Passage rapide posté par Marc (Le voisin) : Fleurs et moral
-(
-    'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44', -- Cercle de Monique
-    'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380c33', -- Auteur : Marc Voisin
-    8,                                      -- Humeur : Bonne
-    'Je suis passé en coup de vent lui apporter quelques fleurs de mon jardin. Elle va bien, elle regardait son émission préférée. Pas d''inquiétude à avoir pour ce soir.',
-    'https://images.unsplash.com/photo-1490750967868-58cb7506a90a?q=80&w=1000&auto=format&fit=crop', -- Image: Bouquet de fleurs fraiches
-    '2025-06-12 18:45:00'
 );

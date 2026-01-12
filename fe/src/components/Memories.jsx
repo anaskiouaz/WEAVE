@@ -1,20 +1,29 @@
 import { useState, useEffect } from 'react';
-import { Download, Image, Heart, MessageCircle, Calendar, Loader2, Send } from 'lucide-react';
+import { Download, Image, Heart, MessageCircle, Calendar, Loader2, Send, Smile, Trash2 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
-import { apiGet, apiPost } from '../api/client'; // Import du client API
+import { apiGet, apiPost, apiDelete } from '../api/client'; // Import du client API
+import { useAuth } from '../context/AuthContext'; // Import du hook d'authentification
 
 export default function Memories() {
+  const { user } = useAuth(); // Récupération de l'utilisateur connecté
   const [memories, setMemories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // --- ÉTATS POUR LE NOUVEAU SOUVENIR ---
+  const [newText, setNewText] = useState("");
+  const [newMood, setNewMood] = useState(5); // Valeur par défaut
+  const [newPhotoUrl, setNewPhotoUrl] = useState("");
+  const [newPhotoFile, setNewPhotoFile] = useState(null);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   // --- ÉTATS AJOUTÉS POUR LES COMMENTAIRES ---
   const [activeCommentId, setActiveCommentId] = useState(null);
   const [commentText, setCommentText] = useState("");
   const [isSending, setIsSending] = useState(false);
 
-  // ID du cercle (famille) à récupérer (à dynamiser selon l'utilisateur connecté)
-  const CIRCLE_ID = "d0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44"; // Exemple d'ID de cercle
+  // ID du cercle (famille) à récupérer dynamiquement depuis l'utilisateur connecté
+  const CIRCLE_ID = user?.circles?.[0]?.id || "d0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44"; // Fallback au cercle par défaut
 
   // Récupération des données depuis la base de données
   const fetchMemories = async () => {
@@ -40,6 +49,74 @@ export default function Memories() {
     fetchMemories();
   }, [CIRCLE_ID]);
 
+  // Nettoyer les URLs d'objet lors du démontage du composant
+  useEffect(() => {
+    return () => {
+      if (newPhotoUrl && newPhotoUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(newPhotoUrl);
+      }
+    };
+  }, [newPhotoUrl]);
+
+  // --- FONCTION POUR PUBLIER UN SOUVENIR ---
+  const handleAddMemory = async () => {
+    if (!newText.trim() || !user) return;
+
+    setIsPublishing(true);
+    try {
+      let photoUrl = newPhotoUrl;
+
+      // Si un fichier est sélectionné, l'uploader d'abord
+      if (newPhotoFile) {
+        const formData = new FormData();
+        formData.append('image', newPhotoFile);
+
+        const uploadResponse = await fetch('/upload/image', {
+          method: 'POST',
+          body: formData
+        });
+
+        if (!uploadResponse.ok) {
+          throw new Error('Erreur lors de l\'upload de l\'image');
+        }
+
+        const uploadData = await uploadResponse.json();
+        if (uploadData.status !== 'ok') {
+          throw new Error(uploadData.message || 'Erreur upload');
+        }
+
+        photoUrl = uploadData.data.url;
+      }
+
+      await apiPost('/souvenirs', {
+        circle_id: CIRCLE_ID,
+        author_id: user.id,
+        text_content: newText,
+        mood: newMood,
+        photo_url: photoUrl
+      });
+
+      // Reset du formulaire
+      setNewText("");
+      setNewPhotoUrl("");
+      setNewPhotoFile(null);
+      setNewMood(5);
+
+      // Nettoyer l'URL d'objet si elle existe
+      if (newPhotoUrl && newPhotoUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(newPhotoUrl);
+      }
+
+      // Rafraîchir la liste
+      await fetchMemories();
+    } catch (err) {
+      console.error("Erreur lors de la publication:", err);
+      alert("Erreur lors de la publication du souvenir.");
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
   // --- FONCTION AJOUTÉE POUR ENVOYER UN COMMENTAIRE ---
   const handleSendComment = async (entryId) => {
     if (!commentText.trim()) return;
@@ -47,7 +124,7 @@ export default function Memories() {
     setIsSending(true);
     try {
       await apiPost(`/souvenirs/${entryId}/comments`, {
-        author_name: "Utilisateur", // À dynamiser ultérieurement
+        author_name: user?.name || "Utilisateur", // Utilise le nom de l'utilisateur connecté
         content: commentText
       });
       setCommentText("");
@@ -57,6 +134,28 @@ export default function Memories() {
       console.error("Erreur lors de l'envoi du commentaire:", err);
     } finally {
       setIsSending(false);
+    }
+  };
+
+  // --- FONCTION POUR SUPPRIMER UN SOUVENIR ---
+  const handleDeleteMemory = async (memoryId) => {
+    if (!user) return;
+
+    // Demander confirmation avant suppression
+    const confirmDelete = window.confirm("Êtes-vous sûr de vouloir supprimer ce souvenir ? Cette action est irréversible.");
+    if (!confirmDelete) return;
+
+    try {
+      await apiDelete(`/souvenirs/${memoryId}`, {
+        author_id: user.id
+      });
+
+      // Rafraîchir la liste après suppression
+      await fetchMemories();
+      alert("Souvenir supprimé avec succès");
+    } catch (err) {
+      console.error("Erreur lors de la suppression:", err);
+      alert("Erreur lors de la suppression du souvenir: " + err.message);
     }
   };
 
@@ -125,25 +224,76 @@ export default function Memories() {
           </div>
         )}
 
-        {/* Formulaire d'ajout */}
+        {/* --- FORMULAIRE D'AJOUT DYNAMISÉ --- */}
         <div className="mb-8 bg-white rounded-lg shadow-sm border p-6">
           <div className="flex gap-4">
             <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <span className="text-blue-600 font-bold">V</span>
+              <span className="text-blue-600 font-bold">{user?.name?.charAt(0) || 'U'}</span>
             </div>
             <div className="flex-1">
               <textarea
+                value={newText}
+                onChange={(e) => setNewText(e.target.value)}
                 placeholder="Partagez une nouvelle ou un souvenir..."
                 className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 rows={3}
               />
+              
+              {/* Aperçu de l'image sélectionnée */}
+              {newPhotoUrl && (
+                <div className="mt-3">
+                  <img 
+                    src={newPhotoUrl} 
+                    alt="Aperçu" 
+                    className="w-full max-h-48 object-cover rounded-lg border"
+                  />
+                </div>
+              )}
+
+              {/* Input caché pour la capture d'image */}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    setNewPhotoFile(file);
+                    setNewPhotoUrl(URL.createObjectURL(file)); // Aperçu temporaire
+                  }
+                }}
+                className="hidden"
+                id="photo-input"
+              />
+
               <div className="flex justify-between items-center mt-3">
-                <button className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors text-sm">
-                  <Image className="w-5 h-5" />
-                  <span>Ajouter une photo</span>
-                </button>
-                <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
-                  Publier
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => document.getElementById('photo-input').click()}
+                    className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors text-sm"
+                  >
+                    <Image className="w-5 h-5" />
+                    <span>{newPhotoFile ? "Photo sélectionnée" : "Ajouter une photo"}</span>
+                  </button>
+                  
+                  <div className="flex items-center gap-2 text-gray-600 text-sm">
+                    <Smile className="w-4 h-4" />
+                    <select 
+                      value={newMood} 
+                      onChange={(e) => setNewMood(parseInt(e.target.value))}
+                      className="bg-transparent outline-none cursor-pointer border-b border-gray-300"
+                    >
+                      {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>Humeur: {n}/10</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={handleAddMemory}
+                  disabled={isPublishing || !newText.trim() || !user}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
+                >
+                  {isPublishing ? "Publication..." : "Publier"}
                 </button>
               </div>
             </div>
@@ -195,6 +345,17 @@ export default function Memories() {
                     <MessageCircle className="w-5 h-5" />
                     <span>Commenter ({memory.comments?.length || 0})</span>
                   </button>
+                  {/* BOUTON DE SUPPRESSION - UNIQUEMENT POUR L'AUTEUR */}
+                  {user && memory.author_id === user.id && (
+                    <button 
+                      onClick={() => handleDeleteMemory(memory.id)}
+                      className="flex items-center gap-2 text-gray-600 hover:text-red-600 transition-colors"
+                      title="Supprimer ce souvenir"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                      <span>Supprimer</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* --- SECTION DES COMMENTAIRES AJOUTÉE --- */}
