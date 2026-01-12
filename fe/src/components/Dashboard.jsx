@@ -2,7 +2,6 @@ import { useState } from 'react';
 import { Calendar, Heart, MessageSquare, Users } from 'lucide-react';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { apiPost } from '../api/client';
-
 export default function Dashboard() {
   
   // Fonction pour activer les notifications

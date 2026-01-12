@@ -41,6 +41,7 @@ const initDB = async () => {
       );
     `);
 
+  
     // Ajout des tables si besoin
     await db.query(`
       DO $$ 
