@@ -5,7 +5,7 @@
 
 -- 1. DEFINITION DES TYPES (ENUMS)
 CREATE TYPE global_role_type AS ENUM ('SUPERADMIN', 'ADMIN', 'HELPER', 'PC', 'USER');
-CREATE TYPE circle_role_type AS ENUM ('ADMIN', 'HELPER', 'PC'); -- PC = Person Cared For (Bénéficiaire)
+CREATE TYPE circle_role_type AS ENUM ('SUPERADMIN', 'ADMIN', 'HELPER', 'PC'); -- PC = Person Cared For (Bénéficiaire)
 CREATE TYPE incident_status_type AS ENUM ('OPEN', 'ESCALATED', 'RESOLVED');
 CREATE TYPE severity_type AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
 
@@ -64,6 +64,7 @@ CREATE TABLE tasks (
     -- Détails
     title VARCHAR(255) NOT NULL,
     task_type VARCHAR(50) NOT NULL,     -- ex: "medical", "shopping"
+    description TEXT,                    -- Description détaillée de la tâche
 
     -- Planification
     date DATE NOT NULL,
