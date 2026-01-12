@@ -8,6 +8,7 @@
     "start": "node src/server.js"
   },
   "dependencies": {
+    "@azure/storage-blob": "^12.x",
     "express": "^4.x",
     "cors": "^2.x",
     "dotenv": "^16.x",

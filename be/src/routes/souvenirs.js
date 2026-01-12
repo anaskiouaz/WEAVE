@@ -29,7 +29,7 @@ export async function getJournalEntries(req, res) {
 export async function createJournalEntry(req, res) {
   try {
     // 1. On récupère les champs nécessaires
-    const { circle_id, author_id, text_content, mood, photo_url } = req.body;
+    const { circle_id, author_id, text_content, mood, photo_data } = req.body;
 
     // Validation basique
     if (!author_id || !text_content) {
@@ -71,15 +71,15 @@ export async function createJournalEntry(req, res) {
 
     // 3. Insertion en base de données
     const result = await db.query(
-  `INSERT INTO journal_entries (circle_id, author_id, mood, text_content, photo_url, comments)
+  `INSERT INTO journal_entries (circle_id, author_id, mood, text_content, photo_data, comments)
    VALUES ($1, $2, $3, $4, $5, $6) -- On ajoute $6 pour les commentaires
-   RETURNING id, circle_id, author_id, mood, text_content, photo_url, created_at`,
+   RETURNING id, circle_id, author_id, mood, text_content, photo_data, created_at`,
   [
     resolvedCircleId,
     author_id,
     mood || null,
     text_content,
-    photo_url || null,
+    photo_data || null,
     '[]' // On initialise avec un tableau vide JSON
   ]
 );
