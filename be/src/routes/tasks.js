@@ -4,27 +4,27 @@ import admin from '../config/firebase.js';
 
 const router = Router();
 
+// CRÉATION DE TÂCHE (POST)
 router.post('/', async (req, res) => {
-    const { title, description, assigned_to, due_date, task_type } = req.body;
+    // On récupère "time" ici
+    const { title, description, assigned_to, due_date, task_type, time } = req.body;
+    
     try {
-        // Insertion en base
+        // On l'ajoute dans la requête SQL
         const result = await db.query(
-            'INSERT INTO tasks (title, description, assigned_to, due_date, task_type) VALUES ($1, $2, $3, $4, $5) RETURNING *',
-            [title, description, assigned_to, due_date, task_type]
+            'INSERT INTO tasks (title, description, assigned_to, due_date, task_type, time) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [title, description, assigned_to, due_date, task_type, time]
         );
         const newTask = result.rows[0];
-
-        // Récupération des tokens pour notif
         const userTokens = await db.query("SELECT fcm_token FROM users WHERE fcm_token IS NOT NULL AND fcm_token != ''");
         const tokens = [...new Set(userTokens.rows.map(r => r.fcm_token))];
 
-        // Envoi notif via Firebase
         if (tokens.length > 0) {
              try {
                  const message = {
                     notification: {
-                        title: 'Nouvelle tâche',
-                        body: `Tâche créée : ${title}`
+                        title: `Nouvelle tâche ajoutée pour ${time}`,
+                        body: `Tâche ajoutée : ${title}`
                     },
                     data: { taskId: newTask.id.toString(), type: 'task_created' },
                     tokens: tokens
