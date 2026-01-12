@@ -9,7 +9,7 @@ import incidentsRouter from './incidents.js';
 
 // Import des fonctions contrôleurs (Destructuring)
 import { getTasks, createTask, deleteTask } from './tasks.js'; // Vérifie le chemin !
-import { getJournalEntries, createJournalEntry , addCommentToEntry} from './souvenirs.js'; // Le fichier qu'on vient de créer
+import { getJournalEntries, createJournalEntry , addCommentToEntry, deleteJournalEntry} from './souvenirs.js'; // Le fichier qu'on vient de créer
 
 const router = Router();
 
@@ -29,5 +29,6 @@ router.delete('/tasks/:id', deleteTask);
 router.get('/souvenirs', getJournalEntries);
 router.post('/souvenirs', createJournalEntry);
 router.post('/souvenirs/:id/comments', addCommentToEntry);
+router.delete('/souvenirs/:id', deleteJournalEntry);
 
 export default router;

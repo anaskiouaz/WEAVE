@@ -136,3 +136,53 @@ export async function addCommentToEntry(req, res) {
     res.status(500).json({ status: 'error', message: err.message });
   }
 }
+
+// Supprimer un souvenir
+export async function deleteJournalEntry(req, res) {
+  try {
+    const { id } = req.params;
+    const { author_id } = req.body; // Pour vérifier que c'est bien l'auteur qui supprime
+
+    if (!id || !author_id) {
+      return res.status(400).json({
+        status: 'error',
+        message: 'ID du souvenir et author_id requis'
+      });
+    }
+
+    // Vérifier que le souvenir existe et appartient bien à l'utilisateur
+    const checkResult = await db.query(
+      'SELECT id, author_id FROM journal_entries WHERE id = $1',
+      [id]
+    );
+
+    if (checkResult.rows.length === 0) {
+      return res.status(404).json({
+        status: 'error',
+        message: 'Souvenir non trouvé'
+      });
+    }
+
+    if (checkResult.rows[0].author_id !== author_id) {
+      return res.status(403).json({
+        status: 'error',
+        message: 'Vous ne pouvez supprimer que vos propres souvenirs'
+      });
+    }
+
+    // Supprimer le souvenir
+    await db.query('DELETE FROM journal_entries WHERE id = $1', [id]);
+
+    res.json({
+      status: 'ok',
+      message: 'Souvenir supprimé avec succès'
+    });
+
+  } catch (err) {
+    console.error('Error deleting journal entry:', err);
+    res.status(500).json({
+      status: 'error',
+      message: err.message
+    });
+  }
+}
