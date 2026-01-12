@@ -137,6 +137,24 @@ export default function Memories() {
                 className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 rows={3}
               />
+              
+              {/* Prévisualisation de la photo prise */}
+              {tempPhoto && (
+                <div className="mt-3 relative inline-block">
+                  <img 
+                    src={tempPhoto} 
+                    alt="Aperçu" 
+                    className="h-32 w-auto rounded-lg border border-gray-200"
+                  />
+                  <button 
+                    onClick={clearPhoto}
+                    className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full p-1 shadow-md hover:bg-red-600"
+                  >
+                    <X className="w-4 h-4" />
+                  </button>
+                </div>
+              )}
+
               <div className="flex justify-between items-center mt-3">
                 <button className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors text-sm">
                   <Image className="w-5 h-5" />
