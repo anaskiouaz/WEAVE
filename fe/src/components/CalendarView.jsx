@@ -20,12 +20,18 @@ export default function CalendarView() {
   const daysOfWeek = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
 
   // Fetch tasks from API
+  // Fetch tasks from API
   useEffect(() => {
     async function fetchTasks() {
       try {
         setLoading(true);
-        const data = await apiGet('/tasks');
-        setTasks(data.data || []);
+        const result = await apiGet('/tasks');
+
+        const tasksArray = Array.isArray(result) ? result : (result.data || []);
+        
+        console.log("📅 Tâches reçues pour le calendrier :", tasksArray); // Pour vérifier dans la console F12
+        setTasks(tasksArray);
+        
         setError(null);
       } catch (err) {
         console.error('Error fetching tasks:', err);
@@ -57,17 +63,16 @@ export default function CalendarView() {
 
   // Dans CalendarView.jsx
 
-  const handleAddTask = async () => {
+const handleAddTask = async () => {
     try {
-      // 1. Validation basique
+      // Validation basique
       if (!newTask.date || !newTask.title) {
         alert("La date et le titre sont requis");
         return;
       }
 
-      // 2. Construction du payload
+      // Construction du payload
       const taskPayload = {
-        // circle_id: 1,  <--- SUPPRIME CETTE LIGNE (Laisse le backend choisir le cercle par défaut)
         title: newTask.title,
         task_type: newTask.type,
         date: newTask.date,
@@ -79,11 +84,10 @@ export default function CalendarView() {
 
       await apiPost('/tasks', taskPayload);
 
-      // Rafraichissement
-      const data = await apiGet('/tasks');
-      setTasks(data.data || []);
+      const result = await apiGet('/tasks');
+      const tasksArray = Array.isArray(result) ? result : (result.data || []);
+      setTasks(tasksArray);
 
-      // Reset du formulaire et fermeture
       setShowAddTask(false);
       setNewTask({
         title: '',
@@ -102,8 +106,11 @@ export default function CalendarView() {
   const handleDeleteTask = async (taskId) => {
     try {
       await apiDelete(`/tasks/${taskId}`);
-      const data = await apiGet('/tasks');
-      setTasks(data.data || []);
+      
+      const result = await apiGet('/tasks');
+      const tasksArray = Array.isArray(result) ? result : (result.data || []);
+      setTasks(tasksArray);
+      
     } catch (err) {
       console.error('Error deleting task:', err);
       setError(err.message);
