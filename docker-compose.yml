@@ -64,3 +64,4 @@ volumes:
 
 networks:
   weave-net:
+    driver: bridge
