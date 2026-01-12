@@ -16,7 +16,7 @@ export const initFirebase = () => {
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount)
       });
-      console.log("✅ Firebase Admin initialisé avec succès");
+      console.log("Firebase Admin initialisé avec succès");
     }
   } catch (error) {
     console.error("❌ Erreur initialisation Firebase:", error);

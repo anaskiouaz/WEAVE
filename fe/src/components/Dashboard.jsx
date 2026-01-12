@@ -17,7 +17,7 @@ export default function Dashboard() {
 
         // Écouter l'arrivée du token
         await PushNotifications.addListener('registration', async (token) => {
-            console.log(`✅ Token reçu : ${token.value}`);
+            console.log(`Token reçu : ${token.value}`);
             try {
                 // Envoi au backend
                 await apiPost('/users/device-token', { userId, token: token.value });
