@@ -30,7 +30,7 @@ export default function CalendarView() {
 
         const tasksArray = Array.isArray(result) ? result : (result.data || []);
         
-        console.log("📅 Tâches reçues pour le calendrier :", tasksArray); // Pour vérifier dans la console F12
+        console.log("Tâches reçues pour le calendrier :", tasksArray); // Pour vérifier dans la console F12
         setTasks(tasksArray);
         
         setError(null);

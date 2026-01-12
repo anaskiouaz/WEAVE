@@ -28,7 +28,7 @@ export default function Dashboard() {
 
         // Vérif
         await PushNotifications.addListener('registrationError', (error) => {
-            console.error(`❌ Erreur Firebase: ${JSON.stringify(error)}`);
+            console.error(`Erreur Firebase: ${JSON.stringify(error)}`);
         });
 
         // Demander la permission à l'utilisateur
@@ -38,7 +38,7 @@ export default function Dashboard() {
         }
         
         if (perm.receive !== 'granted') {
-            console.log("❌ Permission REFUSÉE.");
+            console.log("Permission REFUSÉE.");
             return;
         }
 
