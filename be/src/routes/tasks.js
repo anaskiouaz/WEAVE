@@ -31,7 +31,7 @@ router.post('/', async (req, res) => {
                  };
                  await admin.messaging().sendEachForMulticast(message);
              } catch (e) {
-                 console.error('⚠️ Erreur envoi notif:', e);
+                 console.error('Erreur envoi notif:', e);
              }
         }
         res.status(201).json(newTask);
@@ -52,8 +52,9 @@ router.get('/', async (req, res) => {
                 task_type,
                 assigned_to,
                 created_at,
-                -- MAGIE ICI : Si due_date est vide, on utilise created_at
-                -- Cela garantit que le calendrier a toujours une date à afficher
+                time, -- <--- C'EST CETTE LIGNE QUI MANQUAIT !
+                
+                -- Gestion des dates pour le calendrier
                 COALESCE(due_date, created_at) as start, 
                 COALESCE(due_date, created_at) as end,
                 COALESCE(due_date, created_at) as date

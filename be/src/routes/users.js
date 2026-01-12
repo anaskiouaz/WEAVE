@@ -21,7 +21,7 @@ router.post('/device-token', async (req, res) => {
 
     if (userId) {
         await db.query('UPDATE users SET fcm_token = $1 WHERE id = $2', [token, userId]);
-        console.log(`📱 Token lié à l'utilisateur ${userId}`);
+        console.log(`Token lié à l'utilisateur ${userId}`);
     } else {
         const existing = await db.query('SELECT id FROM users WHERE fcm_token = $1', [token]);
         
@@ -31,9 +31,9 @@ router.post('/device-token', async (req, res) => {
                 `INSERT INTO users (name, email, fcm_token) VALUES ($1, $2, $3)`,
                 ['Appareil Mobile', fakeEmail, token]
             );
-            console.log(`📱 Token enregistré pour un appareil anonyme`);
+            console.log(`Token enregistré pour un appareil anonyme`);
         } else {
-            console.log(`📱 Token déjà connu en base (rien à faire)`);
+            console.log(`Token déjà connu en base (rien à faire)`);
         }
     }
     
