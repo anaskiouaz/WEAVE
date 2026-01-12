@@ -67,15 +67,7 @@ export default function Dashboard() {
             <h1 className="text-gray-900 mb-2">Tableau de bord</h1>
             <p className="text-gray-600">Bienvenue sur votre espace d'entraide</p>
           </div>
-          {/* Bouton discret pour réactiver les notifs si besoin (ex: après réinstallation) */}
-          <button 
-            onClick={activerNotifs}
-            className="text-indigo-600 hover:text-indigo-800 text-sm font-medium underline"
-          >
-            Activer les notifications
-          </button>
         </div>
-
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {stats.map((stat) => {
             const Icon = stat.icon;
