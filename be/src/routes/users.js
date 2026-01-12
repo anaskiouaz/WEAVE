@@ -5,6 +5,7 @@ import { encrypt } from '../utils/crypto.js'; // Vérifie le chemin de ton fichi
 import checkRole from '../middleware/checkRole.js'; // Décommente si tu as ce middleware
 import { logAudit } from '../utils/audits.js'; 
 
+
 const router = Router();
 
 // ==================================================================
