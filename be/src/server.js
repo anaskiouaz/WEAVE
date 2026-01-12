@@ -1,11 +1,4 @@
-import express from 'express';
-import cors from 'cors';
 import dotenv from 'dotenv';
-import db from './config/db.js';
-import usersRoutes from './routes/users.js';
-import tasksRoutes from './routes/tasks.js';
-import { initFirebase } from './config/firebase.js';
-
 dotenv.config();
 
 const app = express();
@@ -65,63 +58,11 @@ const initDB = async () => {
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='assigned_to') THEN 
           ALTER TABLE tasks ADD COLUMN assigned_to VARCHAR(100); 
         END IF;
+import app from './app.js';
 
-        -- TASKS : due_date
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='due_date') THEN 
-          ALTER TABLE tasks ADD COLUMN due_date TIMESTAMP; 
-        END IF;
+const PORT = process.env.PORT || 4000;
 
-        -- TASKS : completed (CELLE QUI VOUS MANQUAIT !)
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='completed') THEN 
-          ALTER TABLE tasks ADD COLUMN completed BOOLEAN DEFAULT FALSE; 
-        END IF;
-
-        -- TASKS : circle_id
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='circle_id') THEN 
-          ALTER TABLE tasks ADD COLUMN circle_id INTEGER; 
-        END IF;
-        
-        -- TASKS : date & time (si utilisées)
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='date') THEN 
-          ALTER TABLE tasks ADD COLUMN date DATE; 
-        END IF;
-        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='time') THEN 
-          ALTER TABLE tasks ADD COLUMN time TIME; 
-        END IF;
-
-      END $$;
-    `);
-
-    // Assouplissement des contraintes NOT NULL
-    try {
-        await db.query(`ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;`);
-        await db.query(`ALTER TABLE tasks ALTER COLUMN circle_id DROP NOT NULL;`);
-        await db.query(`ALTER TABLE tasks ALTER COLUMN task_type DROP NOT NULL;`);
-        await db.query(`ALTER TABLE tasks ALTER COLUMN date DROP NOT NULL;`);
-        await db.query(`ALTER TABLE tasks ALTER COLUMN time DROP NOT NULL;`);
-        console.log("Base de données prête : Colonnes vérifiées et contraintes assouplies.");
-    } catch (e) {
-        console.log("Contraintes déjà ajustées.");
-    }
-    
-  } catch (err) {
-    console.error("❌ Erreur lors de l'initialisation de la DB :", err.message);
-  }
-};
-// ---------------------------------------------------
-
-// Initialisation
-initFirebase();
-initDB(); 
-
-// Routes
-app.use('/api/users', usersRoutes);
-app.use('/api/tasks', tasksRoutes);
-
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date() });
-});
-
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`API running on port ${PORT}`);
+  console.log('Test modification');
 });
