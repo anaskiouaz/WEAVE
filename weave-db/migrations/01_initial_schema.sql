@@ -107,7 +107,7 @@ CREATE TABLE journal_entries (
      author_id UUID NOT NULL, -- Nouvelle colonne pour identifier l'auteur
      mood INT CHECK (mood BETWEEN 1 AND 10),
      text_content TEXT,
-     photo_data VARCHAR, -- Stockage binaire pour les photos
+     photo_data VARCHAR, -- Stockage du nom du blob Azure (privé avec SAS token)
      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
      comments JSONB DEFAULT '[]'::jsonb,
 

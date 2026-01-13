@@ -29,6 +29,8 @@ export default function Memories() {
   const fetchMemories = async () => {
     try {
       setLoading(true);
+      setError(null); // Reset error state
+      
       const response = await apiGet(`/souvenirs?circle_id=${CIRCLE_ID}`);
 
       if (response && response.data) {
@@ -38,7 +40,7 @@ export default function Memories() {
       }
     } catch (err) {
       console.error("Erreur chargement souvenirs:", err);
-      setError("Impossible de charger les souvenirs.");
+      setError(`Impossible de charger les souvenirs: ${err.message}`);
       setMemories([]);
     } finally {
       setLoading(false);
@@ -64,7 +66,7 @@ export default function Memories() {
 
     setIsPublishing(true);
     try {
-      let photoUrl = newPhotoUrl;
+      let photoBlobName = null;
 
       // Si un fichier est sélectionné, l'uploader d'abord
       if (newPhotoFile) {
@@ -93,8 +95,8 @@ export default function Memories() {
     throw new Error(uploadData.message || 'Erreur upload');
   }
 
-  // 3. On récupère l'URL Azure renvoyée par le backend
-  photoUrl = uploadData.data.url;
+  // 3. On récupère le nom du blob renvoyé par le backend
+  photoBlobName = uploadData.data.blobName;
 }
 
       await apiPost('/souvenirs', {
@@ -102,7 +104,7 @@ export default function Memories() {
         author_id: user.id,
         text_content: newText,
         mood: newMood,
-        photo_data: photoUrl
+        photo_data: photoBlobName || null
       });
 
       // Reset du formulaire
@@ -120,7 +122,7 @@ export default function Memories() {
       await fetchMemories();
     } catch (err) {
       console.error("Erreur lors de la publication:", err);
-      alert("Erreur lors de la publication du souvenir.");
+      alert(`Erreur lors de la publication du souvenir: ${err.message}`);
     } finally {
       setIsPublishing(false);
     }
@@ -143,6 +145,33 @@ export default function Memories() {
       console.error("Erreur lors de l'envoi du commentaire:", err);
     } finally {
       setIsSending(false);
+    }
+  };
+
+  // --- FONCTION AJOUTÉE POUR SUPPRIMER UN COMMENTAIRE ---
+  const handleDeleteComment = async (memoryId, commentId, commentAuthor, memoryAuthor) => {
+    if (!user) return;
+
+    // Vérifier que l'utilisateur est l'auteur du commentaire
+    if (commentAuthor !== user.name && memoryAuthor !== user.name) {
+      alert("Vous ne pouvez pas supprimer les commentaires des autres.");
+      return;
+    }
+
+    // Demander confirmation avant suppression
+    const confirmDelete = window.confirm("Êtes-vous sûr de vouloir supprimer ce commentaire ?");
+    if (!confirmDelete) return;
+
+    try {
+      await apiDelete(`/souvenirs/${memoryId}/comments/${commentId}`, {
+        author_name: user.name
+      });
+
+      // Rafraîchir la liste après suppression
+      await fetchMemories();
+    } catch (err) {
+      console.error("Erreur lors de la suppression du commentaire:", err);
+      alert("Erreur lors de la suppression du commentaire: " + err.message);
     }
   };
 
@@ -374,7 +403,19 @@ export default function Memories() {
                       {memory.comments && memory.comments.length > 0 ? (
                         memory.comments.map((comment, idx) => (
                           <div key={idx} className="bg-gray-50 p-3 rounded-lg text-sm shadow-sm border border-gray-100">
-                            <p className="font-semibold text-blue-700 mb-1">{comment.author}</p>
+                            <div className="flex justify-between items-start mb-1">
+                              <p className="font-semibold text-blue-700">{comment.author}</p>
+                              {/* Bouton de suppression - seulement si l'utilisateur est l'auteur du commentaire */}
+                              {user && (comment.author === user.name || memory.author_name === user.name) && (
+                                <button 
+                                  onClick={() => handleDeleteComment(memory.id, comment.id, comment.author, memory.author_name)}
+                                  className="text-gray-400 hover:text-red-600 transition-colors p-1"
+                                  title="Supprimer ce commentaire"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
                             <p className="text-gray-700">{comment.content}</p>
                           </div>
                         ))
