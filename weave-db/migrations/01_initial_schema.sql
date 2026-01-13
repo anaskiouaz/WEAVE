@@ -24,9 +24,8 @@ DROP TYPE IF EXISTS global_role_type CASCADE;
 
 -- ============================================================
 -- 1. DEFINITION DES TYPES (ENUMS)
--- ============================================================
 CREATE TYPE global_role_type AS ENUM ('SUPERADMIN', 'ADMIN', 'HELPER', 'PC', 'USER');
-CREATE TYPE circle_role_type AS ENUM ('SUPERADMIN', 'ADMIN', 'HELPER', 'PC');
+CREATE TYPE circle_role_type AS ENUM ('ADMIN', 'HELPER', 'PC'); -- PC = Person Cared For (Bénéficiaire)
 CREATE TYPE incident_status_type AS ENUM ('OPEN', 'ESCALATED', 'RESOLVED');
 CREATE TYPE severity_type AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
 
@@ -37,17 +36,16 @@ CREATE TYPE severity_type AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
 
 -- TABLE UTILISATEURS
 CREATE TABLE users (
-    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    name VARCHAR(255) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    phone VARCHAR(20),
-    birth_date DATE,
-    medical_info TEXT,
-    privacy_consent BOOLEAN DEFAULT FALSE,
-    password_hash VARCHAR(255), 
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    role_global global_role_type,
-    fcm_token TEXT 
+                       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                       name VARCHAR(255) NOT NULL,
+                       email VARCHAR(255) UNIQUE NOT NULL,
+                       phone VARCHAR(20),
+                       birth_date DATE,
+                       medical_info TEXT,                       -- Pour stocker les données chiffrées
+                       privacy_consent BOOLEAN DEFAULT FALSE,   -- Pour le consentement RGPD
+                       password_hash VARCHAR(255) NOT NULL,
+                       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                       role_global global_role_type
 );
 
 -- CERCLES DE SOINS
@@ -139,7 +137,7 @@ CREATE TABLE journal_entries (
      author_id UUID NOT NULL,
      mood INT CHECK (mood BETWEEN 1 AND 10),
      text_content TEXT,
-     photo_url VARCHAR(2048),
+     photo_data VARCHAR, -- Stockage du nom du blob Azure (privé avec SAS token)
      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
      comments JSONB DEFAULT '[]'::jsonb,
 
@@ -147,7 +145,7 @@ CREATE TABLE journal_entries (
      CONSTRAINT fk_journal_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- JOURNAUX D'AUDIT
+-- 10. JOURNAUX D'AUDIT (Pour savoir qui a fait quoi)
 CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID,                      
