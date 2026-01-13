@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import crypto from 'crypto';
-import { BlobServiceClient } from '@azure/storage-blob';
+import { BlobServiceClient, StorageSharedKeyCredential, generateBlobSASQueryParameters, BlobSASPermissions } from '@azure/storage-blob';
 
 const router = express.Router();
 const __filename = fileURLToPath(import.meta.url);
@@ -13,12 +13,46 @@ const __dirname = path.dirname(__filename);
 // Azure Storage configuration
 const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
 const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME || 'images';
+const accountName = process.env.AZURE_STORAGE_ACCOUNT_NAME;
+const accountKey = process.env.AZURE_STORAGE_ACCOUNT_KEY;
+
 let blobServiceClient;
+let sharedKeyCredential;
 
 if (connectionString) {
   blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
+  // Extract account name and key from connection string for SAS generation
+  const connStrParts = connectionString.split(';');
+  const accountNamePart = connStrParts.find(part => part.startsWith('AccountName='));
+  const accountKeyPart = connStrParts.find(part => part.startsWith('AccountKey='));
+  if (accountNamePart && accountKeyPart) {
+    const extractedAccountName = accountNamePart.split('=')[1];
+    const extractedAccountKey = accountKeyPart.split('=')[1];
+    sharedKeyCredential = new StorageSharedKeyCredential(extractedAccountName, extractedAccountKey);
+  }
+} else if (accountName && accountKey) {
+  sharedKeyCredential = new StorageSharedKeyCredential(accountName, accountKey);
+  blobServiceClient = new BlobServiceClient(`https://${accountName}.blob.core.windows.net`, sharedKeyCredential);
 } else {
-  console.warn('AZURE_STORAGE_CONNECTION_STRING not set, uploads will fail');
+  console.warn('Azure Storage credentials not set, uploads will fail');
+}
+
+// Function to generate SAS token for blob access
+function generateBlobSASUrl(containerName, blobName) {
+  if (!sharedKeyCredential) {
+    throw new Error('Storage credentials not available for SAS generation');
+  }
+
+  const sasOptions = {
+    containerName,
+    blobName,
+    permissions: BlobSASPermissions.parse('r'), // Read permission
+    startsOn: new Date(),
+    expiresOn: new Date(new Date().valueOf() + 24 * 60 * 60 * 1000), // 24 hours
+  };
+
+  const sasToken = generateBlobSASQueryParameters(sasOptions, sharedKeyCredential).toString();
+  return `https://${sharedKeyCredential.accountName}.blob.core.windows.net/${containerName}/${blobName}?${sasToken}`;
 }
 
 // Fonction pour traiter l'upload sans dépendances externes
@@ -117,23 +151,30 @@ function processFileUpload(req, res, next) {
           }
 
           try {
-            // Upload to Azure Blob Storage
+            // Upload to Azure Blob Storage (private)
             const containerClient = blobServiceClient.getContainerClient(containerName);
+            
+            // Ensure container exists
+            await containerClient.createIfNotExists({
+              access: 'blob' // Private access
+            });
+
             const blockBlobClient = containerClient.getBlockBlobClient(uniqueName);
 
             await blockBlobClient.upload(data, data.length, {
               blobHTTPHeaders: {
                 blobContentType: contentType,
               },
+              // Remove public access - blob will be private
             });
 
             req.uploadedFile = {
               filename: uniqueName,
               originalname: filename,
               size: data.length,
-              url: blockBlobClient.url
+              blobName: uniqueName // Store blob name instead of URL
             };
-            console.log('File uploaded to Azure:', blockBlobClient.url);
+            console.log('File uploaded to Azure:', uniqueName);
           } catch (error) {
             console.error('Error uploading to Azure:', error);
             req.fileError = 'Erreur lors de l\'upload vers Azure';

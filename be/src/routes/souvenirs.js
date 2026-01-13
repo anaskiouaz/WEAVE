@@ -1,6 +1,45 @@
 // src/controllers/souvenirs.js
 import db from '../config/db.js';
 import crypto from 'crypto';
+import { generateBlobSASUrl } from '../utils/azureStorage.js';
+import { BlobServiceClient } from '@azure/storage-blob';
+
+// Configuration Azure pour la suppression
+const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
+const containerName = process.env.AZURE_STORAGE_CONTAINER_NAME || 'images';
+let blobServiceClient;
+
+if (connectionString) {
+  blobServiceClient = BlobServiceClient.fromConnectionString(connectionString);
+}
+
+// Fonction utilitaire pour supprimer un blob d'Azure
+async function deleteBlobFromAzure(blobName) {
+  if (!blobServiceClient || !blobName) {
+    return; // Ne pas échouer si Azure n'est pas configuré ou pas de blob
+  }
+
+  // Ne supprimer que les blobs (pas les URLs externes)
+  if (blobName.startsWith('http://') || blobName.startsWith('https://')) {
+    console.log('Skipping deletion of external URL:', blobName);
+    return;
+  }
+
+  try {
+    const containerClient = blobServiceClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+    
+    const deleteResponse = await blockBlobClient.deleteIfExists();
+    if (deleteResponse.succeeded) {
+      console.log('✅ Blob supprimé d\'Azure:', blobName);
+    } else {
+      console.log('⚠️ Blob n\'existait pas ou déjà supprimé:', blobName);
+    }
+  } catch (error) {
+    console.error('❌ Erreur lors de la suppression du blob Azure:', blobName, error);
+    // Ne pas échouer la suppression du souvenir si la suppression du blob échoue
+  }
+}
 
 // Récupérer les souvenirs
 export async function getJournalEntries(req, res) {
@@ -19,7 +58,26 @@ export async function getJournalEntries(req, res) {
       [circle_id]
     );
 
-    res.json({ status: 'ok', data: result.rows, count: result.rows.length });
+    // Generate SAS URLs for photos
+    const entriesWithSAS = result.rows.map(entry => {
+      if (entry.photo_data) {
+        // Check if it's already a full URL (from existing data or external URLs)
+        if (entry.photo_data.startsWith('http://') || entry.photo_data.startsWith('https://')) {
+          // Keep the URL as is
+          return entry;
+        } else {
+          // Generate SAS URL for blob name
+          const sasUrl = generateBlobSASUrl(entry.photo_data);
+          return {
+            ...entry,
+            photo_data: sasUrl || entry.photo_data // Fallback to blob name if SAS fails
+          };
+        }
+      }
+      return entry;
+    });
+
+    res.json({ status: 'ok', data: entriesWithSAS, count: entriesWithSAS.length });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
   }
@@ -137,6 +195,56 @@ export async function addCommentToEntry(req, res) {
   }
 }
 
+export async function deleteCommentFromEntry(req, res) {
+  try {
+    const { id, commentId } = req.params; // ID du souvenir et ID du commentaire
+    const { author_name } = req.body; // Nom de l'auteur qui fait la demande de suppression
+
+    if (!id || !commentId || !author_name) {
+      return res.status(400).json({ status: 'error', message: 'Souvenir ID, comment ID, and author_name required' });
+    }
+
+    // Récupérer les commentaires actuels
+    const result = await db.query(
+      'SELECT comments FROM journal_entries WHERE id = $1',
+      [id]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ status: 'error', message: 'Souvenir not found' });
+    }
+
+    let comments = result.rows[0].comments || [];
+
+    // Trouver le commentaire à supprimer
+    const commentIndex = comments.findIndex(comment => comment.id === commentId);
+
+    if (commentIndex === -1) {
+      return res.status(404).json({ status: 'error', message: 'Comment not found' });
+    }
+
+    const comment = comments[commentIndex];
+
+    // Vérifier que l'auteur de la demande est bien l'auteur du commentaire
+    if (comment.author !== author_name && memoryAuthor !== author_name) {
+      return res.status(403).json({ status: 'error', message: 'You can only delete your own comments' });
+    }
+
+    // Supprimer le commentaire du tableau
+    comments.splice(commentIndex, 1);
+
+    // Mettre à jour la base de données
+    await db.query(
+      'UPDATE journal_entries SET comments = $1::jsonb WHERE id = $2',
+      [JSON.stringify(comments), id]
+    );
+
+    res.json({ status: 'ok', data: comments });
+  } catch (err) {
+    res.status(500).json({ status: 'error', message: err.message });
+  }
+}
+
 // Supprimer un souvenir
 export async function deleteJournalEntry(req, res) {
   try {
@@ -150,29 +258,38 @@ export async function deleteJournalEntry(req, res) {
       });
     }
 
-    // Vérifier que le souvenir existe et appartient bien à l'utilisateur
-    const checkResult = await db.query(
-      'SELECT id, author_id FROM journal_entries WHERE id = $1',
+    // Récupérer les informations du souvenir avant suppression (pour l'image)
+    const souvenirResult = await db.query(
+      'SELECT id, author_id, photo_data FROM journal_entries WHERE id = $1',
       [id]
     );
 
-    if (checkResult.rows.length === 0) {
+    if (souvenirResult.rows.length === 0) {
       return res.status(404).json({
         status: 'error',
         message: 'Souvenir non trouvé'
       });
     }
 
-    if (checkResult.rows[0].author_id !== author_id) {
+    const souvenir = souvenirResult.rows[0];
+
+    if (souvenir.author_id !== author_id) {
       return res.status(403).json({
         status: 'error',
         message: 'Vous ne pouvez supprimer que vos propres souvenirs'
       });
     }
 
-    // Supprimer le souvenir
+    // Supprimer l'image d'Azure si elle existe
+    if (souvenir.photo_data) {
+      console.log('🗑️ Suppression de l\'image associée au souvenir:', id);
+      await deleteBlobFromAzure(souvenir.photo_data);
+    }
+
+    // Supprimer le souvenir de la base de données
     await db.query('DELETE FROM journal_entries WHERE id = $1', [id]);
 
+    console.log('✅ Souvenir supprimé avec succès:', id);
     res.json({
       status: 'ok',
       message: 'Souvenir supprimé avec succès'
