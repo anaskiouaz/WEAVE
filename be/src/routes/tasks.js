@@ -46,14 +46,6 @@ export async function createTask(req, res) {
 
     let resolvedCircle = null;
 
-
-router.delete('/:id', async (req, res) => {
-    const { id } = req.params;
-    try {
-        await db.query('DELETE FROM tasks WHERE id = $1', [id]);
-        res.json({ message: 'Tâche supprimée' });
-    } catch (err) {
-        res.status(500).json({ error: err.message });
     if (circle_id) {
       const specificCircle = await db.query(
         `SELECT id, senior_name FROM care_circles WHERE id = $1`,
