@@ -1,42 +1,51 @@
 import { useState, useEffect } from 'react';
-import { Plus, X, ShoppingCart, Stethoscope, Activity, User, Users } from 'lucide-react'; // Ajout de l'icone Users
+import { Plus, X, ShoppingCart, Stethoscope, Activity, User, Users, ArrowLeft } from 'lucide-react';
 import { apiGet, apiPost, apiDelete } from '../api/client';
+import { useNavigate } from 'react-router-dom';
 
 export default function CalendarView() {
+  const navigate = useNavigate();
   const [showAddTask, setShowAddTask] = useState(false);
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // Mise à jour de l'état initial pour inclure la date et le quota
+  // 1. RÉCUPÉRATION DU CERCLE ACTUEL
+  const currentCircleId = localStorage.getItem('weave_current_circle');
+
   const [newTask, setNewTask] = useState({
     title: '',
     type: 'activity',
-    date: new Date().toISOString().split('T')[0], // Date par défaut : Aujourd'hui
+    date: new Date().toISOString().split('T')[0],
     time: '',
-    required_helpers: 1, // Quota par défaut
+    required_helpers: 1,
   });
 
   const daysOfWeek = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
 
-  // Fetch tasks from API
   useEffect(() => {
-    async function fetchTasks() {
-      try {
-        setLoading(true);
-        const data = await apiGet('/tasks');
-        setTasks(data.data || []);
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching tasks:', err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
-      }
+    // Si pas de cercle, on redirige (sécurité)
+    if (!currentCircleId) {
+        navigate('/dashboard');
+        return;
     }
-
     fetchTasks();
-  }, []);
+  }, [currentCircleId]);
+
+  async function fetchTasks() {
+    try {
+      setLoading(true);
+      // 2. APPEL AVEC LE BON ID
+      const data = await apiGet(`/tasks?circleId=${currentCircleId}`);
+      setTasks(data.data || []);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching tasks:', err);
+      setError(err.message);
+    } finally {
+      setLoading(false);
+    }
+  }
 
   function getDateDayOfWeek(dateStr) {
     const date = new Date(dateStr);
@@ -55,35 +64,27 @@ export default function CalendarView() {
     activity: { icon: Activity, color: 'bg-green-100 text-green-600 border-green-200' },
   };
 
-  // Dans CalendarView.jsx
-
   const handleAddTask = async () => {
     try {
-      // 1. Validation basique
       if (!newTask.date || !newTask.title) {
         alert("La date et le titre sont requis");
         return;
       }
 
-      // 2. Construction du payload
+      // 3. ENVOI DU BON CIRCLE_ID
       const taskPayload = {
-        // circle_id: 1,  <--- SUPPRIME CETTE LIGNE (Laisse le backend choisir le cercle par défaut)
+        circle_id: currentCircleId, // <--- C'EST ICI QUE LA MAGIE OPÈRE
         title: newTask.title,
         task_type: newTask.type,
         date: newTask.date,
         time: newTask.time,
         required_helpers: parseInt(newTask.required_helpers, 10),
         helper_name: 'À pourvoir',
-        senior_name: 'Grand-Père Michel',
       };
 
       await apiPost('/tasks', taskPayload);
 
-      // Rafraichissement
-      const data = await apiGet('/tasks');
-      setTasks(data.data || []);
-
-      // Reset du formulaire et fermeture
+      fetchTasks(); // On recharge la liste
       setShowAddTask(false);
       setNewTask({
         title: '',
@@ -102,92 +103,87 @@ export default function CalendarView() {
   const handleDeleteTask = async (taskId) => {
     try {
       await apiDelete(`/tasks/${taskId}`);
-      const data = await apiGet('/tasks');
-      setTasks(data.data || []);
+      fetchTasks();
     } catch (err) {
       console.error('Error deleting task:', err);
       setError(err.message);
     }
   };
 
-  if (loading) {
-    return <div className="p-8 text-center">Chargement des tâches...</div>;
-  }
+  if (loading) return <div className="p-8 text-center text-gray-500">Chargement des tâches...</div>;
 
   return (
     <div className="p-8">
       <div className="max-w-7xl mx-auto">
+        <button onClick={() => navigate('/dashboard')} className="flex items-center gap-2 text-gray-500 hover:text-blue-600 mb-4 transition-colors">
+            <ArrowLeft size={20}/> Retour au tableau de bord
+        </button>
+
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-gray-900 mb-2">Calendrier partagé</h1>
-            <p className="text-gray-600">
-              Coordonnez les interventions de la semaine
-            </p>
+            <h1 className="text-gray-900 mb-2 font-bold text-2xl">Calendrier partagé</h1>
+            <p className="text-gray-600">Coordonnez les interventions de la semaine</p>
           </div>
           <button
             onClick={() => setShowAddTask(true)}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md"
           >
-            <Plus className="w-5 h-5" />
-            Ajouter une tâche
+            <Plus className="w-5 h-5" /> Ajouter une tâche
           </button>
         </div>
 
-        {error && (
-          <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg">
-            {error}
-          </div>
-        )}
+        {error && <div className="mb-4 p-4 bg-red-50 text-red-700 rounded-lg border border-red-200">{error}</div>}
 
         {/* Calendar Grid */}
-        <div className="grid grid-cols-7 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-7 gap-4">
           {daysOfWeek.map((day) => {
             const dayTasks = getTasksByDay(day);
 
             return (
-              <div key={day} className="bg-white rounded-lg shadow">
-                <div className="p-4 border-b bg-blue-50">
-                  <h3 className="text-blue-900 text-center">{day}</h3>
+              <div key={day} className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden flex flex-col h-full min-h-[400px]">
+                <div className="p-3 border-b border-gray-100 bg-gray-50">
+                  <h3 className="text-gray-700 font-bold text-center text-sm uppercase tracking-wide">{day}</h3>
                 </div>
-                <div className="p-3 space-y-2 min-h-[400px]">
+                <div className="p-2 space-y-2 flex-1 bg-gray-50/30">
                   {dayTasks.map((task) => {
                     const typeInfo = taskTypeIcons[task.task_type] || taskTypeIcons.activity;
                     const Icon = typeInfo.icon;
 
                     return (
-                      <div
-                        key={task.id}
-                        className={`p-3 rounded-lg border ${typeInfo.color} relative group`}
-                      >
+                      <div key={task.id} className={`p-3 rounded-lg border ${typeInfo.color} relative group bg-white shadow-sm transition-all hover:shadow-md`}>
                         <button
                           onClick={() => handleDeleteTask(task.id)}
-                          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-red-600 hover:text-red-800"
+                          className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 p-1 bg-white/80 rounded-full"
                         >
-                          <X className="w-4 h-4" />
+                          <X className="w-3 h-3" />
                         </button>
                         <div className="flex items-start gap-2 mb-2">
-                          <Icon className="w-4 h-4 mt-0.5" />
+                          <Icon className="w-4 h-4 mt-0.5 shrink-0" />
                           <div className="flex-1 min-w-0">
-                            <p className="text-gray-900 break-words font-medium">{task.title}</p>
-                            <p className="text-gray-600 text-sm">{task.time}</p>
+                            <p className="text-gray-900 break-words font-bold text-sm leading-tight">{task.title}</p>
+                            <p className="text-gray-500 text-xs mt-0.5">{task.time.substring(0,5)}</p>
                           </div>
                         </div>
-                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200/50">
+                        <div className="flex items-center justify-between mt-2 pt-2 border-t border-black/5">
                           <div className="flex items-center gap-1">
-                            <User className="w-3 h-3 text-gray-500" />
-                            <p className="text-gray-600 text-xs">{task.helper_name}</p>
+                            <User className="w-3 h-3 text-gray-400" />
+                            <p className="text-gray-600 text-xs font-medium truncate max-w-[80px]">{task.helper_name}</p>
                           </div>
-                          {/* Affichage du quota requis si > 1 */}
                           {task.required_helpers > 1 && (
-                            <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-gray-200">
+                            <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-gray-200 shadow-sm">
                               <Users className="w-3 h-3 text-gray-500" />
-                              <span className="text-xs font-semibold text-gray-600">{task.required_helpers}</span>
+                              <span className="text-xs font-bold text-gray-700">{task.required_helpers}</span>
                             </div>
                           )}
                         </div>
                       </div>
                     );
                   })}
+                  {dayTasks.length === 0 && (
+                      <div className="h-full flex items-center justify-center opacity-30">
+                          <Plus className="w-6 h-6 text-gray-400"/>
+                      </div>
+                  )}
                 </div>
               </div>
             );
@@ -196,33 +192,30 @@ export default function CalendarView() {
 
         {/* Add Task Modal */}
         {showAddTask && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg max-w-md w-full p-6">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm flex items-center justify-center z-50 p-4 animate-in fade-in">
+            <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
               <div className="flex justify-between items-center mb-6">
-                <h2 className="text-gray-900 text-xl font-semibold">Nouvelle tâche</h2>
-                <button
-                  onClick={() => setShowAddTask(false)}
-                  className="text-gray-400 hover:text-gray-600"
-                >
-                  <X className="w-6 h-6" />
+                <h2 className="text-gray-900 text-xl font-bold flex items-center gap-2"><Plus className="text-blue-600"/> Nouvelle tâche</h2>
+                <button onClick={() => setShowAddTask(false)} className="text-gray-400 hover:text-gray-600 bg-gray-100 p-2 rounded-full hover:bg-gray-200 transition-colors">
+                  <X className="w-5 h-5" />
                 </button>
               </div>
 
               <div className="space-y-4">
                 <div>
-                  <label className="block text-gray-700 mb-2 font-medium">Titre de la tâche</label>
+                  <label className="block text-gray-700 mb-1.5 text-sm font-bold">Titre de la tâche</label>
                   <input
                     type="text"
                     value={newTask.title}
                     onChange={(e) => setNewTask({ ...newTask, title: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
-                    placeholder="Ex: Visite médicale"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                    placeholder="Ex: Visite médicale, Courses..."
                   />
                 </div>
 
                 <div className="grid grid-cols-2 gap-4">
                   <div>
-                    <label className="block text-gray-700 mb-2 font-medium">Date</label>
+                    <label className="block text-gray-700 mb-1.5 text-sm font-bold">Date</label>
                     <input
                       type="date"
                       value={newTask.date}
@@ -231,7 +224,7 @@ export default function CalendarView() {
                     />
                   </div>
                   <div>
-                    <label className="block text-gray-700 mb-2 font-medium">Heure</label>
+                    <label className="block text-gray-700 mb-1.5 text-sm font-bold">Heure</label>
                     <input
                       type="time"
                       value={newTask.time}
@@ -242,22 +235,20 @@ export default function CalendarView() {
                 </div>
 
                 <div>
-                  <label className="block text-gray-700 mb-2 font-medium">Type de tâche</label>
+                  <label className="block text-gray-700 mb-1.5 text-sm font-bold">Type de tâche</label>
                   <select
                     value={newTask.type}
                     onChange={(e) => setNewTask({ ...newTask, type: e.target.value })}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white"
                   >
-                    <option value="medical">Médical</option>
-                    <option value="shopping">Courses</option>
-                    <option value="activity">Activité</option>
+                    <option value="medical">Médical (Rdv, Soins)</option>
+                    <option value="shopping">Logistique (Courses, Repas)</option>
+                    <option value="activity">Activité (Promenade, Jeux)</option>
                   </select>
                 </div>
 
                 <div>
-                  <label className="block text-gray-700 mb-2 font-medium">
-                    Nombre d'aidants requis (Quota)
-                  </label>
+                  <label className="block text-gray-700 mb-1.5 text-sm font-bold">Nombre d'aidants requis</label>
                   <div className="relative">
                     <Users className="absolute left-3 top-3.5 w-5 h-5 text-gray-400" />
                     <input
@@ -271,16 +262,16 @@ export default function CalendarView() {
                   </div>
                 </div>
 
-                <div className="flex gap-3 pt-4">
+                <div className="flex gap-3 pt-4 border-t border-gray-100 mt-2">
                   <button
                     onClick={() => setShowAddTask(false)}
-                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors"
+                    className="flex-1 px-4 py-3 border border-gray-300 rounded-lg hover:bg-gray-50 transition-colors font-medium text-gray-700"
                   >
                     Annuler
                   </button>
                   <button
                     onClick={handleAddTask}
-                    className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+                    className="flex-1 px-4 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-bold shadow-md hover:shadow-lg"
                   >
                     Ajouter
                   </button>
