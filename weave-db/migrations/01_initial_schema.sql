@@ -1,24 +1,29 @@
 -- ============================================================
--- SCHEMA COMPLET FUSIONNÉ (CARE CIRCLES)
--- Version : Tout inclus (Profil étendu + Journal riche + Dispos)
+-- SCHEMA COMPLET FUSIONNÉ ET À JOUR (CARE CIRCLES)
+-- Mis à jour selon le scan de la base de données
 -- ============================================================
 
 -- 1. DEFINITION DES TYPES (ENUMS)
-CREATE TYPE global_role_type AS ENUM ('SUPERADMIN', 'USER');
-CREATE TYPE circle_role_type AS ENUM ('ADMIN', 'HELPER', 'PC'); -- PC = Person Cared For (Bénéficiaire)
+CREATE TYPE global_role_type AS ENUM ('SUPERADMIN', 'ADMIN', 'HELPER', 'PC', 'USER');
+CREATE TYPE circle_role_type AS ENUM ('SUPERADMIN', 'ADMIN', 'HELPER', 'PC');
 CREATE TYPE incident_status_type AS ENUM ('OPEN', 'ESCALATED', 'RESOLVED');
 CREATE TYPE severity_type AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
 
--- 2. TABLE UTILISATEURS (Fusionnée : Profil riche)
+-- 2. TABLE UTILISATEURS
 CREATE TABLE users (
-                       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                       name VARCHAR(255) NOT NULL,
-                       email VARCHAR(255) UNIQUE NOT NULL,
-                       medical_info TEXT,                       -- Pour stocker les données chiffrées
-                       privacy_consent BOOLEAN DEFAULT FALSE,   -- Pour le consentement RGPD
-                       password_hash VARCHAR(255) NOT NULL,
-                       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                       role_global global_role_type
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    phone VARCHAR(20),
+    birth_date DATE,
+    medical_info TEXT,
+    privacy_consent BOOLEAN DEFAULT FALSE,
+    password_hash VARCHAR(255), -- Note: marqué 'nullable' dans ta DB, mais souvent requis en pratique
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    role_global global_role_type,
+    
+    -- Colonne ajoutée suite au scan DB
+    fcm_token TEXT 
 );
 
 -- 3. CERCLES DE SOINS
@@ -41,12 +46,11 @@ CREATE TABLE user_roles (
     CONSTRAINT fk_role_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE
 );
 
--- 5. DISPONIBILITÉS (Indispensable pour votre API Node.js)
+-- 5. DISPONIBILITÉS
 CREATE TABLE user_availability (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
     circle_id UUID NOT NULL,
-
     day_of_week VARCHAR(20) NOT NULL, 
     slots JSONB NOT NULL DEFAULT '[]'::jsonb, 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -59,24 +63,30 @@ CREATE TABLE tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     circle_id UUID NOT NULL,
 
-    -- Détails
+    -- Détails de base
     title VARCHAR(255) NOT NULL,
-    task_type VARCHAR(50) NOT NULL,     -- ex: "medical", "shopping"
+    task_type VARCHAR(50),      -- Nullable dans la DB
+    description TEXT,
 
-    -- Planification
-    date DATE NOT NULL,
-    time TIME NOT NULL,
+    -- Planification (Format historique)
+    date DATE,                  -- Nullable dans la DB
+    time TIME,                  -- Nullable dans la DB
 
     -- Gestion des aidants
     required_helpers INT DEFAULT 1,
-    helper_name VARCHAR(100),           -- Nom simple pour affichage rapide
+    helper_name VARCHAR(100),
+
+    -- Colonnes ajoutées suite au scan DB
+    assigned_to VARCHAR(255),       -- Pour l'assignation directe (string)
+    due_date TIMESTAMP,             -- Pour une date d'échéance précise
+    completed BOOLEAN DEFAULT FALSE, -- Statut de complétion simple
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_task_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE
 );
 
--- 7. ASSIGNATION DES TACHES
+-- 7. ASSIGNATION DES TACHES (Table de jointure)
 CREATE TABLE task_signups (
     task_id UUID NOT NULL,
     user_id UUID NOT NULL,
@@ -98,42 +108,28 @@ CREATE TABLE messages (
     CONSTRAINT fk_message_sender FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- 9. JOURNAL DE BORD (Fusionnée : Version riche avec Auteur et Commentaires)
+-- 9. JOURNAL DE BORD
 CREATE TABLE journal_entries (
      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
      circle_id UUID NOT NULL,
-     author_id UUID NOT NULL, -- Nouvelle colonne pour identifier l'auteur
+     author_id UUID NOT NULL,
      mood INT CHECK (mood BETWEEN 1 AND 10),
      text_content TEXT,
      photo_url VARCHAR(2048),
      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
      comments JSONB DEFAULT '[]'::jsonb,
 
-     -- Contraintes
      CONSTRAINT fk_journal_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE,
      CONSTRAINT fk_journal_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
-    mood INT CHECK (mood BETWEEN 1 AND 10),
-    text_content TEXT,
-    photo_url VARCHAR(2048),
-    
-    -- Ajout version 2 (Commentaires)
-    comments JSONB DEFAULT '[]'::jsonb,
-
-    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-    CONSTRAINT fk_journal_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE,
-    CONSTRAINT fk_journal_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL
-);
-
--- 10. JOURNAUX D'AUDIT (Pour savoir qui a fait quoi)
+-- 10. JOURNAUX D'AUDIT
 CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID,                                  
+    user_id UUID,                      
     action VARCHAR(50) NOT NULL,                   
     details TEXT,                                 
-    ip_address VARCHAR(45),                      
+    ip_address VARCHAR(45),                       
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
