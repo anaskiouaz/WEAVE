@@ -1,4 +1,4 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL;
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
 
 // src/api/client.js
 
@@ -53,16 +53,25 @@ export async function apiPut(path, data) {
   return res.json();
 }// ----------------------------------------------
 
-export async function apiDelete(path) {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+export async function apiDelete(path, data = null) {
+  const headers = {
+    'Content-Type': 'application/json',
+  };
+
+  const config = {
     method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
+    headers,
+  };
+
+  if (data) {
+    config.body = JSON.stringify(data);
+  }
+
+  const res = await fetch(`${API_BASE_URL}${path}`, config);
 
   if (!res.ok) {
-    throw new Error(`API error: ${res.status}`);
+    const errorData = await res.json().catch(() => ({}));
+    throw new Error(`API error ${res.status}: ${errorData.message || errorData.error || res.statusText}`);
   }
 
   return res.json();
