@@ -39,12 +39,13 @@ INSERT INTO user_roles (user_id, circle_id, role) VALUES
 ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b22', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44', 'HELPER'); -- Sophie aide
 
 
--- 4. Création des Tâches
-INSERT INTO tasks (circle_id, title, task_type, date, time, required_helpers, helper_name) VALUES
+-- 4. Création des Tâches (avec descriptions détaillées)
+INSERT INTO tasks (circle_id, title, task_type, description, date, time, required_helpers, helper_name) VALUES
 (
     'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
     'Consultation Cardiologue',
     'medical',
+    'Accompagner Monique à sa visite de suivi chez le cardiologue à la clinique Saint-Jean.',
     '2025-06-12',
     '14:30:00',
     1,
@@ -54,6 +55,7 @@ INSERT INTO tasks (circle_id, title, task_type, date, time, required_helpers, he
     'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
     'Courses au Supermarché (Lait, Eau, Fruits)',
     'shopping',
+    'Faire les achats hebdomadaires pour remplir le frigo et vérifier les stocks de produits frais.',
     '2025-06-13',
     '10:00:00',
     1,
@@ -63,6 +65,7 @@ INSERT INTO tasks (circle_id, title, task_type, date, time, required_helpers, he
     'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
     'Prendre le thé et discuter',
     'social',
+    'Moment convivial à la maison pour maintenir le lien social et écouter les nouvelles de Monique.',
     '2025-06-14',
     '16:00:00',
     2,
@@ -72,6 +75,7 @@ INSERT INTO tasks (circle_id, title, task_type, date, time, required_helpers, he
     'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
     'Récupérer ordonnance pharmacie centrale',
     'logistics',
+    'Aller chercher l’ordonnance et vérifier qu’il ne manque aucun médicament prescrit.',
     '2025-06-12',
     '18:00:00',
     1,
@@ -81,6 +85,7 @@ INSERT INTO tasks (circle_id, title, task_type, date, time, required_helpers, he
     'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
     'Sortir les poubelles et arroser les plantes',
     'home',
+    'Gestion des sacs poubelles du soir et arrosage des plantes du salon et du balcon.',
     '2025-06-15',
     '19:00:00',
     1,
@@ -90,6 +95,7 @@ INSERT INTO tasks (circle_id, title, task_type, date, time, required_helpers, he
     'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
     'Déposer Monique au club de bridge',
     'transport',
+    'Trajet aller-retour en voiture pour déposer Monique et l’aider à s’installer à la table de jeu.',
     '2025-06-16',
     '13:45:00',
     1,

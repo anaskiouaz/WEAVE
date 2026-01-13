@@ -1,3 +1,5 @@
+import { useState } from 'react';
+import { apiPost } from '../api/client';
 import { Calendar, Heart, MessageSquare, Users, TrendingUp, Clock } from 'lucide-react';
 
 export default function Dashboard() {
