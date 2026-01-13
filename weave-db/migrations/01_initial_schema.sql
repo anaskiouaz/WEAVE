@@ -1,15 +1,41 @@
 -- ============================================================
--- SCHEMA COMPLET FUSIONNÉ ET À JOUR (CARE CIRCLES)
--- Mis à jour selon le scan de la base de données
+-- SCHEMA COMPLET FUSIONNÉ (CARE CIRCLES)
+-- AVEC RESET TOTAL (DROP TABLE)
 -- ============================================================
 
+-- 0. RESET / NETTOYAGE (Attention : Supprime toutes les données existantes)
+DROP TABLE IF EXISTS incidents CASCADE;
+DROP TABLE IF EXISTS audit_logs CASCADE;
+DROP TABLE IF EXISTS journal_entries CASCADE;
+DROP TABLE IF EXISTS messages CASCADE;
+DROP TABLE IF EXISTS task_signups CASCADE;
+DROP TABLE IF EXISTS tasks CASCADE;
+DROP TABLE IF EXISTS user_availability CASCADE;
+DROP TABLE IF EXISTS user_roles CASCADE;
+DROP TABLE IF EXISTS care_circles CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
+-- Suppression des types (Enums) pour les recréer proprement
+DROP TYPE IF EXISTS severity_type CASCADE;
+DROP TYPE IF EXISTS incident_status_type CASCADE;
+DROP TYPE IF EXISTS circle_role_type CASCADE;
+DROP TYPE IF EXISTS global_role_type CASCADE;
+
+
+-- ============================================================
 -- 1. DEFINITION DES TYPES (ENUMS)
+-- ============================================================
 CREATE TYPE global_role_type AS ENUM ('SUPERADMIN', 'ADMIN', 'HELPER', 'PC', 'USER');
 CREATE TYPE circle_role_type AS ENUM ('SUPERADMIN', 'ADMIN', 'HELPER', 'PC');
 CREATE TYPE incident_status_type AS ENUM ('OPEN', 'ESCALATED', 'RESOLVED');
 CREATE TYPE severity_type AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
 
--- 2. TABLE UTILISATEURS
+
+-- ============================================================
+-- 2. TABLES PRINCIPALES
+-- ============================================================
+
+-- TABLE UTILISATEURS
 CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
@@ -18,15 +44,13 @@ CREATE TABLE users (
     birth_date DATE,
     medical_info TEXT,
     privacy_consent BOOLEAN DEFAULT FALSE,
-    password_hash VARCHAR(255), -- Note: marqué 'nullable' dans ta DB, mais souvent requis en pratique
+    password_hash VARCHAR(255), 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     role_global global_role_type,
-    
-    -- Colonne ajoutée suite au scan DB
     fcm_token TEXT 
 );
 
--- 3. CERCLES DE SOINS
+-- CERCLES DE SOINS
 CREATE TABLE care_circles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     senior_name VARCHAR(255) NOT NULL,
@@ -35,7 +59,7 @@ CREATE TABLE care_circles (
     CONSTRAINT fk_circle_creator FOREIGN KEY (created_by) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- 4. ROLES DANS LE CERCLE
+-- ROLES DANS LE CERCLE
 CREATE TABLE user_roles (
     user_id UUID NOT NULL,
     circle_id UUID NOT NULL,
@@ -46,7 +70,7 @@ CREATE TABLE user_roles (
     CONSTRAINT fk_role_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE
 );
 
--- 5. DISPONIBILITÉS
+-- DISPONIBILITÉS
 CREATE TABLE user_availability (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID NOT NULL,
@@ -58,35 +82,35 @@ CREATE TABLE user_availability (
     CONSTRAINT uq_user_day UNIQUE (user_id, day_of_week)
 );
 
--- 6. TACHES
+-- TACHES
 CREATE TABLE tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     circle_id UUID NOT NULL,
 
-    -- Détails de base
+    -- Détails
     title VARCHAR(255) NOT NULL,
-    task_type VARCHAR(50),      -- Nullable dans la DB
+    task_type VARCHAR(50),      
     description TEXT,
 
-    -- Planification (Format historique)
-    date DATE,                  -- Nullable dans la DB
-    time TIME,                  -- Nullable dans la DB
+    -- Planification
+    date DATE,                  
+    time TIME,                  
 
     -- Gestion des aidants
     required_helpers INT DEFAULT 1,
     helper_name VARCHAR(100),
 
-    -- Colonnes ajoutées suite au scan DB
-    assigned_to VARCHAR(255),       -- Pour l'assignation directe (string)
-    due_date TIMESTAMP,             -- Pour une date d'échéance précise
-    completed BOOLEAN DEFAULT FALSE, -- Statut de complétion simple
+    -- Suivi
+    assigned_to VARCHAR(255),       
+    due_date TIMESTAMP,             
+    completed BOOLEAN DEFAULT FALSE, 
 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_task_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE
 );
 
--- 7. ASSIGNATION DES TACHES (Table de jointure)
+-- ASSIGNATION DES TACHES
 CREATE TABLE task_signups (
     task_id UUID NOT NULL,
     user_id UUID NOT NULL,
@@ -97,7 +121,7 @@ CREATE TABLE task_signups (
     CONSTRAINT fk_signup_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- 8. MESSAGES
+-- MESSAGES
 CREATE TABLE messages (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     circle_id UUID NOT NULL,
@@ -108,7 +132,7 @@ CREATE TABLE messages (
     CONSTRAINT fk_message_sender FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- 9. JOURNAL DE BORD
+-- JOURNAL DE BORD
 CREATE TABLE journal_entries (
      id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
      circle_id UUID NOT NULL,
@@ -123,7 +147,7 @@ CREATE TABLE journal_entries (
      CONSTRAINT fk_journal_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- 10. JOURNAUX D'AUDIT
+-- JOURNAUX D'AUDIT
 CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     user_id UUID,                      
@@ -134,7 +158,7 @@ CREATE TABLE audit_logs (
     CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
--- 11. INCIDENTS
+-- INCIDENTS
 CREATE TABLE incidents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     circle_id UUID NOT NULL,
