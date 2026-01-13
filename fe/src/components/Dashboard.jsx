@@ -1,6 +1,4 @@
 import { useState } from 'react';
-import { Calendar, Heart, MessageSquare, Users } from 'lucide-react';
-import { PushNotifications } from '@capacitor/push-notifications';
 import { apiPost } from '../api/client';
 import { Calendar, Heart, MessageSquare, Users, TrendingUp, Clock } from 'lucide-react';
 
