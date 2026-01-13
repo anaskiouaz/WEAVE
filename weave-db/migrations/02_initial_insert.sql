@@ -3,6 +3,15 @@
 INSERT INTO users (id, name, email, password_hash, role_global, medical_info, privacy_consent) VALUES
 (
     'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 
+    'root', 
+    'root', 
+    'root', 
+    'SUPERADMIN',
+    NULL,  -- Pas de données chiffrées pour l'instant (évite le crash)
+    TRUE   -- Consentement DONNÉ
+),
+(
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 
     'Thomas Durand', 
     'thomas@weave.app', 
     'hash_secret_123', 
