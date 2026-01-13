@@ -55,27 +55,30 @@ CREATE TABLE user_availability (
     CONSTRAINT fk_availability_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
     CONSTRAINT uq_user_day UNIQUE (user_id, day_of_week)
 );
-
--- 6. TACHES
+-- 4. TÂCHES (La table demandée, mise à jour)
 CREATE TABLE tasks (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     circle_id UUID NOT NULL,
-
-    -- Détails
+    
+    -- Détails de la tâche
     title VARCHAR(255) NOT NULL,
-    task_type VARCHAR(50) NOT NULL,     -- ex: "medical", "shopping"
-    description TEXT,                    -- Description détaillée de la tâche
-
-    -- Planification
+    task_type VARCHAR(50),      -- ex: "medical", "shopping", "transport"
+    description TEXT,
+    
+    -- Planification (Séparé selon ta demande, mais souvent un TIMESTAMPTZ est mieux)
     date DATE NOT NULL,
-    time TIME NOT NULL,
-
-    -- Gestion des aidants
-    required_helpers INT DEFAULT 1,
-    helper_name VARCHAR(100),           -- Nom simple pour affichage rapide
-
+    time TIME WITHOUT TIME ZONE,
+    due_date TIMESTAMP WITHOUT TIME ZONE, -- Date limite optionnelle
+    
+    -- Gestion des ressources
+    required_helpers INTEGER DEFAULT 1,
+    
+    -- État
+    completed BOOLEAN DEFAULT FALSE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
+    created_by UUID REFERENCES users(id), -- Qui a créé la demande
+    
+    -- Clé étrangère vers le cercle
     CONSTRAINT fk_task_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE
 );
 
