@@ -73,14 +73,6 @@ export default function Dashboard() {
             <h1 className="text-gray-900 mb-2">Tableau de bord</h1>
             <p className="text-gray-600">Bienvenue sur votre espace d'entraide</p>
           </div>
-          {/* Bouton de secours si le lancement auto est bloqué par l'OS */}
-          <button 
-            onClick={activerNotifs}
-            className="flex items-center gap-2 text-indigo-600 bg-indigo-50 px-3 py-2 rounded-lg text-sm font-medium hover:bg-indigo-100 transition-colors"
-          >
-            <Bell className="w-4 h-4" />
-            Activer Notifications
-          </button>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
