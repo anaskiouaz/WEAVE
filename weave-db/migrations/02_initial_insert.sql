@@ -1,6 +1,6 @@
 -- 1. Création de 3 utilisateurs (Un admin famille, un bénévole, une voisine)
 -- Correction : medical_info est à NULL pour éviter de faire planter le déchiffrement au démarrage
-INSERT INTO users (id, name, email, password_hash, role_global, medical_info, privacy_consent) VALUESq
+INSERT INTO users (id, name, email, password_hash, role_global, medical_info, privacy_consent) VALUES
 (
     'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 
     'Thomas Durand', 
