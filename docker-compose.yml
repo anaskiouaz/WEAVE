@@ -46,7 +46,7 @@ services:
       - weave-net
 
   frontend:
-    image: node:22-alpine
+    image: node:22.21.1
     container_name: weave-fe
     working_dir: /app
     restart: unless-stopped

@@ -16,23 +16,23 @@ router.post('/login', async (req, res) => {
     const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
     
     if (result.rows.length === 0) {
-      console.log('❌ Échec: Email introuvable dans la base de données.');
+      console.log('Échec: Email introuvable dans la base de données.');
       return res.status(401).json({ success: false, error: "Email incorrect." });
     }
 
     const user = result.rows[0];
-    console.log('✅ Utilisateur trouvé:', user.name);
+    console.log('Utilisateur trouvé:', user.name);
     console.log('Hachage en base:', user.password_hash ? 'Présent' : 'MANQUANT !');
 
     // 2. Vérifier le mot de passe
     const isMatch = await bcrypt.compare(password, user.password_hash);
     
     if (!isMatch) {
-      console.log('❌ Échec: Le mot de passe ne correspond pas au hachage.');
+      console.log('Échec: Le mot de passe ne correspond pas au hachage.');
       return res.status(401).json({ success: false, error: "Mot de passe incorrect." });
     }
 
-    console.log('✅ Succès: Mot de passe validé.');
+    console.log('Succès: Mot de passe validé.');
 
     // Récupérer les cercles de l'utilisateur
     const circlesResult = await db.query(`
@@ -50,7 +50,7 @@ router.post('/login', async (req, res) => {
     res.json({ success: true, token, user: { ...user, circles } });
 
   } catch (error) {
-    console.error('❌ ERREUR CRITIQUE:', error);
+    console.error('ERREUR CRITIQUE:', error);
     res.status(500).json({ success: false, error: "Erreur serveur." });
   }
 });
