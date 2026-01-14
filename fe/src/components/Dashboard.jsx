@@ -1,6 +1,8 @@
 import { useState, useEffect } from 'react';
 import { apiPost } from '../api/client';
 import { Calendar, Heart, MessageSquare, Users, TrendingUp, Clock } from 'lucide-react';
+import { PushNotifications } from '@capacitor/push-notifications';
+import { Capacitor } from '@capacitor/core';
 
 export default function Dashboard() {
   
@@ -11,6 +13,7 @@ export default function Dashboard() {
   ];
   // Fonction pour activer les notifications
   const activerNotifs = async () => {
+    if (Capacitor.getPlatform() === 'web') return; 
     console.log("--- Démarrage Activer Notifs ---");
     try {
         const storedUser = localStorage.getItem('user');
