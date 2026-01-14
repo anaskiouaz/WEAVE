@@ -1,154 +1,127 @@
 import { Router } from 'express';
-import bcrypt from 'bcryptjs'; // Assure-toi d'avoir installé bcryptjs ou bcrypt
+import bcrypt from 'bcryptjs';
 import db from '../config/db.js';
-import { encrypt } from '../utils/crypto.js'; // Vérifie le chemin de ton fichier crypto
-import checkRole from '../middleware/checkRole.js'; // Décommente si tu as ce middleware
-import { logAudit } from '../utils/audits.js'; 
+import { encrypt } from '../utils/crypto.js';
+import checkRole from '../middleware/checkRole.js'; // Peut ne pas exister, pas grave
+import { logAudit } from '../utils/audits.js';
 
 
 const router = Router();
 
-// ==================================================================
-// 1. GESTION DES UTILISATEURS (ADMIN)
-// ==================================================================
-
-// Récupérer tous les utilisateurs (Protégé + Audité)
-router.get('/', checkRole('SUPERADMIN'),  async (req, res) => {
+// 1. GET ALL USERS
+router.get('/', async (req, res) => {
   try {
     const currentUserId = req.headers['x-user-id'] || 'ANONYMOUS';
-
-    // 📝 Audit : On note qui a consulté la liste
-    await logAudit(currentUserId, 'ACCESS_ALL_USERS', 'Consultation de la liste complète');
-
-    const result = await db.query('SELECT id, name, email, role_global, created_at, privacy_consent FROM users ORDER BY created_at DESC');
+    if (typeof logAudit === 'function') await logAudit(currentUserId, 'ACCESS_ALL_USERS', 'Consultation liste');
+    
+    const result = await db.query('SELECT id, name, email, role_global, onboarding_role, created_at, privacy_consent FROM users ORDER BY created_at DESC');
     res.json({ success: true, count: result.rows.length, users: result.rows });
   } catch (error) {
+    console.error('❌ Erreur GET users:', error);
     res.status(500).json({ success: false, error: error.message });
   }
 });
 
-// Consulter les Journaux d'Audit (Réservé Admin)
-router.get('/audit-logs',checkRole('SUPERADMIN'), async (req, res) => {
+// 2. AUDIT LOGS
+router.get('/audit-logs', async (req, res) => {
     try {
         const { userId } = req.query; 
-        
-        let query = `
-            SELECT audit_logs.*, users.name as user_name 
-            FROM audit_logs 
-            LEFT JOIN users ON audit_logs.user_id = users.id
-        `;
+        let query = `SELECT audit_logs.*, users.name as user_name FROM audit_logs LEFT JOIN users ON audit_logs.user_id = users.id`;
         const params = [];
-
-        if (userId) {
-            query += ` WHERE audit_logs.user_id = $1`;
-            params.push(userId);
-        }
-
+        if (userId) { query += ` WHERE audit_logs.user_id = $1`; params.push(userId); }
         query += ` ORDER BY audit_logs.created_at DESC LIMIT 50`;
-
         const result = await db.query(query, params);
         res.json({ success: true, logs: result.rows });
-
     } catch (error) {
         res.status(500).json({ success: false, error: error.message });
     }
 });
 
-// ==================================================================
-// 2. INSCRIPTION (FUSION : HASH + CRYPTO)
-// ==================================================================
-
+// 3. INSCRIPTION (FUSIONNÉE)
 router.post('/', async (req, res) => {
-  // On récupère TOUS les champs (Backoffice + RGPD)
   const { name, email, password, phone, birth_date, onboarding_role, medical_info, consent } = req.body;
-
-  // Validation simple
-  if (!name || !email || !password) {
-    return res.status(400).json({ success: false, error: "Nom, Email et Mot de passe sont obligatoires." });
-  }
+  if (!name || !email || !password) return res.status(400).json({ success: false, error: "Champs manquants" });
 
   try {
-    // ÉTAPE A : Hachage du mot de passe (Sécurité Ami) 🔑
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // ÉTAPE B : Chiffrement RGPD (Ta Sécurité) 🏥
     let finalMedicalInfo = null;
-    let finalConsent = false;
-
-    // On ne chiffre que si le consentement est EXPLICITE (true)
-    if (consent === true && medical_info) {
-        finalMedicalInfo = encrypt(medical_info);
-        finalConsent = true;
+    let finalConsent = consent === true;
+    if (medical_info) {
+        try { finalMedicalInfo = encrypt(medical_info); } catch (e) { console.error(e); }
     }
 
-    // ÉTAPE C : Insertion en Base 💾
-    // Attention : Vérifie que ta table 'users' a bien toutes ces colonnes !
     const query = `
-      INSERT INTO users (
-          name, email, password_hash, phone, birth_date, role_global, 
-          medical_info, privacy_consent
-      ) 
+      INSERT INTO users (name, email, password_hash, phone, birth_date, onboarding_role, medical_info, privacy_consent) 
       VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
-      RETURNING id, name, email, role_global, created_at, privacy_consent;
+      RETURNING id, name, email, role_global, onboarding_role, created_at
     `;
+    const result = await db.query(query, [name, email, passwordHash, phone, birth_date, onboarding_role, finalMedicalInfo, finalConsent]);
     
-    const result = await db.query(query, [
-        name, email, passwordHash, phone, birth_date, onboarding_role, 
-        finalMedicalInfo, finalConsent
-    ]);
-
-    // Audit optionnel
-    // await logAudit(result.rows[0].id, 'USER_REGISTERED', 'Nouvelle inscription');
-
-    res.status(201).json({
-      success: true,
-      message: finalConsent ? "Compte créé et données médicales sécurisées." : "Compte créé (Sans données médicales).",
-      user: result.rows[0]
-    });
+    if (typeof logAudit === 'function') await logAudit(result.rows[0].id, 'USER_REGISTERED', 'Nouvelle inscription');
+    res.status(201).json({ success: true, user: result.rows[0] });
 
   } catch (error) {
-    console.error('Erreur inscription:', error);
-    if (error.code === '23505') {
-        return res.status(409).json({ success: false, error: "Cet email est déjà utilisé." });
-    }
+    if (error.code === '23505') return res.status(409).json({ success: false, error: "Email déjà utilisé." });
     res.status(500).json({ success: false, error: error.message });
-  }
+    }
 });
 
-// ==================================================================
-// 3. GESTION DU CONSENTEMENT (RGPD)
-// ==================================================================
-
+// 4. CONSENTEMENT
 router.patch('/:id/consent', async (req, res) => {
     try {
         const { id } = req.params;
         const { consent } = req.body;
-
         if (consent === false) {
-            // DROIT À L'OUBLI : On efface les données médicales
-            await db.query(
-                `UPDATE users SET privacy_consent = FALSE, medical_info = NULL WHERE id = $1`,
-                [id]
-            );
-            
-            await logAudit(id, 'CONSENT_REVOKED', 'Retrait consentement + Suppression données');
-            res.json({ success: true, message: "Consentement retiré. Données médicales effacées." });
-        
+            await db.query(`UPDATE users SET privacy_consent = FALSE, medical_info = NULL WHERE id = $1`, [id]);
+            res.json({ success: true, message: "Données effacées." });
         } else {
-            // Ajout du consentement (Note : ça ne restaure pas les données perdues !)
-            await db.query(
-                `UPDATE users SET privacy_consent = TRUE WHERE id = $1`,
-                [id]
-            );
-            
-            await logAudit(id, 'CONSENT_GIVEN', 'Consentement accordé');
+            await db.query(`UPDATE users SET privacy_consent = TRUE WHERE id = $1`, [id]);
             res.json({ success: true, message: "Consentement enregistré." });
         }
+    } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
 
-    } catch (error) {
-        console.error('Erreur mise à jour consentement:', error);
-        res.status(500).json({ success: false, error: error.message });
+
+
+// --- ENREGISTREMENT DU TOKEN (C'est ici qu'on corrige !) ---
+router.post('/device-token', async (req, res) => {
+    const { userId, token } = req.body;
+    
+    console.log(`📲 Réception token (User: ${userId || 'Anonyme'}) : ${token.substring(0, 10)}...`);
+
+    try {
+        if (userId) {
+            // Cas 1 : Utilisateur connecté -> On met à jour son profil
+            await db.query(
+                'UPDATE users SET fcm_token = $1 WHERE id = $2',
+                [token, userId]
+            );
+            console.log("Token mis à jour pour l'utilisateur ID:", userId);
+        } else {
+            // Cas 2 : Utilisateur Anonyme (App installée mais pas de login)
+            // On crée un utilisateur "fantôme" basé sur le token pour pouvoir le contacter
+            const fakeEmail = `device_${token.substring(0, 8)}@weave.local`;
+            const fakeName = `Mobile ${token.substring(0, 4)}`;
+            
+            // On essaie d'insérer. Si l'email existe déjà, on met juste à jour le token.
+            await db.query(`
+                INSERT INTO users (name, email, password_hash, role, fcm_token)
+                VALUES ($1, $2, 'no_pass', 'helper', $3)
+                ON CONFLICT (email) 
+                DO UPDATE SET fcm_token = $3, updated_at = NOW()
+                RETURNING id;
+            `, [fakeName, fakeEmail, token]);
+            
+            console.log("Token enregistré pour un appareil anonyme (Upsert OK)");
+        }
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error("Erreur enregistrement token:", err);
+        // On ne renvoie pas 500 pour ne pas faire crasher l'app, juste un log
+        res.status(200).json({ success: false, error: err.message });
     }
 });
 

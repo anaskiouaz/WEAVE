@@ -13,6 +13,11 @@ services:
       - pgdata14:/var/lib/postgresql/data
     networks:
       - weave-net
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U weave_user"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
 
   api:
     image: node:22.21.1
@@ -28,6 +33,7 @@ services:
       PORT: "4000"
       PGHOST: "postgres"
       PGPORT: "5432"
+      TZ: "Europe/Paris"
       PGUSER: "weave_user"
       PGPASSWORD: "toto"
       PGDATABASE: "weave_local"
@@ -41,7 +47,9 @@ services:
     ports:
       - "4000:4000"
     depends_on:
-      - postgres
+      postgres:
+        condition: service_healthy
+
     networks:
       - weave-net
 
@@ -63,6 +71,7 @@ services:
     networks:
       - weave-net
 
+# Section globale : on déclare juste le nom du volume
 volumes:
   pgdata14:
 

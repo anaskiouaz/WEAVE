@@ -3,11 +3,63 @@ import { apiPost } from '../api/client';
 import { Calendar, Heart, MessageSquare, Users, TrendingUp, Clock } from 'lucide-react';
 
 export default function Dashboard() {
-  const upcomingTasks = [
+  
+   const upcomingTasks = [
     { id: 1, title: 'Visite médicale', time: '14:00', helper: 'Marie Dupont', type: 'medical' },
     { id: 2, title: 'Courses alimentaires', time: '16:30', helper: 'À pourvoir', type: 'shopping' },
     { id: 3, title: 'Promenade au parc', time: 'Demain 10:00', helper: 'Jean Martin', type: 'activity' },
   ];
+  // Fonction pour activer les notifications
+  const activerNotifs = async () => {
+    console.log("--- Démarrage Activer Notifs ---");
+    try {
+        const storedUser = localStorage.getItem('user');
+        const userId = storedUser ? JSON.parse(storedUser).id : null;
+
+        // Nettoyage
+        await PushNotifications.removeAllListeners(); 
+
+        // Écouteurs
+        await PushNotifications.addListener('registration', async (token) => {
+            console.log(`Token reçu : ${token.value}`);
+            try {
+                await apiPost('/users/device-token', { userId, token: token.value });
+                console.log("Token envoyé au serveur avec SUCCÈS !");
+            } catch (err) {
+                 console.error(`Erreur API: ${err.message}`);
+            }
+        });
+
+        await PushNotifications.addListener('registrationError', (error) => {
+            console.error(`Erreur Firebase: ${JSON.stringify(error)}`);
+        });
+
+        await PushNotifications.addListener('pushNotificationReceived', (notification) => {
+            alert(`${notification.title}\n${notification.body}`);
+        });
+
+        // Demande de permission
+        let perm = await PushNotifications.checkPermissions();
+        if (perm.receive === 'prompt') {
+            perm = await PushNotifications.requestPermissions();
+        }
+        
+        if (perm.receive !== 'granted') {
+            console.log("Permission REFUSÉE par l'utilisateur.");
+            return;
+        }
+
+        // Enregistrement
+        await PushNotifications.register();
+
+    } catch (e) {
+        console.error(`Crash JS Notifs: ${e.message}`);
+    }
+  };
+
+  useEffect(() => {
+    activerNotifs();
+  }, []);
 
   const stats = [
     { label: 'Aidants actifs', value: '8', icon: Users, color: 'blue' },
@@ -20,7 +72,7 @@ export default function Dashboard() {
     <div className="p-8">
       <div className="max-w-6xl mx-auto">
         <div className="mb-8">
-          <h1 className="text-gray-900 mb-2">Tableau de bord</h1>
+            <h1 className="text-gray-900 mb-2">Tableau de bord</h1>
           <p className="text-gray-600">
             Bienvenue sur votre espace d'entraide
           </p>
