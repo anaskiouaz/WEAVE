@@ -1,6 +1,9 @@
 import { BrowserRouter, Routes, Route, Link, useLocation, Outlet } from 'react-router-dom';
 import { Home, Calendar, Heart, MessageSquare, User, Settings, AlertCircle } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect} from 'react';
+import { PushNotifications } from '@capacitor/push-notifications';
+import { Capacitor } from '@capacitor/core';
+import { apiPost } from './api/client';
 
 // Composants de l'application
 import Dashboard from './components/Dashboard';
@@ -52,7 +55,7 @@ function ProtectedLayout() {
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-lg ${location.pathname === path
                 ? 'bg-blue-50 text-blue-600 font-medium'
                 : 'text-gray-700 hover:bg-gray-50'
-                }`}
+              }`}
             >
               <Icon className="w-6 h-6" />
               <span>{label}</span>
@@ -107,7 +110,7 @@ function ProtectedLayout() {
 export default function App() {
   return (
     <AuthProvider>
-      <BrowserRouter>
+    <BrowserRouter>
         <Routes>
           <Route path="/" element={<LandingPage />} />
           <Route path="/login" element={<LoginPage />} />
@@ -115,14 +118,14 @@ export default function App() {
 
           <Route element={<ProtectedLayout />}>
             <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/calendar" element={<CalendarView />} />
-            <Route path="/memories" element={<Memories />} />
-            <Route path="/messages" element={<Messages />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/admin" element={<Admin />} />
+          <Route path="/calendar" element={<CalendarView />} />
+          <Route path="/memories" element={<Memories />} />
+          <Route path="/messages" element={<Messages />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/admin" element={<Admin />} />
           </Route>
         </Routes>
-      </BrowserRouter>
+    </BrowserRouter>
     </AuthProvider>
   );
 }

@@ -190,7 +190,7 @@ export default function CalendarView() {
                     <ChevronRight className="w-6 h-6 text-white" />
                 </button>
             </div>
-        </div>
+          </div>
 
         <div className="flex justify-end mb-6">
           <button
@@ -267,8 +267,8 @@ export default function CalendarView() {
                   })}
                   {dayTasks.length === 0 && (
                       <div className="h-full flex items-center justify-center text-gray-300 text-sm italic py-8">
-                          Rien de prévu
-                      </div>
+                        Rien de prévu
+                     </div>
                   )}
                 </div>
               </div>
