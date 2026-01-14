@@ -33,6 +33,7 @@ services:
       PORT: "4000"
       PGHOST: "postgres"
       PGPORT: "5432"
+      TZ: "Europe/Paris"
       PGUSER: "weave_user"
       PGPASSWORD: "toto"
       PGDATABASE: "weave_local"
@@ -70,6 +71,7 @@ services:
     networks:
       - weave-net
 
+# Section globale : on déclare juste le nom du volume
 volumes:
   pgdata14:
 

@@ -1,0 +1,11 @@
+{
+  "appId": "com.anaskiouaz.weave",
+  "appName": "Weave",
+  "webDir": "dist",
+  "server": {
+    "androidScheme": "http",
+    "cleartext": true,
+    "allowNavigation": ["*"]
+  }
+}
+
