@@ -65,7 +65,7 @@ router.post('/', async (req, res) => {
   } catch (error) {
     if (error.code === '23505') return res.status(409).json({ success: false, error: "Email déjà utilisé." });
     res.status(500).json({ success: false, error: error.message });
-  }
+    }
 });
 
 // 4. CONSENTEMENT
@@ -81,6 +81,48 @@ router.patch('/:id/consent', async (req, res) => {
             res.json({ success: true, message: "Consentement enregistré." });
         }
     } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
+
+
+// --- ENREGISTREMENT DU TOKEN (C'est ici qu'on corrige !) ---
+router.post('/device-token', async (req, res) => {
+    const { userId, token } = req.body;
+    
+    console.log(`📲 Réception token (User: ${userId || 'Anonyme'}) : ${token.substring(0, 10)}...`);
+
+    try {
+        if (userId) {
+            // Cas 1 : Utilisateur connecté -> On met à jour son profil
+            await db.query(
+                'UPDATE users SET fcm_token = $1 WHERE id = $2',
+                [token, userId]
+            );
+            console.log("Token mis à jour pour l'utilisateur ID:", userId);
+        } else {
+            // Cas 2 : Utilisateur Anonyme (App installée mais pas de login)
+            // On crée un utilisateur "fantôme" basé sur le token pour pouvoir le contacter
+            const fakeEmail = `device_${token.substring(0, 8)}@weave.local`;
+            const fakeName = `Mobile ${token.substring(0, 4)}`;
+            
+            // On essaie d'insérer. Si l'email existe déjà, on met juste à jour le token.
+            await db.query(`
+                INSERT INTO users (name, email, password_hash, role, fcm_token)
+                VALUES ($1, $2, 'no_pass', 'helper', $3)
+                ON CONFLICT (email) 
+                DO UPDATE SET fcm_token = $3, updated_at = NOW()
+                RETURNING id;
+            `, [fakeName, fakeEmail, token]);
+            
+            console.log("Token enregistré pour un appareil anonyme (Upsert OK)");
+        }
+
+        res.json({ success: true });
+    } catch (err) {
+        console.error("Erreur enregistrement token:", err);
+        // On ne renvoie pas 500 pour ne pas faire crasher l'app, juste un log
+        res.status(200).json({ success: false, error: err.message });
+    }
 });
 
 export default router;
