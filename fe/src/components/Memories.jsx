@@ -1,12 +1,7 @@
 import { useState, useEffect } from 'react';
-<<<<<<< HEAD
-import { Download, Image, Heart, MessageCircle, Calendar, Loader2, Send, Smile, Trash2 } from 'lucide-react';
-=======
 import { Download, Image as ImageIcon, Heart, MessageCircle, Calendar, Loader2, Send, Smile, Trash2 } from 'lucide-react';
->>>>>>> c4c98d8803913c008c19f83a0190afe0946a4c3d
 import { jsPDF } from 'jspdf';
 import { Camera, CameraResultType } from '@capacitor/camera';
-import CalendarView from './CalendarView';
 import { apiGet, apiPost, apiDelete } from '../api/client'; // Import du client API
 import { useAuth } from '../context/AuthContext'; // Import du hook d'authentification
 
@@ -181,62 +176,6 @@ export default function Memories() {
   // --- FONCTION AJOUTÉE POUR SUPPRIMER UN COMMENTAIRE ---
   const handleDeleteComment = async (memoryId, commentId, commentAuthor, memoryAuthor) => {
     if (!user) return;
-<<<<<<< HEAD
-
-    // Vérifier que l'utilisateur est l'auteur du commentaire
-    if (commentAuthor !== user.name && memoryAuthor !== user.name) {
-      alert("Vous ne pouvez pas supprimer les commentaires des autres.");
-      return;
-    }
-
-    // Demander confirmation avant suppression
-    const confirmDelete = window.confirm("Êtes-vous sûr de vouloir supprimer ce commentaire ?");
-    if (!confirmDelete) return;
-
-    try {
-      await apiDelete(`/souvenirs/${memoryId}/comments/${commentId}`, {
-        author_name: user.name
-      });
-
-      // Rafraîchir la liste après suppression
-      await fetchMemories();
-    } catch (err) {
-      console.error("Erreur lors de la suppression du commentaire:", err);
-      alert("Erreur lors de la suppression du commentaire: " + err.message);
-    }
-  };
-
-  // --- FONCTION POUR SUPPRIMER UN SOUVENIR ---
-  const handleDeleteMemory = async (memoryId) => {
-    if (!user) return;
-
-    // Demander confirmation avant suppression
-    const confirmDelete = window.confirm("Êtes-vous sûr de vouloir supprimer ce souvenir ? Cette action est irréversible.");
-    if (!confirmDelete) return;
-
-    try {
-      await apiDelete(`/souvenirs/${memoryId}`, {
-        author_id: user.id
-      });
-
-      // Rafraîchir la liste après suppression
-      await fetchMemories();
-      alert("Souvenir supprimé avec succès");
-    } catch (err) {
-      console.error("Erreur lors de la suppression:", err);
-      alert("Erreur lors de la suppression du souvenir: " + err.message);
-    }
-  };
-
-  // Fonction d'export PDF avec les données réelles
-  const handleDownloadPDF = () => {
-    const doc = new jsPDF();
-    doc.setFontSize(20);
-    doc.text('Journal de bord - Souvenirs Partagés', 20, 20);
-    doc.setFontSize(12);
-    let yPosition = 40;
-=======
->>>>>>> c4c98d8803913c008c19f83a0190afe0946a4c3d
 
     // Vérifier que l'utilisateur est l'auteur du commentaire
     if (commentAuthor !== user.name && memoryAuthor !== user.name) {
@@ -485,11 +424,7 @@ const loadImageAsBase64 = async (url) => {
                     onClick={() => document.getElementById('photo-input').click()}
                     className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors text-sm"
                   >
-<<<<<<< HEAD
-                    <Image className="w-5 h-5" />
-=======
                     <ImageIcon className="w-5 h-5" />
->>>>>>> c4c98d8803913c008c19f83a0190afe0946a4c3d
                     <span>{newPhotoFile ? "Photo sélectionnée" : "Ajouter une photo"}</span>
                   </button>
                   
@@ -545,11 +480,7 @@ const loadImageAsBase64 = async (url) => {
 
                 {memory.photo_data && (
                   <div className="mb-4 rounded-lg overflow-hidden border">
-<<<<<<< HEAD
-                    <img src={memory.photo_data} alt="Souvenir" className="w-full h-auto max-h-96 object-cover" />
-=======
                     <img src={getPhotoUrl(memory.photo_data)} alt="Souvenir" className="w-full h-auto max-h-96 object-cover"/>
->>>>>>> c4c98d8803913c008c19f83a0190afe0946a4c3d
                   </div>
                 )}
 
