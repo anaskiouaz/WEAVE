@@ -34,10 +34,20 @@ router.post('/login', async (req, res) => {
 
     console.log('Succès: Mot de passe validé.');
 
+    // Récupérer les cercles de l'utilisateur
+    const circlesResult = await db.query(`
+      SELECT cc.id, cc.senior_name, ur.role
+      FROM care_circles cc
+      JOIN user_roles ur ON cc.id = ur.circle_id
+      WHERE ur.user_id = $1
+    `, [user.id]);
+
+    const circles = circlesResult.rows;
+
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET || 'secret', { expiresIn: '30d' });
     delete user.password_hash;
     
-    res.json({ success: true, token, user });
+    res.json({ success: true, token, user: { ...user, circles } });
 
   } catch (error) {
     console.error('ERREUR CRITIQUE:', error);
