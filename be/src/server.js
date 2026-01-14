@@ -1,20 +1,17 @@
-import dotenv from 'dotenv';
-dotenv.config();
-
-import http from 'http'; // <--- 1. On importe le module HTTP natif
+import http from 'http';
 import app from './app.js';
-import { initSocket } from './services/socketService.js'; // <--- 2. On importe ton service socket
+import { initSocket } from './services/socketService.js'; // <--- IMPORT IMPORTANT
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 3000;
 
-// 3. On crée le serveur HTTP manuellement en lui passant ton app Express
+// 1. On crée un serveur HTTP "natif" qui englobe ton app Express
 const server = http.createServer(app);
 
-// 4. On attache Socket.io à ce serveur
-const io = initSocket(server);
+// 2. On attache Socket.io à ce serveur
+initSocket(server);
 
-// 5. ATTENTION : On lance 'server.listen' et non plus 'app.listen'
+// 3. On lance le serveur (Note: on utilise 'server.listen' et plus 'app.listen')
 server.listen(PORT, () => {
-  console.log(`🚀 API + Socket running on port ${PORT}`);
-  console.log('Test modification : Socket.io activé');
+    console.log(`✅ Serveur lancé sur le port ${PORT}`);
+    console.log(`📡 Socket.io est prêt`);
 });

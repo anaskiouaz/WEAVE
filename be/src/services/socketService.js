@@ -1,47 +1,37 @@
 import { Server } from 'socket.io';
-import db from '../config/db.js';
+
+let io = null;
 
 export const initSocket = (httpServer) => {
-    const io = new Server(httpServer, {
+    // Configuration de base pour accepter les connexions du Frontend
+    io = new Server(httpServer, {
         cors: {
-            // On récupère les origines autorisées ou on met le frontend par défaut
-            origin: process.env.ALLOWED_ORIGINS ? process.env.ALLOWED_ORIGINS.split(',') : ["http://localhost:5173"],
+            origin: "*", // En production, il faudra mettre la vraie URL du site
             methods: ["GET", "POST"]
         }
     });
 
     io.on('connection', (socket) => {
-        console.log(`🔌 Socket connecté: ${socket.id}`);
+        console.log('🟢 Nouveau client connecté au socket:', socket.id);
 
-        socket.on('join_conversations', (conversationIds) => {
-            if (Array.isArray(conversationIds)) {
-                conversationIds.forEach(id => {
-                    socket.join(`conversation_${id}`);
-                    console.log(`Socket ${socket.id} a rejoint la room conversation_${id}`);
-                });
-            }
-        });
-
-        socket.on('send_message', async (data) => {
-            console.log('📩 Message reçu via socket:', data);
-            try {
-                // Sauvegarde BDD
-                await db.query(
-                    "INSERT INTO message (conversation_id, auteur_id, contenu) VALUES ($1, $2, $3)",
-                    [data.conversationId, data.auteurId, data.contenu]
-                );
-
-                // Diffusion
-                socket.to(`conversation_${data.conversationId}`).emit('receive_message', data);
-            } catch (err) {
-                console.error("Erreur socket message:", err);
-            }
+        // Quand le frontend dit "Je rejoins la conversation 123"
+        socket.on('join_conversation', (conversationId) => {
+            socket.join(conversationId);
+            console.log(`Socket ${socket.id} a rejoint la salle ${conversationId}`);
         });
 
         socket.on('disconnect', () => {
-            console.log('Socket déconnecté');
+            console.log('🔴 Client déconnecté:', socket.id);
         });
     });
 
+    return io;
+};
+
+// Fonction pour récupérer l'instance io n'importe où dans le code
+export const getIo = () => {
+    if (!io) {
+        throw new Error("Socket.io n'a pas été initialisé !");
+    }
     return io;
 };

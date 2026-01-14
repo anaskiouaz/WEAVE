@@ -1,13 +1,15 @@
 import db from '../config/db.js';
+import { getIo } from '../services/socketService.js';
 
-// --- CONSTANTES : Ce sont les UUIDs définis dans votre SQL ---
-const CURRENT_USER_ID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'; // Thomas Durand
-const CERCLE_ID = 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44';       // Monique Durand
+// --- CONSTANTES CORRIGÉES ---
+// Ces IDs doivent correspondre à ceux insérés par ton script SQL !
+const CURRENT_USER_ID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'; // Alice (Admin)
+const CERCLE_ID = '11111111-1111-1111-1111-111111111111';       // ID du cercle créé en SQL
 
 // 1. Récupérer les membres du cercle (Pour la liste "Nouveau Groupe")
 export const getMembresCercle = async (req, res) => {
     try {
-        // On sélectionne tous les membres du cercle SAUF soi-même (Thomas)
+        // On sélectionne tous les membres du cercle SAUF soi-même
         const result = await db.query(`
             SELECT u.id, u.name as nom, ur.role
             FROM users u
@@ -15,6 +17,7 @@ export const getMembresCercle = async (req, res) => {
             WHERE ur.circle_id = $1 AND u.id != $2
         `, [CERCLE_ID, CURRENT_USER_ID]);
 
+        console.log("Membres trouvés :", result.rows); // Debug pour voir qui est trouvé
         res.json(result.rows);
     } catch (error) {
         console.error("Erreur get membres:", error);
@@ -29,11 +32,10 @@ export const creerConversation = async (req, res) => {
     console.log("📥 Création conversation:", { type, nom, participants });
 
     try {
-        // --- NOUVEAU : Règle 1 - Unicité du chat PRIVE ---
+        // --- Règle 1 - Unicité du chat PRIVE ---
         if (type === 'PRIVE') {
             const targetUserId = participants[0]; // L'autre personne
 
-            // On cherche si une conversation PRIVE existe déjà entre MOI et LUI dans ce cercle
             const existingPrive = await db.query(`
                 SELECT c.id 
                 FROM conversation c
@@ -46,8 +48,6 @@ export const creerConversation = async (req, res) => {
             `, [CERCLE_ID, CURRENT_USER_ID, targetUserId]);
 
             if (existingPrive.rows.length > 0) {
-                console.log("⚠️ Conversation privée existante trouvée:", existingPrive.rows[0].id);
-                // On renvoie l'ID existant avec un statut succès (200)
                 return res.status(200).json({ 
                     success: true, 
                     conversationId: existingPrive.rows[0].id,
@@ -56,37 +56,26 @@ export const creerConversation = async (req, res) => {
             }
         }
 
-        // --- NOUVEAU : Règle 2 - Unicité du NOM DE GROUPE ---
+        // --- Règle 2 - Unicité du NOM DE GROUPE ---
         if (type === 'GROUPE') {
-            // On vérifie si un groupe avec ce nom existe déjà dans ce cercle
             const existingNom = await db.query(
                 "SELECT id FROM conversation WHERE cercle_id = $1 AND type = 'GROUPE' AND nom = $2",
                 [CERCLE_ID, nom]
             );
 
             if (existingNom.rows.length > 0) {
-                // Erreur 409 (Conflit) -> Le Frontend va pouvoir détecter ça
-                return res.status(409).json({ error: "Ce nom de groupe est déjà utilisé. Veuillez en choisir un autre." });
-            }
-
-            // Vérification des droits (Code existant)
-            const verifRole = await db.query(
-                "SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2",
-                [CURRENT_USER_ID, CERCLE_ID]
-            );
-
-            if (verifRole.rows.length === 0 || verifRole.rows[0].role !== 'ADMIN') {
-                return res.status(403).json({ error: "Seul l'ADMIN peut créer un groupe." });
+                return res.status(409).json({ error: "Ce nom de groupe est déjà utilisé." });
             }
         }
 
-        // --- CRÉATION (Si tout est bon) ---
+        // --- CRÉATION ---
         const result = await db.query(
             "INSERT INTO conversation (type, nom, cercle_id) VALUES ($1, $2, $3) RETURNING id",
             [type, nom, CERCLE_ID]
         );
         const convId = result.rows[0].id;
 
+        // Ajout des participants (Soi-même + les sélectionnés)
         const tousLesMembres = [...new Set([...participants, CURRENT_USER_ID])];
 
         for (const userId of tousLesMembres) {
@@ -106,14 +95,7 @@ export const creerConversation = async (req, res) => {
 
 // 3. Récupérer mes conversations
 export const getMesConversations = async (req, res) => {
-    // ID de Thomas (Celui qui est connecté)
-    const userId = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'; 
-
     try {
-        // C'EST ICI QUE LA MAGIE OPÈRE :
-        // On utilise CASE WHEN pour choisir quel nom afficher.
-        // On fait une jointure (LEFT JOIN) pour trouver "l'autre" utilisateur (celui qui n'est pas moi).
-        
         const result = await db.query(`
             SELECT 
                 c.id, 
@@ -133,7 +115,7 @@ export const getMesConversations = async (req, res) => {
                 ON pc_other.utilisateur_id = u_other.id
             WHERE pc_me.utilisateur_id = $1
             ORDER BY c.date_creation DESC
-        `, [userId]);
+        `, [CURRENT_USER_ID]);
 
         res.json(result.rows);
     } catch (error) {
@@ -142,23 +124,22 @@ export const getMesConversations = async (req, res) => {
     }
 };
 
-// 4. RÉCUPÉRER LES MESSAGES D'UNE CONVERSATION
+// 4. Récupérer les messages
 export const getMessages = async (req, res) => {
-    const { id } = req.params; // L'ID de la conversation vient de l'URL
-    const userId = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'; // Thomas (Sécurité)
+    const { id } = req.params;
 
     try {
-        // Vérification : Est-ce que Thomas a le droit de voir ça ?
+        // Vérification des droits
         const verif = await db.query(
             "SELECT * FROM participant_conversation WHERE conversation_id = $1 AND utilisateur_id = $2",
-            [id, userId]
+            [id, CURRENT_USER_ID]
         );
 
         if (verif.rows.length === 0) {
             return res.status(403).json({ error: "Accès interdit à cette conversation" });
         }
 
-        // Récupération des messages avec le nom de l'auteur
+        // Récupération des messages
         const result = await db.query(`
             SELECT m.id, m.contenu, m.date_envoi, m.auteur_id, u.name as nom_auteur
             FROM message m
@@ -173,30 +154,75 @@ export const getMessages = async (req, res) => {
         res.status(500).json({ error: "Erreur serveur" });
     }
 };
-export const deleteConversation = (req, res) => {
+
+// 5. Supprimer conversation (CORRIGÉ: Async/Await)
+export const deleteConversation = async (req, res) => {
     const conversationId = req.params.id;
     
-    // 1. On supprime d'abord les messages liés à cette conversation
-    // (Attention : vérifie que ta table s'appelle bien 'messages')
-    const sqlMessages = "DELETE FROM messages WHERE conversation_id = ?";
+    try {
+        // 1. Supprimer les messages (Table 'message' au singulier selon ton SQL)
+        await db.query("DELETE FROM message WHERE conversation_id = $1", [conversationId]);
 
-    db.query(sqlMessages, [conversationId], (err, result) => {
-        if (err) {
-            console.error("Erreur suppression messages :", err);
-            return res.status(500).json({ error: "Erreur serveur lors de la suppression des messages" });
+        // 2. Supprimer les participants
+        await db.query("DELETE FROM participant_conversation WHERE conversation_id = $1", [conversationId]);
+
+        // 3. Supprimer la conversation (Table 'conversation' au singulier)
+        await db.query("DELETE FROM conversation WHERE id = $1", [conversationId]);
+
+        res.status(200).json({ message: "Conversation supprimée avec succès" });
+    } catch (error) {
+        console.error("Erreur suppression conversation :", error);
+        res.status(500).json({ error: "Erreur serveur lors de la suppression" });
+    }
+};
+
+// 6. Envoyer un message
+export const envoyerMessage = async (req, res) => {
+    const conversationId = req.params.id;
+    const { contenu } = req.body;
+    
+    // ID fixe (Alice) pour tes tests
+    const authorId = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'; 
+
+    if (!contenu || contenu.trim() === "") {
+        return res.status(400).json({ error: "Message vide" });
+    }
+
+    try {
+        // 1. Sauvegarde en DB
+        const insertResult = await db.query(
+            "INSERT INTO message (conversation_id, auteur_id, contenu) VALUES ($1, $2, $3) RETURNING id, date_envoi",
+            [conversationId, authorId, contenu]
+        );
+        const newMessage = insertResult.rows[0];
+        
+        // 2. Récupération du nom
+        const userResult = await db.query("SELECT name FROM users WHERE id = $1", [authorId]);
+        const authorName = userResult.rows[0].name;
+
+        const messageComplet = {
+            id: newMessage.id,
+            contenu: contenu,
+            date_envoi: newMessage.date_envoi,
+            auteur_id: authorId,
+            nom_auteur: authorName,
+            conversation_id: conversationId
+        };
+
+        // 3. ENVOI EN LIVE (SOCKET)
+        try {
+            const io = getIo();
+            // On envoie seulement aux gens connectés sur CETTE conversation
+            io.to(conversationId).emit('receive_message', messageComplet);
+            console.log(`📡 Message envoyé en live dans la salle ${conversationId}`);
+        } catch (e) {
+            console.error("Erreur socket (pas grave):", e.message);
         }
 
-        // 2. On supprime la conversation
-        // (Si tu as une table 'participants', il faudrait aussi la nettoyer ici avant de supprimer la conversation)
-        const sqlConv = "DELETE FROM conversations WHERE id = ?";
+        res.status(201).json(messageComplet);
 
-        db.query(sqlConv, [conversationId], (err, result) => {
-            if (err) {
-                console.error("Erreur suppression conversation :", err);
-                return res.status(500).json({ error: "Erreur serveur lors de la suppression de la conversation" });
-            }
-
-            res.status(200).json({ message: "Conversation supprimée avec succès" });
-        });
-    });
+    } catch (error) {
+        console.error("Erreur envoi:", error);
+        res.status(500).json({ error: "Erreur serveur" });
+    }
 };

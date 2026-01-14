@@ -76,17 +76,17 @@ CREATE TYPE type_conversation AS ENUM ('PRIVE', 'GROUPE');
 -- Elle est liée au CERCLE (pour savoir de quel senior on parle)
 CREATE TABLE conversation (
     id SERIAL PRIMARY KEY,
-    nom VARCHAR(255), -- Ex: "Urgence Médicale" (NULL si c'est un chat privé)
+    nom VARCHAR(255),
     type type_conversation NOT NULL,
-    cercle_id INT REFERENCES cercle_de_soins(id) ON DELETE CASCADE,
+    cercle_id UUID REFERENCES care_circles(id) ON DELETE CASCADE, -- CHANGÉ: UUID + nom table anglais
     date_creation TIMESTAMP DEFAULT NOW()
 );
 
 -- 9. PARTICIPANT_CONVERSATION
 CREATE TABLE participant_conversation (
     conversation_id INT REFERENCES conversation(id) ON DELETE CASCADE,
-    utilisateur_id INT REFERENCES utilisateur(id) ON DELETE CASCADE,
-    date_lecture TIMESTAMP, -- Pour gérer les mesages "non lus"
+    utilisateur_id UUID REFERENCES users(id) ON DELETE CASCADE,   -- CHANGÉ: UUID + nom table anglais
+    date_lecture TIMESTAMP,
     PRIMARY KEY (conversation_id, utilisateur_id)
 );
 
@@ -94,7 +94,7 @@ CREATE TABLE participant_conversation (
 CREATE TABLE message (
     id SERIAL PRIMARY KEY,
     conversation_id INT REFERENCES conversation(id) ON DELETE CASCADE,
-    auteur_id INT REFERENCES utilisateur(id), -- L'auteur est forcément un Humain connecté
+    auteur_id UUID REFERENCES users(id),                          -- CHANGÉ: UUID + nom table anglais
     contenu TEXT NOT NULL,
     date_envoi TIMESTAMP DEFAULT NOW()
 );
