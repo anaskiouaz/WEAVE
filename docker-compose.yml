@@ -5,13 +5,12 @@ services:
     restart: unless-stopped
     environment:
       POSTGRES_USER: weave_user
-      POSTGRES_PASSWORD: "password123"
+      POSTGRES_PASSWORD: "toto"
       POSTGRES_DB: weave_local
     ports:
-      - "5435:5432"
+      - "5432:5432"
     volumes:
       - pgdata14:/var/lib/postgresql/data
-      - ../weave-db/migrations:/docker-entrypoint-initdb.d
     networks:
       - weave-net
 
@@ -22,18 +21,24 @@ services:
     restart: unless-stopped
     volumes:
       - ./be:/app
-    command: sh -c "npm install && node src/server.js" 
+    command: sh -c "npm install && npm start"
+    env_file:
+      - .env
     environment:
       PORT: "4000"
       PGHOST: "postgres"
       PGPORT: "5432"
       TZ: "Europe/Paris"
       PGUSER: "weave_user"
-      PGPASSWORD: "password123"
+      PGPASSWORD: "toto"
       PGDATABASE: "weave_local"
-      DATABASE_URL: "postgres://weave_user:password123@postgres:5432/weave_local"
-      ALLOWED_ORIGINS: "*"
+
+      DATABASE_URL: "postgres://weave_user:toto@postgres:5432/weave_local"
+
+      ALLOWED_ORIGINS: "http://localhost:5173"
       JWT_SECRET: "super-secret"
+
+      AZURE_STORAGE_CONTAINER_NAME: "images"
     ports:
       - "4000:4000"
     depends_on:
@@ -65,3 +70,4 @@ volumes:
 
 networks:
   weave-net:
+    driver: bridge
