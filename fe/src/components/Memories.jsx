@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { Download, Image, Heart, MessageCircle, Calendar, Loader2, Send, Smile, Trash2 } from 'lucide-react';
+import { Download, Image as ImageIcon, Heart, MessageCircle, Calendar, Loader2, Send, Smile, Trash2 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { apiGet, apiPost, apiDelete } from '../api/client'; // Import du client API
 import { useAuth } from '../context/AuthContext'; // Import du hook d'authentification
@@ -197,38 +197,127 @@ export default function Memories() {
     }
   };
 
-  // Fonction d'export PDF avec les données réelles
-  const handleDownloadPDF = () => {
-    const doc = new jsPDF();
-    doc.setFontSize(20);
-    doc.text('Journal de bord - Souvenirs Partagés', 20, 20);
-    doc.setFontSize(12);
-    let yPosition = 40;
+  // 🔹 Construire l'URL complète de l'image
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+  // Si la variable inclut /api, on le retire pour servir les fichiers statiques
+  const FILES_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, '');
 
-    memories.forEach((memory, index) => {
-      if (yPosition > 250) {
-        doc.addPage();
-        yPosition = 20;
+const getPhotoUrl = (photo) => {
+  if (!photo) return null;
+  if (photo.startsWith('http')) return photo;
+  return `${FILES_BASE_URL}/uploads/${photo}`;
+};
+
+// 🔹 Charger une image en base64 pour jsPDF
+// Fallback proxy pour les images Azure afin d'éviter les erreurs CORS/canvas
+const loadImageAsBase64 = async (url) => {
+  try {
+    // Si c'est une URL Azure, passer par le proxy backend
+    if (url.includes('.blob.core.windows.net')) {
+      let blobName = null;
+      try {
+        const u = new URL(url);
+        const parts = u.pathname.split('/');
+        blobName = parts[parts.length - 1];
+      } catch {}
+
+      if (blobName) {
+        const API_BASE_URL_FULL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+        const proxyUrl = `${API_BASE_URL_FULL}/upload/blob/${blobName}`;
+        const resp = await fetch(proxyUrl);
+        if (!resp.ok) throw new Error('Proxy image fetch failed');
+        const blob = await resp.blob();
+        const reader = new FileReader();
+        const base64 = await new Promise((resolve, reject) => {
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        return base64;
       }
-      const dateStr = new Date(memory.created_at).toLocaleDateString('fr-FR');
-      const authorStr = memory.author_name || "Auteur inconnu";
-      doc.setFontSize(10);
-      doc.setTextColor(100);
-      doc.text(`${dateStr} - Par ${authorStr}`, 20, yPosition);
-      yPosition += 7;
-      doc.setFontSize(11);
-      doc.setTextColor(0);
-      const lines = doc.splitTextToSize(memory.text_content || '', 170);
-      doc.text(lines, 20, yPosition);
-      yPosition += (lines.length * 7) + 10;
-      if (index < memories.length - 1) {
-        doc.setDrawColor(200);
-        doc.line(20, yPosition, 190, yPosition);
-        yPosition += 10;
-      }
+    }
+
+    // Par défaut: charger via Image + canvas (pour fichiers locaux)
+    const img = new window.Image();
+    img.crossOrigin = 'anonymous';
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = url;
     });
-    doc.save(`journal-souvenirs-${new Date().toISOString().split('T')[0]}.pdf`);
-  };
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    return canvas.toDataURL('image/jpeg', 0.9);
+  } catch (e) {
+    console.error('loadImageAsBase64 failed:', e);
+    throw e;
+  }
+};
+
+  // Fonction d'export PDF avec les données réelles
+  const handleDownloadPDF = async () => {
+  const doc = new jsPDF();
+  doc.setFontSize(20);
+  doc.text('Journal de bord - Souvenirs Partagés', 20, 20);
+
+  let yPosition = 40;
+
+  for (let index = 0; index < memories.length; index++) {
+    const memory = memories[index];
+
+    if (yPosition > 260) {
+      doc.addPage();
+      yPosition = 20;
+    }
+
+    const dateStr = new Date(memory.created_at).toLocaleDateString('fr-FR');
+    const authorStr = memory.author_name || "Auteur inconnu";
+
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`${dateStr} - Par ${authorStr}`, 20, yPosition);
+    yPosition += 7;
+
+    doc.setFontSize(11);
+    doc.setTextColor(0);
+    const lines = doc.splitTextToSize(memory.text_content || '', 170);
+    doc.text(lines, 20, yPosition);
+    yPosition += lines.length * 7 + 5;
+
+    // ✅ AJOUT DE LA PHOTO DANS LE PDF
+    if (memory.photo_data) {
+      try {
+        const imageUrl = getPhotoUrl(memory.photo_data);
+        const imageBase64 = await loadImageAsBase64(imageUrl);
+
+        const imgWidth = 170;
+        const imgHeight = 100;
+
+        if (yPosition + imgHeight > 280) {
+          doc.addPage();
+          yPosition = 20;
+        }
+
+        doc.addImage(imageBase64, 'JPEG', 20, yPosition, imgWidth, imgHeight);
+        yPosition += imgHeight + 10;
+      } catch (err) {
+        console.error("Erreur image PDF :", err);
+      }
+    }
+
+    if (index < memories.length - 1) {
+      doc.setDrawColor(200);
+      doc.line(20, yPosition, 190, yPosition);
+      yPosition += 10;
+    }
+  }
+
+  doc.save(`journal-souvenirs-${new Date().toISOString().split('T')[0]}.pdf`);
+};
+
 
   if (loading) {
     return (
@@ -310,7 +399,7 @@ export default function Memories() {
                     onClick={() => document.getElementById('photo-input').click()}
                     className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors text-sm"
                   >
-                    <Image className="w-5 h-5" />
+                    <ImageIcon className="w-5 h-5" />
                     <span>{newPhotoFile ? "Photo sélectionnée" : "Ajouter une photo"}</span>
                   </button>
                   
@@ -366,7 +455,7 @@ export default function Memories() {
 
                 {memory.photo_data && (
                   <div className="mb-4 rounded-lg overflow-hidden border">
-                    <img src={memory.photo_data} alt="Souvenir" className="w-full h-auto max-h-96 object-cover" />
+                    <img src={getPhotoUrl(memory.photo_data)} alt="Souvenir" className="w-full h-auto max-h-96 object-cover"/>
                   </div>
                 )}
 
