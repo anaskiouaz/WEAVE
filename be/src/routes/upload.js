@@ -221,4 +221,38 @@ router.post('/image', processFileUpload, (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 export default router;
+=======
+export default router;
+
+// --- Azure Blob proxy to serve images via API (avoids browser CORS) ---
+// Note: This route relies on configured Azure credentials and the container name.
+// It streams the blob content with the original content type.
+router.get('/blob/:blobName', async (req, res) => {
+  try {
+    const { blobName } = req.params;
+    if (!blobServiceClient) {
+      return res.status(500).json({ status: 'error', message: 'Azure Storage not configured' });
+    }
+
+    const containerClient = blobServiceClient.getContainerClient(containerName);
+    const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+
+    // Check existence and get properties
+    const props = await blockBlobClient.getProperties();
+    const contentType = props.contentType || 'application/octet-stream';
+    res.setHeader('Content-Type', contentType);
+
+    const downloadResponse = await blockBlobClient.download(0);
+    const stream = downloadResponse.readableStreamBody;
+    if (!stream) {
+      return res.status(404).json({ status: 'error', message: 'Blob stream not available' });
+    }
+    stream.pipe(res);
+  } catch (error) {
+    console.error('Erreur proxy blob:', error);
+    res.status(404).json({ status: 'error', message: 'Blob introuvable' });
+  }
+});
+>>>>>>> c4c98d8803913c008c19f83a0190afe0946a4c3d
