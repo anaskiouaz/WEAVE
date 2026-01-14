@@ -2,10 +2,6 @@ import { useState, useEffect } from 'react';
 import { Download, Image as ImageIcon, Heart, MessageCircle, Calendar, Loader2, Send, Smile, Trash2 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
 import { Camera, CameraResultType } from '@capacitor/camera';
-<<<<<<< HEAD
-import CalendarView from './CalendarView';
-=======
->>>>>>> bf15c7f9a9b78643414660ce3683ccfbae528691
 import { apiGet, apiPost, apiDelete } from '../api/client'; // Import du client API
 import { useAuth } from '../context/AuthContext'; // Import du hook d'authentification
 
