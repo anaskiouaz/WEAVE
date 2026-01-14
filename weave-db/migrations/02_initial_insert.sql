@@ -103,7 +103,8 @@ INSERT INTO tasks (circle_id, title, task_type, description, date, time, require
 );
 
 
-INSERT INTO journal_entries (circle_id, author_id, mood, text_content, photo_url, created_at) VALUES
+-- 5. Création des Souvenirs (Journal Entries) avec photos et commentaires
+INSERT INTO journal_entries (circle_id, author_id, mood, text_content, photo_data, comments, created_at) VALUES
 -- 1. Souvenir joyeux posté par Sophie (L'aide) : Moment thé/photos
 (
     'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44', -- Cercle de Monique
@@ -111,6 +112,7 @@ INSERT INTO journal_entries (circle_id, author_id, mood, text_content, photo_url
     9,                                      -- Humeur : Excellente
     'Super après-midi avec Monique ! Nous avons ressorti les vieux albums photos autour d''un thé. Elle m''a raconté son voyage en Italie en 1980. Elle avait le sourire jusqu''aux oreilles.',
     'https://images.unsplash.com/photo-1516321497487-e288fb19713f?q=80&w=1000&auto=format&fit=crop', -- Image: Mains âgées tenant une tasse (Ambiance chaleureuse)
+    '[{"author": "Thomas Durand", "content": "Magnifique ! Maman adore parler de ses voyages passés. Continuez comme ça !", "timestamp": "2025-06-10T17:15:00Z"}]'::jsonb, -- Commentaires JSONB
     '2025-06-10 16:30:00'
 ),
 
@@ -121,6 +123,7 @@ INSERT INTO journal_entries (circle_id, author_id, mood, text_content, photo_url
     6,                                      -- Humeur : Moyenne/Fatiguée
     'Maman était un peu fatiguée après le déjeuner aujourd''hui. Je l''ai installée au jardin pour qu''elle profite du soleil sans trop d''effort. Elle s''est assoupie un moment.',
     'https://images.unsplash.com/photo-1585320806297-9794b3e4eeae?q=80&w=1000&auto=format&fit=crop', -- Image: Chaise de jardin paisible
+    '[{"author": "Sophie Martin", "content": "C''est normal après une longue journée. Le jardin lui fait du bien. Elle ira mieux demain !", "timestamp": "2025-06-11T15:30:00Z"}, {"author": "Marc Voisin", "content": "Je passerai prendre de ses nouvelles en fin d''après-midi.", "timestamp": "2025-06-11T16:00:00Z"}]'::jsonb, -- Commentaires JSONB avec 2 commentaires
     '2025-06-11 14:15:00'
 ),
 
@@ -131,5 +134,6 @@ INSERT INTO journal_entries (circle_id, author_id, mood, text_content, photo_url
     8,                                      -- Humeur : Bonne
     'Je suis passé en coup de vent lui apporter quelques fleurs de mon jardin. Elle va bien, elle regardait son émission préférée. Pas d''inquiétude à avoir pour ce soir.',
     'https://images.unsplash.com/photo-1490750967868-58cb7506a90a?q=80&w=1000&auto=format&fit=crop', -- Image: Bouquet de fleurs fraiches
+    '[]'::jsonb, -- Aucun commentaire pour l'instant
     '2025-06-12 18:45:00'
 );
