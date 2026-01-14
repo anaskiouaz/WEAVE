@@ -1,10 +1,15 @@
 import { useState, useEffect } from 'react';
 import { Download, Image as ImageIcon, Heart, MessageCircle, Calendar, Loader2, Send, Smile, Trash2 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
+import { Camera, CameraResultType } from '@capacitor/camera';
 import { apiGet, apiPost, apiDelete } from '../api/client'; // Import du client API
 import { useAuth } from '../context/AuthContext'; // Import du hook d'authentification
 
 export default function Memories() {
+  // CONST PHOTO
+  const [tempPhoto, setTempPhoto] = useState(null);
+  const [newContent, setNewContent] = useState('');
+
   const { user } = useAuth(); // Récupération de l'utilisateur connecté
   const [memories, setMemories] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -128,6 +133,26 @@ export default function Memories() {
     }
   };
 
+// --- NOUVELLE FONCTION CAPACITOR ---
+  const prendrePhoto = async () => {
+    try {
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: true, // Permet de recadrer après la prise
+        resultType: CameraResultType.Uri // Récupère un chemin web affichable
+      });
+
+      // image.webPath contient l'URL locale de l'image pour l'affichage
+      setTempPhoto(image.webPath);
+    } catch (error) {
+      console.log('Prise de photo annulée ou erreur:', error);
+    }
+  };
+
+  const clearPhoto = () => {
+    setTempPhoto(null);
+  };
+  
   // --- FONCTION AJOUTÉE POUR ENVOYER UN COMMENTAIRE ---
   const handleSendComment = async (entryId) => {
     if (!commentText.trim()) return;
@@ -348,9 +373,9 @@ const loadImageAsBase64 = async (url) => {
         {error && (
           <div className="p-4 mb-6 bg-red-50 text-red-600 rounded-lg border border-red-100">
             {error}
-          </div>
-        )}
-
+                </div>
+              )}
+              
         {/* --- FORMULAIRE D'AJOUT DYNAMISÉ --- */}
         <div className="mb-8 bg-white rounded-lg shadow-sm border p-6">
           <div className="flex gap-4">
@@ -391,7 +416,7 @@ const loadImageAsBase64 = async (url) => {
                 }}
                 className="hidden"
                 id="photo-input"
-              />
+                  />
 
               <div className="flex justify-between items-center mt-3">
                 <div className="flex gap-4">

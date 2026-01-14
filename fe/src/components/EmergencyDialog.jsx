@@ -60,32 +60,32 @@ export default function EmergencyDialog({ open, onClose }) {
         {/* === VUE 1 : CONTACTS === */}
         {view === 'CONTACTS' && (
           <>
-            <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-100">
-              <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
-                <Phone className="w-6 h-6 text-red-600" />
-                Numéros d'Urgence
-              </h2>
+        <div className="flex justify-between items-center mb-6 pb-4 border-b border-gray-100">
+          <h2 className="text-xl font-bold text-gray-900 flex items-center gap-2">
+            <Phone className="w-6 h-6 text-red-600" />
+            Numéros d'Urgence
+          </h2>
               <button onClick={onClose} className="p-2 bg-gray-100 rounded-full hover:bg-gray-200 transition-colors">
-                <X className="w-5 h-5 text-gray-500" />
-              </button>
-            </div>
+            <X className="w-5 h-5 text-gray-500" />
+          </button>
+        </div>
 
             <div className="space-y-3 mb-6">
-              {emergencyContacts.map((contact) => (
-                <div key={contact.number} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
-                  <div>
-                    <p className="font-bold text-gray-900">{contact.name}</p>
-                    <p className="text-sm text-gray-500">{contact.label}</p>
-                  </div>
-                  <a 
-                    href={`tel:${contact.number}`}
-                    className={`${contact.color} text-white px-5 py-2.5 rounded-full font-bold text-lg hover:opacity-90 transition-opacity flex items-center gap-2`}
-                  >
-                    📞 {contact.number}
-                  </a>
-                </div>
-              ))}
+          {emergencyContacts.map((contact) => (
+            <div key={contact.number} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-100">
+              <div>
+                <p className="font-bold text-gray-900">{contact.name}</p>
+                <p className="text-sm text-gray-500">{contact.label}</p>
+              </div>
+              <a 
+                href={`tel:${contact.number}`}
+                className={`${contact.color} text-white px-5 py-2.5 rounded-full font-bold text-lg hover:opacity-90 transition-opacity flex items-center gap-2`}
+              >
+                📞 {contact.number}
+              </a>
             </div>
+          ))}
+        </div>
 
             <button
               onClick={() => setView('REPORT')}
@@ -176,5 +176,6 @@ export default function EmergencyDialog({ open, onClose }) {
     </div>
   );
 
+  // Le Portal garantit que ça s'affiche par-dessus tout le reste
   return createPortal(modalContent, document.body);
 }
