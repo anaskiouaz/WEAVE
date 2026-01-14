@@ -1,7 +1,9 @@
 import db from '../config/db.js';
 import admin from '../config/firebase.js';
 
-export async function getTasks(req, res) {
+const router = Router();
+
+router.get('/', async (req, res) => {
     try {
         // Insertion en base de données
         const result = await db.query(
@@ -32,9 +34,9 @@ export async function getTasks(req, res) {
       message: err.message,
     });
   }
-}
+});
 
-export async function createTask(req, res) {
+router.post('/', async (req, res) => {
   try {
     // 1. On récupère required_helpers en plus des autres champs
     const { date, time, title, task_type, helper_name, circle_id, required_helpers } = req.body;
@@ -151,9 +153,9 @@ export async function createTask(req, res) {
       message: err.message,
     });
     }
-}
+});
 
-export async function deleteTask(req, res) {
+router.delete('/:id', async (req, res) => {
   try {
     const { id } = req.params;
     
@@ -169,5 +171,4 @@ export async function deleteTask(req, res) {
       status: 'error',
       message: err.message,
     });
-    }
-}
+    }}
