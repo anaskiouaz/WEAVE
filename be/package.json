@@ -9,6 +9,7 @@
   },
   "dependencies": {
     "bcryptjs": "^2.x",
+    "@azure/storage-blob": "^12.x",
     "cors": "^2.x",
     "dotenv": "^16.x",
     "express": "^4.x",

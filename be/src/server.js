@@ -9,7 +9,8 @@ import initCronJobs from './services/cronService.js';
 
 dotenv.config();
 
-const app = express();
+import app from './app.js';
+
 const PORT = process.env.PORT || 4000;
 
 app.use(cors());
@@ -123,7 +124,7 @@ app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
 
-app.listen(PORT, '0.0.0.0', () => {
-  console.log(`Server running on port ${PORT}`);
+app.listen(PORT, () => {
+  console.log(`API running on port ${PORT}`);
+console.log('Test modification');
 });
-
