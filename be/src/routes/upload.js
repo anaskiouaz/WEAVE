@@ -250,4 +250,6 @@ router.get('/blob/:blobName', async (req, res) => {
     res.status(404).json({ status: 'error', message: 'Blob introuvable' });
   }
 });
->>>>>>> c4c98d8803913c008c19f83a0190afe0946a4c3d
+
+
+export default router;
