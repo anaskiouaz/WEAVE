@@ -11,6 +11,7 @@ import dbTestRouter from './routes/testDb.js';
 import healthRoutes from './routes/health.js';
 import usersRoutes from './routes/users.js';
 import authRoutes from './routes/auth.js';
+import uploadRoutes from './routes/upload.js';
 
 const app = express();
 
@@ -49,6 +50,9 @@ app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json());
 
+// --- Servir les fichiers statiques (images uploadées) ---
+app.use('/uploads', express.static('uploads'));
+
 // --- 1. LANDING PAGE (Demandé en premier) ---
 app.get('/', (req, res) => {
   res.send(`
@@ -66,6 +70,7 @@ app.use('/test-db', dbTestRouter);
 app.use('/health', healthRoutes); // Ou '/api/health' selon ta préférence
 app.use('/users', usersRoutes);
 app.use('/auth', authRoutes);
+app.use('/api/upload', uploadRoutes);
 
 // --- 3. Routeur Principal (si tu as un index global) ---
 // Toutes les routes définies dans routes/index.js seront préfixées par /api
