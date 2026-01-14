@@ -221,11 +221,6 @@ router.post('/image', processFileUpload, (req, res) => {
   }
 });
 
-<<<<<<< HEAD
-export default router;
-=======
-export default router;
-
 // --- Azure Blob proxy to serve images via API (avoids browser CORS) ---
 // Note: This route relies on configured Azure credentials and the container name.
 // It streams the blob content with the original content type.
