@@ -35,7 +35,7 @@ export default function Profile() {
   const weekDays = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
   // Génération des heures de 00:00 à 23:00
   const hours = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
-  
+
   const availableSkillsList = ['Courses', 'Cuisine', 'Accompagnement médical', 'Promenade', 'Lecture', 'Jardinage', 'Bricolage'];
 
   // --- CHARGEMENT DES DONNÉES ---
@@ -175,8 +175,8 @@ export default function Profile() {
               <div className="absolute bottom-0 right-0 bg-white p-2 rounded-full text-gray-600 hover:text-blue-600 shadow-lg border border-gray-100 transition-transform transform group-hover:scale-110">
                 <Camera size={16} />
               </div>
-            </div>
-            
+        </div>
+
             <div className="text-white drop-shadow-md">
               <h1 className="text-3xl font-bold tracking-tight">{userInfo.name}</h1>
               <p className="opacity-95 flex items-center gap-2 font-medium mt-1">
@@ -184,9 +184,9 @@ export default function Profile() {
                 Aidant{userInfo.name && userInfo.name.endsWith('e') ? 'e' : ''} depuis {userInfo.yearsActive} ans
               </p>
             </div>
-          </div>
-        </div>
-      </div>
+                </div>
+                </div>
+                </div>
 
       {/* --- CONTENU --- */}
       <div className="max-w-4xl mx-auto px-8 -mt-24 space-y-6">
@@ -196,18 +196,18 @@ export default function Profile() {
           <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100 transform hover:-translate-y-1 transition-transform duration-200">
             <span className="text-3xl font-bold text-gray-800">{stats.interventions}</span>
             <span className="text-gray-500 text-sm font-bold uppercase tracking-wide mt-1">Interventions</span>
-          </div>
+                </div>
           <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100 transform hover:-translate-y-1 transition-transform duration-200">
             <span className="text-3xl font-bold text-gray-800">{stats.moments}</span>
             <span className="text-gray-500 text-sm font-bold uppercase tracking-wide mt-1">Moments partagés</span>
-          </div>
+              </div>
           <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100 transform hover:-translate-y-1 transition-transform duration-200">
             <div className="flex items-center gap-1 text-3xl font-bold text-gray-800">
               {stats.rating} <Star className="text-yellow-400 fill-yellow-400 w-6 h-6" />
             </div>
             <span className="text-gray-500 text-sm font-bold uppercase tracking-wide mt-1">Appréciation</span>
+            </div>
           </div>
-        </div>
 
         {/* COMPÉTENCES */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
@@ -328,7 +328,7 @@ export default function Profile() {
                       </div>
                   ) : (<div className="text-center py-6 bg-gray-50 rounded-lg border border-dashed border-gray-300"><p className="text-gray-500 italic text-sm">Aucune disponibilité.</p></div>)
               )}
-           </div>
+          </div>
         </div>
 
         {/* INFOS PERSONNELLES */}
@@ -403,8 +403,8 @@ export default function Profile() {
                 <div 
                   className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${notificationsEnabled ? 'translate-x-5' : 'translate-x-0'}`}
                 ></div>
-              </button>
-            </div>
+          </button>
+        </div>
 
             {/* PERSONNES AIDÉES */}
             <div className="border-t border-gray-100 pt-4">
@@ -443,7 +443,7 @@ export default function Profile() {
             >
               <LogOut size={20} />
               <span className="font-medium">Se déconnecter</span>
-            </button>
+          </button>
 
           </div>
         </div>
