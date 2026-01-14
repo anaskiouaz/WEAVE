@@ -9,7 +9,7 @@ export async function apiGet(path) {
     },
   });
 
-  if (!res.ok) {  
+  if (!res.ok) {
     throw new Error(`API error: ${res.status}`);
   }
 
