@@ -221,8 +221,11 @@ router.post('/image', processFileUpload, (req, res) => {
   }
 });
 
+<<<<<<< HEAD
 export default router;
 
+=======
+>>>>>>> bf15c7f9a9b78643414660ce3683ccfbae528691
 // --- Azure Blob proxy to serve images via API (avoids browser CORS) ---
 // Note: This route relies on configured Azure credentials and the container name.
 // It streams the blob content with the original content type.
@@ -251,4 +254,11 @@ router.get('/blob/:blobName', async (req, res) => {
     console.error('Erreur proxy blob:', error);
     res.status(404).json({ status: 'error', message: 'Blob introuvable' });
   }
+<<<<<<< HEAD
 });
+=======
+});
+
+
+export default router;
+>>>>>>> bf15c7f9a9b78643414660ce3683ccfbae528691

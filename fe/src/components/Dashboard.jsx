@@ -1,4 +1,8 @@
+<<<<<<< HEAD
 import { useState } from 'react';
+=======
+import { useState, useEffect } from 'react';
+>>>>>>> bf15c7f9a9b78643414660ce3683ccfbae528691
 import { apiPost } from '../api/client';
 import { Calendar, Heart, MessageSquare, Users, TrendingUp, Clock } from 'lucide-react';
 
