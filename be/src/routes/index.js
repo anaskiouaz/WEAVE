@@ -27,4 +27,12 @@ router.post('/souvenirs/:id/comments', addCommentToEntry);
 router.delete('/souvenirs/:id/comments/:commentId', deleteCommentFromEntry);
 router.delete('/souvenirs/:id', deleteJournalEntry);
 
+// --- ROUTES SOUVENIRS / JOURNAL (EXPRESS) ---
+// Note : Le frontend appelle /api/souvenirs, donc ici on définit la suite
+router.get('/souvenirs', getJournalEntries);
+router.post('/souvenirs', createJournalEntry);
+router.post('/souvenirs/:id/comments', addCommentToEntry);
+router.delete('/souvenirs/:id/comments/:commentId', deleteCommentFromEntry);
+router.delete('/souvenirs/:id', deleteJournalEntry);
+
 export default router;

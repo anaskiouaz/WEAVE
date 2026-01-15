@@ -114,7 +114,7 @@ router.post('/', async (req, res) => {
                         title: `Nouvelle activité :  ${time}`,
                         body: `Tâche ajoutée : ${title}`
                     },
-                    data: { taskId: newTask.id.toString(), type: 'task_created' },
+                    data: { taskId: result.rows[0].id.toString(), type: 'task_created' },
                     tokens: tokens
                  };
 

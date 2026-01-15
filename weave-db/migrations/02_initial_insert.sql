@@ -6,7 +6,7 @@ INSERT INTO users (id, name, email, password_hash, role_global, medical_info, pr
     'Thomas Durand', 
     'thomas@weave.app', 
     'hash_secret_123', 
-    'SUPERADMIN',
+    'ADMIN',
     NULL,  -- Pas de données chiffrées pour l'instant (évite le crash)
     TRUE   -- Consentement DONNÉ
 ),
