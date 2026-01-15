@@ -2,7 +2,6 @@ import { useState, useEffect } from 'react';
 import { Plus, X, ShoppingCart, Stethoscope, Activity, User, Users, ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle } from 'lucide-react'; // J'ai ajouté quelques icônes pour la popup détails
 import { apiGet, apiPost, apiDelete } from '../api/client';
 
-
 export default function CalendarView() {
   const [showAddTask, setShowAddTask] = useState(false);
   
