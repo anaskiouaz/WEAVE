@@ -5,7 +5,10 @@
   "main": "src/server.js",
   "scripts": {
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "test:audit": "node test-audits.js",
+    "test:rbac": "node test-rbac.js",
+    "test:crypto": "node test-crypto.js"
   },
   "dependencies": {
     "bcryptjs": "^2.x",

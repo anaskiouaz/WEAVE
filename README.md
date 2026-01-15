@@ -63,9 +63,29 @@ Le projet repose sur une architecture moderne séparant le frontend, le backend 
 
 Le projet est entièrement "dockerisé" pour faciliter le développement local via `docker-compose`.
 
-### ⚠️ Fichier Service Account (Firebase ou autre)
+### ⚠️ Configuration Préalable
 
-Pour fonctionner correctement en local, l'API a besoin d'un fichier de credentials de service (service account) au format `.json` (par exemple pour Firebase).
+#### 1. Variables d'Environnement
+
+Le projet utilise des variables d'environnement pour la configuration. **Voir [ENV_CONFIG.md](ENV_CONFIG.md) pour la documentation complète.**
+
+**Backend :**
+```bash
+cd be
+cp .env.example .env
+# Éditez .env avec vos valeurs
+```
+
+**Frontend :**
+```bash
+cd fe
+cp .env.example .env
+# Éditez .env avec vos valeurs
+```
+
+#### 2. Fichier Service Account (Firebase)
+
+L'API nécessite un fichier de credentials Firebase au format `.json`.
 
 **Ce fichier n'est pas versionné pour des raisons de sécurité.**
 

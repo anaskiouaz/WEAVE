@@ -8,15 +8,15 @@ export default defineConfig({
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:4000',
+        target: process.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:4000',
         changeOrigin: true
       },
       '/upload': {
-        target: 'http://localhost:4000',
+        target: process.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:4000',
         changeOrigin: true
       },
       '/uploads': {
-        target: 'http://localhost:4000',
+        target: process.env.VITE_API_BASE_URL?.replace('/api', '') || 'http://localhost:4000',
         changeOrigin: true
       }
     }

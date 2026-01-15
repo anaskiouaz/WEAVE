@@ -1,9 +1,13 @@
+import dotenv from 'dotenv';
+dotenv.config();
+
 async function testAudit() {
     console.log("🕵️  Test du système d'Audit...");
     
     const thomasId = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'; // SUPERADMIN
-    const urlUsers = 'http://localhost:4000/api/users';
-    const urlAudit = 'http://localhost:4000/api/users/audit-logs';
+    const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:4000';
+    const urlUsers = `${API_BASE_URL}/api/users`;
+    const urlAudit = `${API_BASE_URL}/api/users/audit-logs`;
 
     // 1. Thomas accède aux données sensibles (Liste des users)
     console.log("\n1. Thomas consulte la liste des utilisateurs...");

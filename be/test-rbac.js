@@ -1,8 +1,12 @@
 
 
+import dotenv from 'dotenv';
+dotenv.config();
+
 async function testRBAC() {
     console.log("👮 Test du contrôle d'accès (RBAC)...");
-    const url = 'http://localhost:4000/api/users';
+    const API_BASE_URL = process.env.API_BASE_URL || 'http://localhost:4000';
+    const url = `${API_BASE_URL}/api/users`;
 
     // SCÉNARIO 1 : Pas d'identité (Pas de header)
     console.log("\n1. Tentative sans identité...");
