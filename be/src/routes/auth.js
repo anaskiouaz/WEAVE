@@ -34,18 +34,20 @@ router.post('/login', async (req, res) => {
 
     console.log('Succès: Mot de passe validé.');
 
-    // Récupérer les cercles de l'utilisateur
+
+    // Récupérer les cercles de l'utilisateur avec le nom du senior (JOIN sur users)
     const circlesResult = await db.query(`
-      SELECT cc.id, cc.senior_name, ur.role
+      SELECT cc.id, u.name AS senior_name, ur.role
       FROM care_circles cc
       JOIN user_roles ur ON cc.id = ur.circle_id
+      JOIN users u ON cc.senior_id = u.id
       WHERE ur.user_id = $1
     `, [user.id]);
 
     const circles = circlesResult.rows;
 
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET || 'secret', { expiresIn: '30d' });
-    delete user.password_hash;
+    delete user.password_hash;  
     
     res.json({ success: true, token, user: { ...user, circles } });
 

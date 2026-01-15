@@ -12,15 +12,15 @@ export default function RegisterPage() {
   const navigate = useNavigate();
   const { register, login, loading } = useAuth();
   const [error, setError] = useState('');
-  
+
   // Ajout du champ confirmPassword dans l'état
   const [formData, setFormData] = useState({
-    name: '', 
-    email: '', 
-    password: '', 
-    confirmPassword: '', 
-    phone: '', 
-    birth_date: '', 
+    name: '',
+    email: '',
+    password: '',
+    confirmPassword: '',
+    phone: '',
+    birth_date: '',
     onboarding_role: ''
   });
 
@@ -42,6 +42,16 @@ export default function RegisterPage() {
     return null;
   };
 
+
+  // Validation du numéro de téléphone (exemple France : 10 chiffres)
+  const validatePhone = (phone) => {
+    const onlyDigits = /^\d+$/;
+    if (!phone) return null; // Champ optionnel
+    if (!onlyDigits.test(phone)) return "Le numéro de téléphone doit contenir uniquement des chiffres.";
+    if (phone.length !== 10) return "Le numéro de téléphone doit contenir exactement 10 chiffres.";
+    return null;
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
@@ -59,17 +69,24 @@ export default function RegisterPage() {
       return;
     }
 
+    // 3. Vérification : Numéro de téléphone
+    const phoneError = validatePhone(formData.phone);
+    if (phoneError) {
+      setError(phoneError);
+      return;
+    }
+
     // Préparation des données (on retire confirmPassword avant l'envoi)
     const { confirmPassword, ...payload } = formData;
 
     // 3. Inscription
     const resRegister = await register(payload);
-    
+
     if (resRegister.success) {
       // 4. Connexion automatique après inscription
       const resLogin = await login(formData.email, formData.password);
       if (resLogin.success) {
-        navigate('/dashboard');
+        navigate('/select-circle');
       } else {
         navigate('/login'); // Fallback si le login auto échoue
       }
@@ -87,10 +104,10 @@ export default function RegisterPage() {
           </Link>
           <CardTitle className="text-3xl font-bold text-blue-900">Créer mon compte</CardTitle>
         </CardHeader>
-        
+
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            
+
             {error && (
               <div className="p-3 text-red-700 bg-red-100 rounded-md text-sm font-medium border border-red-200">
                 {error}
@@ -133,14 +150,14 @@ export default function RegisterPage() {
             {/* Mot de passe */}
             <div className="space-y-2">
               <Label htmlFor="password" className="text-lg font-semibold">Mot de passe *</Label>
-              <Input 
-                id="password" 
-                name="password" 
-                type="password" 
-                required 
-                className="h-14 text-lg bg-white" 
-                value={formData.password} 
-                onChange={handleChange} 
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                required
+                className="h-14 text-lg bg-white"
+                value={formData.password}
+                onChange={handleChange}
               />
               <p className="text-sm text-gray-500">8 caractères, 1 majuscule, 1 chiffre, 1 caractère spécial min.</p>
             </div>
@@ -148,14 +165,14 @@ export default function RegisterPage() {
             {/* Confirmation du mot de passe */}
             <div className="space-y-2">
               <Label htmlFor="confirmPassword" className="text-lg font-semibold">Confirmer le mot de passe *</Label>
-              <Input 
-                id="confirmPassword" 
-                name="confirmPassword" 
-                type="password" 
-                required 
+              <Input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                required
                 className={`h-14 text-lg bg-white ${formData.confirmPassword && formData.password !== formData.confirmPassword ? "border-red-500 focus-visible:ring-red-500" : ""}`}
-                value={formData.confirmPassword} 
-                onChange={handleChange} 
+                value={formData.confirmPassword}
+                onChange={handleChange}
               />
             </div>
 

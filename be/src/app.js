@@ -12,7 +12,7 @@ import healthRoutes from './routes/health.js';
 import usersRoutes from './routes/users.js';
 import authRoutes from './routes/auth.js';
 import uploadRoutes from './routes/upload.js';
-
+import circlesRoutes from './routes/circles.js';
 const app = express();
 
 // --- Configuration CORS ---
@@ -66,6 +66,7 @@ app.get('/', (req, res) => {
 
 app.use('/api', routes);
 // --- 2. Routes API Spécifiques ---
+app.use('/api/circles', circlesRoutes);
 app.use('/test-db', dbTestRouter);
 app.use('/health', healthRoutes); // Ou '/api/health' selon ta préférence
 app.use('/users', usersRoutes);

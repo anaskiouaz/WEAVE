@@ -9,10 +9,10 @@ import { ArrowLeft, Loader2 } from 'lucide-react';
 
 export default function LoginPage() {
   const navigate = useNavigate();
-  
+
   // On récupère la vraie fonction de login et l'état de chargement
-  const { login, loading } = useAuth(); 
-  
+  const { login, loading } = useAuth();
+
   const [formData, setFormData] = useState({ email: '', password: '' });
   const [error, setError] = useState('');
 
@@ -21,13 +21,13 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
-    
+
     // Appel au Backend via le Contexte
     const result = await login(formData.email, formData.password);
-    
+
     if (result.success) {
       // Si le backend dit "OK", on redirige
-      navigate('/dashboard'); 
+      navigate('/select-circle');
     } else {
       // Sinon, on affiche l'erreur (ex: "Mot de passe incorrect")
       setError(result.error || "Email ou mot de passe incorrect.");
@@ -45,7 +45,7 @@ export default function LoginPage() {
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
-            
+
             {/* Zone d'affichage des erreurs */}
             {error && (
               <div className="p-3 text-red-700 bg-red-100 rounded-md text-sm font-medium border border-red-200">
@@ -55,41 +55,41 @@ export default function LoginPage() {
 
             <div className="space-y-2">
               <Label htmlFor="email" className="text-lg font-semibold">Email</Label>
-              <Input 
-                id="email" 
-                name="email" 
-                type="email" 
-                required 
-                className="h-14 text-lg bg-white" 
-                value={formData.email} 
-                onChange={handleChange} 
+              <Input
+                id="email"
+                name="email"
+                type="email"
+                required
+                className="h-14 text-lg bg-white"
+                value={formData.email}
+                onChange={handleChange}
               />
             </div>
-            
+
             <div className="space-y-2">
               <div className="flex justify-between">
                 <Label htmlFor="password" className="text-lg font-semibold">Mot de passe</Label>
               </div>
-              <Input 
-                id="password" 
-                name="password" 
-                type="password" 
-                required 
-                className="h-14 text-lg bg-white" 
-                value={formData.password} 
-                onChange={handleChange} 
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                required
+                className="h-14 text-lg bg-white"
+                value={formData.password}
+                onChange={handleChange}
               />
             </div>
 
-            <Button 
-              type="submit" 
-              size="lg" 
-              disabled={loading} 
+            <Button
+              type="submit"
+              size="lg"
+              disabled={loading}
               className="w-full h-16 text-xl font-bold bg-blue-700 hover:bg-blue-800 mt-4 shadow-md text-white"
             >
               {loading ? <Loader2 className="animate-spin mr-2" /> : "Me connecter"}
             </Button>
-            
+
           </form>
         </CardContent>
         <CardFooter className="justify-center py-6 bg-gray-50/50 rounded-b-xl">
