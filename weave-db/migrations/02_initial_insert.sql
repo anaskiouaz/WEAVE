@@ -35,7 +35,7 @@ INSERT INTO care_circles (id, senior_name, created_by) VALUES
 
 -- 3. Tentative avec rôle SUPERADMIN (Thomas)
 INSERT INTO user_roles (user_id, circle_id, role) VALUES
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44', 'SUPERADMIN'), -- Thomas est l'admin global
+('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44', 'ADMIN'), -- Thomas est l'admin global
 ('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b22', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44', 'HELPER'); -- Sophie aide
 
 

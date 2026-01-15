@@ -63,6 +63,20 @@ Le projet repose sur une architecture moderne séparant le frontend, le backend 
 
 Le projet est entièrement "dockerisé" pour faciliter le développement local via `docker-compose`.
 
+### ⚠️ Fichier Service Account (Firebase ou autre)
+
+Pour fonctionner correctement en local, l'API a besoin d'un fichier de credentials de service (service account) au format `.json` (par exemple pour Firebase).
+
+**Ce fichier n'est pas versionné pour des raisons de sécurité.**
+
+**Étapes à suivre :**
+
+1. Récupérez le fichier de service account auprès de l'administrateur du projet ou via le Discord.
+2. Placez ce fichier dans le dossier approprié du backend (`be/`).
+3. Vérifiez que la variable d'environnement ou la configuration pointe bien vers ce fichier (tout devrai être bon).
+
+Sans ce fichier, certaines fonctionnalités (authentification, notifications, etc.) ne fonctionneront pas et la connection serait impossible.
+
 ### Prérequis
 * [Docker](https://www.docker.com/) et Docker Compose installés sur votre machine.
 * Git.
@@ -113,4 +127,3 @@ WEAVE/
 ├── weave-db/             # Base de données
 │   └── migrations/       # Scripts SQL (01_initial_schema.sql...)
 └── docker-compose.yml    # Orchestration locale
-

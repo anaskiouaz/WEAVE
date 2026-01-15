@@ -14,7 +14,7 @@ services:
     networks:
       - weave-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U weave_user"]
+      test: ["CMD-SHELL", "pg_isready -U weave_user -d weave_local"]
       interval: 5s
       timeout: 5s
       retries: 5
