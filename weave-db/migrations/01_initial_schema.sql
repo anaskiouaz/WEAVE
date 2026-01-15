@@ -39,6 +39,7 @@ CREATE TABLE users (
                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                        name VARCHAR(255) NOT NULL,
                        email VARCHAR(255) UNIQUE NOT NULL,
+                       onboarding_role VARCHAR(50),
                        phone VARCHAR(20),
                        birth_date DATE,
                        medical_info TEXT,                       -- Pour stocker les données chiffrées
@@ -109,7 +110,9 @@ CREATE TABLE tasks (
 
     CONSTRAINT fk_task_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE
 );
+La bonne réponse est : Tu mets le schéma SQL D'ABORD, et ensuite tu rebuild.
 
+Voici pourquoi : Quand tu lances le rebuild (avec le -v pour vider les volumes), PostgreSQL déma
 -- ASSIGNATION DES TACHES
 CREATE TABLE task_signups (
                               task_id UUID NOT NULL,
