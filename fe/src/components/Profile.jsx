@@ -1,11 +1,18 @@
 import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, Heart, LogOut, Camera, ChevronDown, ChevronUp } from 'lucide-react';
-import { apiGet, apiPut } from '../api/client';
-
-// ⚠️ REMPLACE CECI PAR TON VRAI UUID
-const USER_ID = "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380c33";
+import { apiGet, apiPut, apiPost } from '../api/client'; // 👇 J'ai ajouté apiPost
+import { useAuth } from '../context/AuthContext';
+import { PushNotifications } from '@capacitor/push-notifications'; // 👇 Import Notifications
+import { Capacitor } from '@capacitor/core'; // 👇 Import Core
 
 export default function Profile() {
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  
+  // Utilisation de l'ID du contexte s'il existe
+  const USER_ID = user?.id || "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380c33"; 
+
   const [isLoading, setIsLoading] = useState(true);
   const fileInputRef = useRef(null);
 
@@ -23,7 +30,7 @@ export default function Profile() {
   const [skills, setSkills] = useState([]);
   
   // NOUVEAUX ÉTATS
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false); // Par défaut false en attendant le check
   const [showAssistedPeople, setShowAssistedPeople] = useState(false);
   const [assistedPeopleList] = useState(['Grand-Père Michel']); 
 
@@ -33,30 +40,44 @@ export default function Profile() {
   const [skillsForm, setSkillsForm] = useState([]);
 
   const weekDays = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
-  // Génération des heures de 00:00 à 23:00
   const hours = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
-
   const availableSkillsList = ['Courses', 'Cuisine', 'Accompagnement médical', 'Promenade', 'Lecture', 'Jardinage', 'Bricolage'];
 
   // --- CHARGEMENT DES DONNÉES ---
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (USER_ID) {
+        fetchData();
+        checkNotificationStatus(); // 👇 Vérifier l'état réel au chargement
+    }
+  }, [USER_ID]);
+
+  // Vérifier si les notifs sont déjà activées sur le téléphone
+  const checkNotificationStatus = async () => {
+    if (Capacitor.getPlatform() === 'web') return;
+    try {
+      const perm = await PushNotifications.checkPermissions();
+      if (perm.receive === 'granted') {
+        setNotificationsEnabled(true);
+      }
+    } catch (e) {
+      console.error("Erreur check notifs", e);
+    }
+  };
 
   const fetchData = async () => {
     try {
       const data = await apiGet(`/users/${USER_ID}`);
       if (data.success) {
-        const user = data.user;
-        const createdDate = new Date(user.created_at);
+        const userData = data.user;
+        const createdDate = new Date(userData.created_at);
         const now = new Date();
         const yearsActive = now.getFullYear() - createdDate.getFullYear();
 
         setUserInfo({
-          name: user.name,
-          email: user.email,
-          phone: user.phone || '',
-          address: user.address || '',
+          name: userData.name,
+          email: userData.email,
+          phone: userData.phone || '',
+          address: userData.address || '',
           joinDate: createdDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
           yearsActive: yearsActive > 0 ? yearsActive : 1,
           photoUrl: null 
@@ -91,6 +112,63 @@ export default function Profile() {
     }
   };
 
+  // --- GESTION NOTIFICATIONS (Toggle) ---
+  const handleNotificationToggle = async () => {
+    // Si on est sur le web, on ne fait rien (ou juste visuel)
+    if (Capacitor.getPlatform() === 'web') {
+        setNotificationsEnabled(!notificationsEnabled);
+        return;
+    }
+
+    const newStatus = !notificationsEnabled;
+    setNotificationsEnabled(newStatus); // On change visuellement tout de suite
+
+    try {
+        if (newStatus === true) {
+            // --- ACTIVATION ---
+            let perm = await PushNotifications.checkPermissions();
+            if (perm.receive === 'prompt') {
+                perm = await PushNotifications.requestPermissions();
+            }
+
+            if (perm.receive === 'granted') {
+                await PushNotifications.register();
+                // On ajoute un listener temporaire pour capturer le token et l'envoyer
+                PushNotifications.addListener('registration', async (token) => {
+                    console.log('Token réactivé:', token.value);
+                    await apiPost('/users/device-token', { userId: USER_ID, token: token.value });
+                    // On nettoie le listener pour éviter les doublons
+                    PushNotifications.removeAllListeners(); 
+                });
+            } else {
+                // Si refusé, on remet le switch à OFF
+                setNotificationsEnabled(false);
+                alert("Les notifications sont bloquées dans les paramètres de votre téléphone.");
+            }
+
+        } else {
+            // --- DÉSACTIVATION ---
+            // 1. On dit au backend d'oublier ce token (en envoyant une chaine vide)
+            await apiPost('/users/device-token', { userId: USER_ID, token: "" });
+            
+            // 2. On désinscrit le téléphone
+            await PushNotifications.removeAllListeners();
+            await PushNotifications.unregister();
+            console.log("Notifications désactivées et token supprimé.");
+        }
+    } catch (error) {
+        console.error("Erreur toggle notifs:", error);
+        // En cas d'erreur, on annule le changement visuel
+        setNotificationsEnabled(!newStatus); 
+    }
+  };
+
+  // --- LOGOUT ---
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   // --- SAUVEGARDES ---
   const startEditProfile = () => { setProfileForm({ ...userInfo }); setIsEditingProfile(true); };
   
@@ -109,7 +187,6 @@ export default function Profile() {
   const saveSkills = async () => { setSkills(skillsForm); setIsEditingSkills(false); };
 
   const startEditAvail = () => { 
-    // Initialise le formulaire. Si slots est vide, on met un défaut "08:00 - 18:00"
     const initialForm = availability.length > 0 
       ? availability.map(a => ({...a})) 
       : [{ day: 'Lundi', slots: '08:00 - 18:00' }];
@@ -117,11 +194,9 @@ export default function Profile() {
     setIsEditingAvailability(true); 
   };
 
-  // Fonction utilitaire pour mettre à jour l'heure de début ou de fin
   const updateTimeSlot = (index, type, value) => {
     const newAvail = [...availForm];
     const currentSlots = newAvail[index].slots || '08:00 - 18:00';
-    // On essaie de séparer "Début - Fin". Si le format n'est pas bon, on prend des défauts.
     let [start, end] = currentSlots.includes(' - ') ? currentSlots.split(' - ') : ['08:00', '18:00'];
 
     if (type === 'start') start = value;
@@ -249,7 +324,7 @@ export default function Profile() {
           )}
         </div>
 
-        {/* DISPONIBILITÉS (MODIFIÉ AVEC SÉLECTEURS D'HEURE) */}
+        {/* DISPONIBILITÉS */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
            <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -270,14 +345,12 @@ export default function Profile() {
               {isEditingAvailability ? (
                   <div className="space-y-3">
                       {availForm.map((item, index) => {
-                          // Extraction sécurisée des heures pour l'affichage dans les selects
                           let [start, end] = item.slots && item.slots.includes(' - ') 
                             ? item.slots.split(' - ') 
                             : ['08:00', '18:00'];
 
                           return (
                             <div key={index} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-gray-50 p-2 rounded-lg border border-gray-200">
-                                {/* Selecteur de Jour */}
                                 <select 
                                   value={item.day} 
                                   onChange={(e) => updateAvailRow(index, 'day', e.target.value)} 
@@ -286,7 +359,6 @@ export default function Profile() {
                                   {weekDays.map(d => <option key={d} value={d}>{d}</option>)}
                                 </select>
                                 
-                                {/* Selecteurs d'Heure */}
                                 <div className="flex items-center gap-2 flex-1 w-full">
                                     <span className="text-gray-500 text-sm">De</span>
                                     <select 
@@ -307,7 +379,6 @@ export default function Profile() {
                                     </select>
                                 </div>
 
-                                {/* Bouton Supprimer */}
                                 <button onClick={() => removeAvailRow(index)} className="p-2 text-red-500 hover:bg-red-50 rounded transition-colors self-end sm:self-center">
                                   <Trash2 size={18}/>
                                 </button>
@@ -397,7 +468,7 @@ export default function Profile() {
                 <span className="text-gray-700 font-medium">Notifications</span>
               </div>
               <button 
-                onClick={() => setNotificationsEnabled(!notificationsEnabled)}
+                onClick={handleNotificationToggle} // 👇 Utilisation de la nouvelle fonction
                 className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-300 focus:outline-none ${notificationsEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
               >
                 <div 
@@ -438,7 +509,7 @@ export default function Profile() {
 
             {/* DÉCONNEXION */}
             <button 
-              onClick={() => alert("Fonctionnalité de déconnexion à implémenter")}
+              onClick={handleLogout}
               className="flex items-center gap-3 text-orange-600 hover:text-orange-700 transition-colors w-full text-left pt-4 border-t border-gray-100 mt-2"
             >
               <LogOut size={20} />
