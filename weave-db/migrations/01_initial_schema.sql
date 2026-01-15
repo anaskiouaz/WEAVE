@@ -110,9 +110,7 @@ CREATE TABLE tasks (
 
     CONSTRAINT fk_task_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE
 );
-La bonne réponse est : Tu mets le schéma SQL D'ABORD, et ensuite tu rebuild.
 
-Voici pourquoi : Quand tu lances le rebuild (avec le -v pour vider les volumes), PostgreSQL déma
 -- ASSIGNATION DES TACHES
 CREATE TABLE task_signups (
                               task_id UUID NOT NULL,
