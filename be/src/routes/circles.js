@@ -1,21 +1,24 @@
 import express from 'express';
-import db from '../config/db.js';
+// CORRECTION DES IMPORTS ICI :
+import db, { pool } from '../config/db.js'; // db = export default, { pool } = export nommé
 import { authenticateToken } from './../middleware/auth.js';
-import bcrypt from 'bcryptjs'; // Nécessaire pour le dummy password du senior
+import bcrypt from 'bcryptjs'; 
 
 const router = express.Router();
 
-// Utilitaire pour générer un code (ex: W-7A9B2)
 const generateInviteCode = () => {
   return 'W-' + Math.random().toString(36).substring(2, 7).toUpperCase();
 };
+// ... le reste de votre code (generateInviteCode, etc.)
 
-// 1. CRÉER UN CERCLE + LE COMPTE DU SENIOR
+// 1. CRÉER UN CERCLE
 router.post('/', authenticateToken, async (req, res) => {
-  const client = await db.connect();
+  // Maintenant pool.connect() va fonctionner car on utilise la vraie instance pool
+  const client = await pool.connect(); 
+  
   try {
-    // On attend un objet senior_info avec name, birth_date, etc.
     const { senior_info } = req.body;
+    // On attend un objet senior_info avec name, birth_date, etc.
     const creatorId = req.user.id; 
     
     if (!senior_info || !senior_info.name) {
@@ -126,5 +129,40 @@ router.post('/join', authenticateToken, async (req, res) => {
     res.status(500).json({ error: "Erreur serveur." });
   }
 });
+
+
+// 3. RÉCUPÉRER MON CERCLE (Pour le contexte Frontend)
+router.get('/me', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user.id;
+
+    // On cherche le cercle où l'utilisateur a un rôle
+    const query = `
+      SELECT c.id as circle_id, s.name as circle_nom
+      FROM care_circles c
+      JOIN user_roles ur ON c.id = ur.circle_id
+      JOIN users s ON c.senior_id = s.id
+      WHERE ur.user_id = $1
+      LIMIT 1
+    `;
+    
+    const { rows } = await pool.query(query, [userId]);
+
+    if (rows.length > 0) {
+      // C'est ici qu'on renvoie les clés exactes attendues par votre AuthProvider
+      res.json({ 
+        circle_id: rows[0].circle_id, 
+        circle_nom: rows[0].circle_nom 
+      });
+    } else {
+      res.json({ circle_id: null, circle_nom: null });
+    }
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: "Erreur récupération cercle" });
+  }
+});
+
+
 
 export default router;

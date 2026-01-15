@@ -46,15 +46,30 @@ router.post('/login', async (req, res) => {
 
     const circles = circlesResult.rows;
 
+    let mainCircleId = null;
+    let mainCircleNom = null;
+
+    if (circles.length > 0) {
+        mainCircleId = circles[0].id;           // On prend le premier cercle trouvé
+        mainCircleNom = circles[0].senior_name; // Le nom du senior = nom du cercle
+    }
+
     const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET || 'secret', { expiresIn: '30d' });
-    delete user.password_hash;  
-    
-    res.json({ success: true, token, user: { ...user, circles } });
+    delete user.password_hash;    
+    res.json({ 
+        success: true, 
+        token, 
+        user: { ...user, circles }, // On garde circles dans user au cas où
+        circle_id: mainCircleId,    // <--- C'est ça que le AuthContext attend !
+        circle_nom: mainCircleNom   // <--- Et ça !
+    });
 
   } catch (error) {
     console.error('ERREUR CRITIQUE:', error);
     res.status(500).json({ success: false, error: "Erreur serveur." });
   }
+
+  
 });
 
 export default router;

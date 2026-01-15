@@ -31,7 +31,7 @@ export default function SelectCirclePage() {
     const apiCall = async (endpoint, body) => {
         setLoading(true);
         setError('');
-        const token = localStorage.getItem('token');
+        const token = localStorage.getItem('weave_token');
 
         try {
             const res = await fetch(`http://localhost:4000/api/circles${endpoint}`, {

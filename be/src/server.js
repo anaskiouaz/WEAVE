@@ -117,9 +117,6 @@ initDB();
 initCronJobs();
 
 // Routes
-app.use('/api/users', usersRoutes);
-app.use('/api/tasks', tasksRoutes);
-
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });
