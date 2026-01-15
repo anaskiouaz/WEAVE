@@ -6,6 +6,7 @@ import usersRoutes from './routes/users.js';
 import tasksRoutes from './routes/tasks.js';
 import { initFirebase } from './config/firebase.js';
 import initCronJobs from './services/cronService.js';
+import profile_module from   './routes/profile_module.js';
 
 dotenv.config();
 

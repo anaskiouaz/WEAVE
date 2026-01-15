@@ -12,6 +12,7 @@ import healthRoutes from './routes/health.js';
 import usersRoutes from './routes/users.js';
 import authRoutes from './routes/auth.js';
 import uploadRoutes from './routes/upload.js';
+import profile_module from   './routes/profile_module.js';  
 
 const app = express();
 
@@ -26,22 +27,13 @@ console.log('CORS allowed origins:', allowedOrigins);
 
 app.use(cors({
   origin(origin, callback) {
-    // Autoriser les requêtes sans origine (ex: Postman, curl, server-to-server)
     if (!origin) return callback(null, true);
-
-    if (allowedOrigins.length > 0) {
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      console.warn(`CORS blocked origin: ${origin}`);
-      return callback(new Error('Not allowed by CORS'));
-    }
-
-    // Si aucune ALLOWED_ORIGINS n'est configurée, tout autoriser (Dev mode)
+    // Tu peux remettre ta logique de liste blanche ici si tu veux
     return callback(null, true);
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  // 👇 AJOUTE 'x-user-id' ICI (C'est le plus important) 👇
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id'], 
   credentials: true,
 }));
 
@@ -71,6 +63,7 @@ app.use('/health', healthRoutes); // Ou '/api/health' selon ta préférence
 app.use('/users', usersRoutes);
 app.use('/auth', authRoutes);
 app.use('/api/upload', uploadRoutes);
+app.use('/profile_module', profile_module);
 
 // --- 3. Routeur Principal (si tu as un index global) ---
 // Toutes les routes définies dans routes/index.js seront préfixées par /api

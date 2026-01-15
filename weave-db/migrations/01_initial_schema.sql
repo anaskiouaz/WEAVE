@@ -47,7 +47,9 @@ CREATE TABLE users (
                        password_hash VARCHAR(255) NOT NULL,
                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                        role_global global_role_type,
-                       fcm_token TEXT                      -- Pour les notifications push
+                       fcm_token TEXT     
+                       skills JSONB DEFAULT '[]'::jsonb;
+                                        -- Pour les notifications push
 );
 
 -- CERCLES DE SOINS
@@ -110,15 +112,14 @@ CREATE TABLE tasks (
 
     CONSTRAINT fk_task_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE
 );
-La bonne réponse est : Tu mets le schéma SQL D'ABORD, et ensuite tu rebuild.
 
-Voici pourquoi : Quand tu lances le rebuild (avec le -v pour vider les volumes), PostgreSQL déma
 -- ASSIGNATION DES TACHES
 CREATE TABLE task_signups (
                               task_id UUID NOT NULL,
                               user_id UUID NOT NULL,
                               confirmed BOOLEAN DEFAULT FALSE,
                               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    
                               PRIMARY KEY (task_id, user_id),
                               CONSTRAINT fk_signup_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
                               CONSTRAINT fk_signup_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -137,14 +138,14 @@ CREATE TABLE messages (
 
 -- JOURNAL DE BORD
 CREATE TABLE journal_entries (
-                                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                                 circle_id UUID NOT NULL,
-     author_id UUID NOT NULL,
-                                 mood INT CHECK (mood BETWEEN 1 AND 10),
-                                 text_content TEXT,
-     photo_data VARCHAR, -- Stockage du nom du blob Azure (privé avec SAS token)
-                                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-     comments JSONB DEFAULT '[]'::jsonb,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    circle_id UUID NOT NULL,
+    author_id UUID NOT NULL,
+    mood INT CHECK (mood BETWEEN 1 AND 10),
+    text_content TEXT,
+    photo_data VARCHAR, -- Stockage du nom du blob Azure (privé avec SAS token)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    comments JSONB DEFAULT '[]'::jsonb,
 
      CONSTRAINT fk_journal_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE,
      CONSTRAINT fk_journal_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL
