@@ -1,13 +1,18 @@
-import { useState, useEffect, useRef, useContext } from 'react';
-import { AuthContext } from '../context/AuthContext';
-import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, Camera, ChevronDown, ChevronUp, Bell, Heart, LogOut } from 'lucide-react';
-import { apiGet, apiPut } from '../api/client';
-
-// ID de "Marc Voisin"
-const USER_ID = "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380c33";
+import { useState, useEffect, useRef } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, Heart, LogOut, Camera, ChevronDown, ChevronUp } from 'lucide-react';
+import { apiGet, apiPut, apiPost } from '../api/client'; // 👇 J'ai ajouté apiPost
+import { useAuth } from '../context/AuthContext';
+import { PushNotifications } from '@capacitor/push-notifications'; // 👇 Import Notifications
+import { Capacitor } from '@capacitor/core'; // 👇 Import Core
 
 export default function Profile() {
-  const { circleId } = useContext(AuthContext);
+  const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  
+  // Utilisation de l'ID du contexte s'il existe
+  const USER_ID = user?.id || "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380c33"; 
+
   const [isLoading, setIsLoading] = useState(true);
   const fileInputRef = useRef(null);
 
@@ -22,7 +27,12 @@ export default function Profile() {
   const [stats, setStats] = useState({ interventions: 0, moments: 0, rating: 0 });
   const [skills, setSkills] = useState([]);
   
-  // FORMULAIRES
+  // NOUVEAUX ÉTATS
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false); // Par défaut false en attendant le check
+  const [showAssistedPeople, setShowAssistedPeople] = useState(false);
+  const [assistedPeopleList] = useState(['Grand-Père Michel']); 
+
+  // --- FORMULAIRES ---
   const [profileForm, setProfileForm] = useState({});
   const [availForm, setAvailForm] = useState([]);
   const [skillsForm, setSkillsForm] = useState([]);
@@ -37,8 +47,24 @@ export default function Profile() {
 
   // --- CHARGEMENT ---
   useEffect(() => {
-    fetchData();
-  }, []);
+    if (USER_ID) {
+        fetchData();
+        checkNotificationStatus(); // 👇 Vérifier l'état réel au chargement
+    }
+  }, [USER_ID]);
+
+  // Vérifier si les notifs sont déjà activées sur le téléphone
+  const checkNotificationStatus = async () => {
+    if (Capacitor.getPlatform() === 'web') return;
+    try {
+      const perm = await PushNotifications.checkPermissions();
+      if (perm.receive === 'granted') {
+        setNotificationsEnabled(true);
+      }
+    } catch (e) {
+      console.error("Erreur check notifs", e);
+    }
+  };
 
   const fetchData = async () => {
     try {
@@ -47,16 +73,16 @@ export default function Profile() {
       const data = await apiGet('/module/profile', options);
       
       if (data.success) {
-        const user = data.user;
-        const createdDate = new Date(user.created_at);
+        const userData = data.user;
+        const createdDate = new Date(userData.created_at);
         const now = new Date();
         const yearsActive = now.getFullYear() - createdDate.getFullYear();
 
         setUserInfo({
-          name: user.name,
-          email: user.email,
-          phone: user.phone || '',
-          address: user.address || '',
+          name: userData.name,
+          email: userData.email,
+          phone: userData.phone || '',
+          address: userData.address || '',
           joinDate: createdDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
           yearsActive: yearsActive > 0 ? yearsActive : 1,
           photoUrl: null
@@ -90,8 +116,66 @@ export default function Profile() {
     } catch (err) { console.error(err); }
   };
 
-  // Remplacer par le vrai cercle sélectionné côté UI !
-  const saveAvailability = async () => {
+  // --- GESTION NOTIFICATIONS (Toggle) ---
+  const handleNotificationToggle = async () => {
+    // Si on est sur le web, on ne fait rien (ou juste visuel)
+    if (Capacitor.getPlatform() === 'web') {
+        setNotificationsEnabled(!notificationsEnabled);
+        return;
+    }
+
+    const newStatus = !notificationsEnabled;
+    setNotificationsEnabled(newStatus); // On change visuellement tout de suite
+
+    try {
+        if (newStatus === true) {
+            // --- ACTIVATION ---
+            let perm = await PushNotifications.checkPermissions();
+            if (perm.receive === 'prompt') {
+                perm = await PushNotifications.requestPermissions();
+            }
+
+            if (perm.receive === 'granted') {
+                await PushNotifications.register();
+                // On ajoute un listener temporaire pour capturer le token et l'envoyer
+                PushNotifications.addListener('registration', async (token) => {
+                    console.log('Token réactivé:', token.value);
+                    await apiPost('/users/device-token', { userId: USER_ID, token: token.value });
+                    // On nettoie le listener pour éviter les doublons
+                    PushNotifications.removeAllListeners(); 
+                });
+            } else {
+                // Si refusé, on remet le switch à OFF
+                setNotificationsEnabled(false);
+                alert("Les notifications sont bloquées dans les paramètres de votre téléphone.");
+            }
+
+        } else {
+            // --- DÉSACTIVATION ---
+            // 1. On dit au backend d'oublier ce token (en envoyant une chaine vide)
+            await apiPost('/users/device-token', { userId: USER_ID, token: "" });
+            
+            // 2. On désinscrit le téléphone
+            await PushNotifications.removeAllListeners();
+            await PushNotifications.unregister();
+            console.log("Notifications désactivées et token supprimé.");
+        }
+    } catch (error) {
+        console.error("Erreur toggle notifs:", error);
+        // En cas d'erreur, on annule le changement visuel
+        setNotificationsEnabled(!newStatus); 
+    }
+  };
+
+   const handleLogout = () => {
+    logout();           // Vide le localStorage et le state user
+    navigate('/login'); // Redirige vers la page de connexion
+  };
+
+  // --- SAUVEGARDES ---
+  const startEditProfile = () => { setProfileForm({ ...userInfo }); setIsEditingProfile(true); };
+  
+  const saveProfile = async () => {
     try {
       const options = { headers: { 'x-user-id': USER_ID } };
       if (!circleId) { alert('Aucun cercle sélectionné'); return; }
@@ -118,7 +202,9 @@ export default function Profile() {
   };
 
   const startEditAvail = () => { 
-    const initialForm = availability.length > 0 ? availability.map(a => ({...a})) : [{ day: 'Lundi', slots: '08:00 - 18:00' }];
+    const initialForm = availability.length > 0 
+      ? availability.map(a => ({...a})) 
+      : [{ day: 'Lundi', slots: '08:00 - 18:00' }];
     setAvailForm(initialForm); 
     setIsEditingAvailability(true); 
   };
@@ -217,17 +303,30 @@ export default function Profile() {
               {isEditingAvailability ? (
                   <div className="space-y-3">
                       {availForm.map((item, index) => {
-                          let [start, end] = item.slots && item.slots.includes(' - ') ? item.slots.split(' - ') : ['08:00', '18:00'];
+                          let [start, end] = item.slots && item.slots.includes(' - ') 
+                            ? item.slots.split(' - ') 
+                            : ['08:00', '18:00'];
+
                           return (
-                            <div key={index} className="flex flex-col sm:flex-row gap-3 items-center bg-gray-50 p-2 rounded-lg border border-gray-200">
-                                <select value={item.day} onChange={(e) => updateAvailRow(index, 'day', e.target.value)} className="border p-2 rounded bg-white w-32 text-sm outline-none">{weekDays.map(d => <option key={d} value={d}>{d}</option>)}</select>
-                                <div className="flex items-center gap-2 flex-1">
+                            <div key={index} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-gray-50 p-2 rounded-lg border border-gray-200">
+                                <select 
+                                  value={item.day} 
+                                  onChange={(e) => updateAvailRow(index, 'day', e.target.value)} 
+                                  className="border p-2 rounded bg-white w-full sm:w-32 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
+                                >
+                                  {weekDays.map(d => <option key={d} value={d}>{d}</option>)}
+                                </select>
+                                
+                                <div className="flex items-center gap-2 flex-1 w-full">
                                     <span className="text-gray-500 text-sm">De</span>
                                     <select value={start} onChange={(e) => updateTimeSlot(index, 'start', e.target.value)} className="border p-2 rounded bg-white flex-1 text-sm outline-none">{hours.map(h => <option key={h} value={h}>{h}</option>)}</select>
                                     <span className="text-gray-500 text-sm">à</span>
                                     <select value={end} onChange={(e) => updateTimeSlot(index, 'end', e.target.value)} className="border p-2 rounded bg-white flex-1 text-sm outline-none">{hours.map(h => <option key={h} value={h}>{h}</option>)}</select>
                                 </div>
-                                <button onClick={() => removeAvailRow(index)} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 size={18}/></button>
+
+                                <button onClick={() => removeAvailRow(index)} className="p-2 text-red-500 hover:bg-red-50 rounded transition-colors self-end sm:self-center">
+                                  <Trash2 size={18}/>
+                                </button>
                             </div>
                           );
                       })}
@@ -275,7 +374,69 @@ export default function Profile() {
            </div>
         </div>
 
-        {/* PARAMETRES (Garde le reste de ton code ici pour les notifications, etc.) */}
+        {/* --- PARAMÈTRES --- */}
+        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
+          <h2 className="text-lg font-bold text-gray-900 mb-6">Paramètres</h2>
+          <div className="space-y-6">
+            
+            {/* NOTIFICATIONS */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Bell className="text-gray-500" size={20} />
+                <span className="text-gray-700 font-medium">Notifications</span>
+              </div>
+              <button 
+                onClick={handleNotificationToggle} // 👇 Utilisation de la nouvelle fonction
+                className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-300 focus:outline-none ${notificationsEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
+              >
+                <div 
+                  className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${notificationsEnabled ? 'translate-x-5' : 'translate-x-0'}`}
+                ></div>
+          </button>
+        </div>
+
+            {/* PERSONNES AIDÉES */}
+            <div className="border-t border-gray-100 pt-4">
+              <button 
+                onClick={() => setShowAssistedPeople(!showAssistedPeople)}
+                className="w-full flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-3">
+                  <Heart className="text-gray-500 group-hover:text-red-500 transition-colors" size={20} />
+                  <span className="text-gray-700 font-medium group-hover:text-gray-900">Personnes aidées</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded text-sm">{assistedPeopleList.length}</span>
+                  {showAssistedPeople ? <ChevronUp size={16} className="text-gray-400"/> : <ChevronDown size={16} className="text-gray-400"/>}
+                </div>
+              </button>
+
+              {/* Liste déroulante */}
+              {showAssistedPeople && (
+                <div className="mt-3 ml-8 p-3 bg-gray-50 rounded-lg animate-in fade-in slide-in-from-top-2">
+                  <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Liste des bénéficiaires</p>
+                  {assistedPeopleList.map((person, idx) => (
+                    <div key={idx} className="flex items-center gap-2 py-1 text-gray-700">
+                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
+                      {person}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* DÉCONNEXION */}
+            <button 
+              onClick={handleLogout} // <--- 4. Remplacez l'alert par handleLogout
+              className="flex items-center gap-3 text-orange-600 hover:text-orange-700 hover:bg-orange-50 p-2 rounded-lg transition-colors w-full text-left pt-4 border-t border-gray-100 mt-2"
+            >
+              <LogOut size={20} />
+              <span className="font-medium text-lg">Se déconnecter</span>
+            </button>
+
+          </div>
+        </div>
+
       </div>
     </div>
   );

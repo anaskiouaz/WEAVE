@@ -3,6 +3,7 @@ import db from '../config/db.js';
 import crypto from 'crypto';
 import { generateBlobSASUrl } from '../utils/azureStorage.js';
 import { BlobServiceClient } from '@azure/storage-blob';
+import admin from '../config/firebase.js';
 
 // Configuration Azure pour la suppression
 const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
@@ -84,6 +85,7 @@ export async function getJournalEntries(req, res) {
 }
 
 // Créer un souvenir
+// Créer un souvenir
 export async function createJournalEntry(req, res) {
   try {
     // 1. On récupère les champs nécessaires
@@ -99,7 +101,7 @@ export async function createJournalEntry(req, res) {
 
     let resolvedCircleId = circle_id;
 
-    // 2. Logique de résolution du Cercle (copiée de ton exemple tasks)
+    // 2. Logique de résolution du Cercle
     if (circle_id) {
       const specificCircle = await db.query(
         `SELECT id FROM care_circles WHERE id = $1`,
@@ -113,7 +115,6 @@ export async function createJournalEntry(req, res) {
         });
       }
     } else {
-      // Si pas de cercle fourni, on prend le premier créé (comportement par défaut)
       const defaultCircle = await db.query(
         `SELECT id FROM care_circles ORDER BY created_at ASC LIMIT 1`
       );
@@ -129,23 +130,24 @@ export async function createJournalEntry(req, res) {
 
     // 3. Insertion en base de données
     const result = await db.query(
-  `INSERT INTO journal_entries (circle_id, author_id, mood, text_content, photo_data, comments)
-   VALUES ($1, $2, $3, $4, $5, $6) -- On ajoute $6 pour les commentaires
-   RETURNING id, circle_id, author_id, mood, text_content, photo_data, created_at`,
-  [
-    resolvedCircleId,
-    author_id,
-    mood || null,
-    text_content,
-    photo_data || null,
-    '[]' // On initialise avec un tableau vide JSON
-  ]
-);
+      `INSERT INTO journal_entries (circle_id, author_id, mood, text_content, photo_data, comments)
+       VALUES ($1, $2, $3, $4, $5, $6)
+       RETURNING id, circle_id, author_id, mood, text_content, photo_data, created_at`,
+      [
+        resolvedCircleId,
+        author_id,
+        mood || null,
+        text_content,
+        photo_data || null,
+        '[]'
+      ]
+    );
 
-    // Petit bonus : On récupère le nom de l'auteur pour le renvoyer au frontend immédiatement
+    // Récupérer le nom de l'auteur
     const authorResult = await db.query(`SELECT name FROM users WHERE id = $1`, [author_id]);
     const authorName = authorResult.rows.length ? authorResult.rows[0].name : 'Inconnu';
 
+    // ✅ Réponse envoyée au client (Succès)
     res.status(201).json({
       status: 'ok',
       message: 'Journal entry created',
@@ -155,12 +157,44 @@ export async function createJournalEntry(req, res) {
       },
     });
 
+    // --- 🔔 NOTIFICATIONS (Maintenant à l'intérieur du try) ---
+    // On met ça dans un try/catch séparé pour ne pas crasher si la notif échoue
+    try {
+        const userTokens = await db.query("SELECT fcm_token FROM users WHERE fcm_token IS NOT NULL AND fcm_token != ''");
+        const tokens = [...new Set(userTokens.rows.map(r => r.fcm_token))];
+        console.log(`Préparation notif. Tokens trouvés en DB : ${tokens.length}`);
+
+        if (tokens.length > 0) {
+            const message = {
+                notification: {
+                    title: `Nouveau souvenir ajouté par : ${authorName}`, // On utilise authorName qu'on a déjà récupéré plus haut
+                    body: `Souvenir ajouté : ${text_content.substring(0, 100)}...`,
+                },
+                data: { 
+                    taskId: result.rows[0].id.toString(), // "result" est accessible ici !
+                    type: 'souvenir_created' // J'ai changé "task_created" en "souvenir_created" pour la cohérence
+                },
+                tokens: tokens
+            };
+    
+            console.log("Envoi à Firebase en cours...");
+            const response = await admin.messaging().sendEachForMulticast(message);
+            console.log(`Bilan Firebase : ${response.successCount} succès, ${response.failureCount} échecs.`);
+        }
+    } catch (notifError) {
+        console.error("Erreur lors de l'envoi de la notification (non bloquant) :", notifError);
+    }
+    // ---------------------------------------------------------
+
   } catch (err) {
     console.error('Error creating journal entry:', err);
-    res.status(500).json({
-      status: 'error',
-      message: err.message,
-    });
+    // On vérifie que la réponse n'a pas déjà été envoyée avant d'envoyer l'erreur
+    if (!res.headersSent) {
+        res.status(500).json({
+            status: 'error',
+            message: err.message,
+        });
+    }
   }
 }
 

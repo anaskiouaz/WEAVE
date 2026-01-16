@@ -7,12 +7,20 @@ import tasksRoutes from './routes/tasks.js';
 import { initFirebase } from './config/firebase.js';
 import initCronJobs from './services/cronService.js';
 import profile_module from   './routes/profile_module.js';
+import app from './app.js';
 
 dotenv.config();
 
-import app from './app.js';
+import http from 'http';
+import { initSocket } from './services/socketService.js'; // <--- IMPORT IMPORTANT
 
-const PORT = process.env.PORT || 4000;
+const PORT = process.env.PORT || 3000;
+
+// 1. On crée un serveur HTTP "natif" qui englobe ton app Express
+const server = http.createServer(app);
+
+// 2. On attache Socket.io à ce serveur
+initSocket(server);
 
 app.use(cors());
 app.use(express.json());
@@ -118,9 +126,6 @@ initDB();
 initCronJobs();
 
 // Routes
-app.use('/api/users', usersRoutes);
-app.use('/api/tasks', tasksRoutes);
-
 app.get('/api/health', (req, res) => {
   res.json({ status: 'ok', timestamp: new Date() });
 });

@@ -37,12 +37,23 @@ export function generateBlobSASUrl(blobName) {
   }
 
   try {
+    // 1. Définir les dates avec une marge de sécurité
+    const now = new Date();
+    
+    // CORRECTION ICI : On recule l'heure de début de 10 minutes
+    // Cela permet au token d'être valide même si l'horloge Azure est décalée
+    const startsOn = new Date(now);
+    startsOn.setMinutes(now.getMinutes() - 10);
+
+    const expiresOn = new Date(now);
+    expiresOn.setHours(now.getHours() + 24); // Valide 24 heures
+
     const sasOptions = {
       containerName,
       blobName,
       permissions: BlobSASPermissions.parse('r'), // Read permission
-      startsOn: new Date(),
-      expiresOn: new Date(new Date().valueOf() + 24 * 60 * 60 * 1000), // 24 hours
+      startsOn: startsOn, // Utilise l'heure "antidatée"
+      expiresOn: expiresOn,
     };
 
     const sasToken = generateBlobSASQueryParameters(sasOptions, sharedKeyCredential).toString();

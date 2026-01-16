@@ -83,9 +83,8 @@ router.patch('/:id/consent', async (req, res) => {
     } catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 
-
-
-// --- ENREGISTREMENT DU TOKEN (C'est ici qu'on corrige !) ---
+//
+// --- ENREGISTREMENT DU TOKEN ---
 router.post('/device-token', async (req, res) => {
     const { userId, token } = req.body;
     
@@ -93,24 +92,27 @@ router.post('/device-token', async (req, res) => {
 
     try {
         if (userId) {
-            // Cas 1 : Utilisateur connecté -> On met à jour son profil
+            // Cas 1 : Utilisateur connecté
             await db.query(
                 'UPDATE users SET fcm_token = $1 WHERE id = $2',
                 [token, userId]
             );
             console.log("Token mis à jour pour l'utilisateur ID:", userId);
         } else {
-            // Cas 2 : Utilisateur Anonyme (App installée mais pas de login)
-            // On crée un utilisateur "fantôme" basé sur le token pour pouvoir le contacter
+            // Cas 2 : Utilisateur Anonyme
             const fakeEmail = `device_${token.substring(0, 8)}@weave.local`;
             const fakeName = `Mobile ${token.substring(0, 4)}`;
             
-            // On essaie d'insérer. Si l'email existe déjà, on met juste à jour le token.
+            // CORRECTIONS APPORTÉES ICI :
+            // 1. Suppression de "updated_at = NOW()" (car la colonne n'existe pas)
+            // 2. Remplacement de "role" par "role_global" (nom réel de la colonne)
+            // 3. Remplacement de 'helper' par 'HELPER' (l'ENUM Postgres est sensible à la casse)
+            
             await db.query(`
-                INSERT INTO users (name, email, password_hash, role, fcm_token)
-                VALUES ($1, $2, 'no_pass', 'helper', $3)
+                INSERT INTO users (name, email, password_hash, role_global, fcm_token)
+                VALUES ($1, $2, 'no_pass', 'HELPER', $3)
                 ON CONFLICT (email) 
-                DO UPDATE SET fcm_token = $3, updated_at = NOW()
+                DO UPDATE SET fcm_token = $3
                 RETURNING id;
             `, [fakeName, fakeEmail, token]);
             
@@ -120,7 +122,6 @@ router.post('/device-token', async (req, res) => {
         res.json({ success: true });
     } catch (err) {
         console.error("Erreur enregistrement token:", err);
-        // On ne renvoie pas 500 pour ne pas faire crasher l'app, juste un log
         res.status(200).json({ success: false, error: err.message });
     }
 });

@@ -1,27 +1,28 @@
-import { Router } from 'express';
 import db from '../config/db.js';
 import admin from '../config/firebase.js';
+import { Router } from 'express';
 
 const router = Router();
 
 router.get('/', async (req, res) => {
     try {
         // Insertion en base de données
-        const result = await db.query(
+          const result = await db.query(
             `SELECT 
-         t.id,
-         t.circle_id,
-         t.date,
-         t.time,
-         t.title,
-         t.task_type,
-         t.helper_name,
-         t.required_helpers,
-         c.senior_name
-       FROM tasks t
-       LEFT JOIN care_circles c ON c.id = t.circle_id
-       ORDER BY t.date ASC, t.time ASC`
-    );
+          t.id,
+          t.circle_id,
+          t.date,
+          t.time,
+          t.title,
+          t.task_type,
+          t.helper_name,
+          t.required_helpers,
+          u.name AS senior_name
+         FROM tasks t
+         LEFT JOIN care_circles c ON c.id = t.circle_id
+         LEFT JOIN users u ON c.senior_id = u.id
+         ORDER BY t.date ASC, t.time ASC`
+       );
     
     res.json({
       status: 'ok',
@@ -51,9 +52,10 @@ router.post('/', async (req, res) => {
 
     let resolvedCircle = null;
 
+
     if (circle_id) {
       const specificCircle = await db.query(
-        `SELECT id, senior_name FROM care_circles WHERE id = $1`,
+        `SELECT c.id, u.name AS senior_name FROM care_circles c LEFT JOIN users u ON c.senior_id = u.id WHERE c.id = $1`,
         [circle_id]
       );
                  
@@ -61,13 +63,13 @@ router.post('/', async (req, res) => {
         return res.status(400).json({
           status: 'error',
           message: 'Care circle not found',
-                    });
-                 }
+        });
+      }
 
       resolvedCircle = specificCircle.rows[0];
-        } else {
+    } else {
       const defaultCircle = await db.query(
-        `SELECT id, senior_name FROM care_circles ORDER BY created_at ASC LIMIT 1`
+        `SELECT c.id, u.name AS senior_name FROM care_circles c LEFT JOIN users u ON c.senior_id = u.id ORDER BY c.created_at ASC LIMIT 1`
       );
 
       if (!defaultCircle.rows.length) {
@@ -75,7 +77,7 @@ router.post('/', async (req, res) => {
           status: 'error',
           message: 'No care circle available. Please create one first.',
         });
-    }
+      }
 
       resolvedCircle = defaultCircle.rows[0];
     }
@@ -114,7 +116,7 @@ router.post('/', async (req, res) => {
                         title: `Nouvelle activité :  ${time}`,
                         body: `Tâche ajoutée : ${title}`
                     },
-                    data: { taskId: newTask.id.toString(), type: 'task_created' },
+                    data: { taskId: result.rows[0].id.toString(), type: 'task_created' },
                     tokens: tokens
                  };
 
@@ -172,7 +174,7 @@ router.delete('/:id', async (req, res) => {
       status: 'error',
       message: err.message,
     });
-    }
-});
+    }}
+  );
 
-export default router;
+  export default router;
