@@ -1,3 +1,4 @@
+import { Router } from 'express';
 import db from '../config/db.js';
 import admin from '../config/firebase.js';
 
@@ -173,4 +174,6 @@ router.delete('/:id', async (req, res) => {
       status: 'error',
       message: err.message,
     });
-    }}
+    }
+});
+export default router;
