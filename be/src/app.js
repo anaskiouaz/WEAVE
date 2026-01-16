@@ -10,9 +10,10 @@ import routes from './routes/index.js';
 import dbTestRouter from './routes/testDb.js';
 import healthRoutes from './routes/health.js';
 import usersRoutes from './routes/users.js';
+import tasksRoutes from './routes/tasks.js';
 import authRoutes from './routes/auth.js';
 import uploadRoutes from './routes/upload.js';
-
+import circlesRoutes from './routes/circles.js';
 const app = express();
 
 // --- Configuration CORS ---
@@ -66,11 +67,14 @@ app.get('/', (req, res) => {
 
 app.use('/api', routes);
 // --- 2. Routes API Spécifiques ---
+app.use('/api/circles', circlesRoutes);
 app.use('/test-db', dbTestRouter);
 app.use('/health', healthRoutes); // Ou '/api/health' selon ta préférence
 app.use('/users', usersRoutes);
-app.use('/auth', authRoutes);
+app.use('/api/auth', authRoutes); // <--- CORRECTION ICI
 app.use('/api/upload', uploadRoutes);
+app.use('/api/users', usersRoutes);
+app.use('/api/tasks', tasksRoutes);
 
 // --- 3. Routeur Principal (si tu as un index global) ---
 // Toutes les routes définies dans routes/index.js seront préfixées par /api

@@ -1,7 +1,6 @@
-import { BrowserRouter, Routes, Route, Link, useLocation, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useLocation, Outlet, Navigate } from 'react-router-dom';
 import { Home, Calendar, Heart, MessageSquare, User, Settings, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
-import { AuthProvider, useAuth } from './context/AuthContext';
 
 import Dashboard from './components/Dashboard';
 import CalendarView from './components/CalendarView';
@@ -11,17 +10,25 @@ import Profile from './components/Profile';
 import Admin from './components/Admin';
 import EmergencyDialog from './components/EmergencyDialog';
 import Navigation from './components/ui-mobile/navigation';
-import AdminGuard from './components/auth/AdminGuard';
+
+// Nouvelles pages d'authentification et d'accueil
 import LandingPage from './components/LandingPage';
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
+import SelectCirclePage from './components/auth/SelectCirclePage';
+import { useAuth } from './context/AuthContext'; // On importe seulement le hook, pas le Provider
 
 function ProtectedLayout() {
   const location = useLocation();
+  const hideNav = location.pathname.startsWith('/select-circle');
   const [emergencyOpen, setEmergencyOpen] = useState(false);
-  const { user } = useAuth();
+  const { token } = useAuth(); // Récupération du token
 
-  // 1. Liste de base (Accessible à tous)
+  // SÉCURITÉ : Si pas de token, redirection vers la page d'accueil
+  if (!token) {
+    return <Navigate to="/" replace />;
+  }
+
   const navItems = [
     { path: '/dashboard', icon: Home, label: 'Accueil' },
     { path: '/calendar', icon: Calendar, label: 'Calendrier' },
@@ -44,9 +51,10 @@ function ProtectedLayout() {
 
   return (
     <div className="flex h-screen bg-gray-50">
-      
-      {/* SIDEBAR DESKTOP */}
-      <aside className="hidden md:flex w-64 bg-white shadow-lg flex-col z-50">
+
+      {/* --- SIDEBAR (VISIBLE UNIQUEMENT SUR DESKTOP) --- */}
+      {!hideNav && (
+        <aside className="hidden md:flex w-64 bg-white shadow-lg flex-col z-50">
         <div className="p-6 border-b">
           <h1 className="text-blue-600 text-2xl font-bold">Weave</h1>
           <p className="text-gray-600 mt-1 text-sm">Plateforme d'entraide</p>
@@ -60,7 +68,7 @@ function ProtectedLayout() {
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-lg ${location.pathname === path
                 ? 'bg-blue-50 text-blue-600 font-medium'
                 : 'text-gray-700 hover:bg-gray-50'
-              }`}
+                }'}
             >
               <Icon className="w-6 h-6" />
               <span>{label}</span>
@@ -77,10 +85,13 @@ function ProtectedLayout() {
             <span className="text-lg font-bold">Urgence</span>
           </button>
         </div>
-      </aside>
+        </aside>
+      )}
 
-      {/* CONTENU PRINCIPAL */}
+      {/* --- CONTENU PRINCIPAL --- */}
       <main className="flex-1 overflow-auto w-full relative pb-28 md:pb-0">
+
+        {/* HEADER MOBILE */}
         <div className="md:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-4 bg-white border-b shadow-sm">
           <div>
             <p className="text-lg font-bold text-blue-600">Weave</p>
@@ -96,9 +107,13 @@ function ProtectedLayout() {
         <Outlet />
       </main>
 
-      <div className="md:hidden">
-        <Navigation />
-      </div>
+      {/* --- NAVIGATION FLOTTANTE (VISIBLE UNIQUEMENT SUR MOBILE) --- */}
+      {!hideNav && (
+        <div className="md:hidden">
+          <Navigation />
+        </div>
+      )}
+
       <EmergencyDialog open={emergencyOpen} onClose={() => setEmergencyOpen(false)} />
     </div>
   );
@@ -106,22 +121,25 @@ function ProtectedLayout() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
-          <Route element={<ProtectedLayout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/calendar" element={<CalendarView />} />
-            <Route path="/memories" element={<Memories />} />
-            <Route path="/messages" element={<Messages />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/admin" element={<AdminGuard><Admin /></AdminGuard>} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+    // AuthProvider a été retiré ici car il est déjà dans main.jsx
+    <BrowserRouter>
+      <Routes>
+        {/* Routes Publiques */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+
+        {/* Routes Protégées : Tout ce qui est ici nécessite d'être connecté */}
+        <Route element={<ProtectedLayout />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/calendar" element={<CalendarView />} />
+          <Route path="/memories" element={<Memories />} />
+          <Route path="/messages" element={<Messages />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/admin" element={<Admin />} />
+          <Route path="/select-circle" element={<SelectCirclePage />} />
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }

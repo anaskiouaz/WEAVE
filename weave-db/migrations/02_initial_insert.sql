@@ -1,14 +1,19 @@
--- 1. Création de 3 utilisateurs (Un admin famille, un bénévole, une voisine)
--- Correction : medical_info est à NULL pour éviter de faire planter le déchiffrement au démarrage
-INSERT INTO users (id, name, email, password_hash, role_global, medical_info, privacy_consent) VALUES
+-- ============================================================
+-- SEED DATA (DONNÉES DE TEST)
+-- ============================================================
+
+-- 1. Création des utilisateurs
+-- NOTE : On doit créer "Mamie Monique" en tant qu'utilisateur car care_circles demande un senior_id
+INSERT INTO users (id, name, email, password_hash, role_global, onboarding_role, medical_info, privacy_consent) VALUES
 (
     'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 
     'Thomas Durand', 
     'thomas@weave.app', 
     'hash_secret_123', 
+    'SUPERADMIN',
     'ADMIN',
-    NULL,  -- Pas de données chiffrées pour l'instant (évite le crash)
-    TRUE   -- Consentement DONNÉ
+    NULL,
+    TRUE
 ),
 (
     'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b22', 
@@ -16,6 +21,7 @@ INSERT INTO users (id, name, email, password_hash, role_global, medical_info, pr
     'sophie@weave.app', 
     'hash_secret_456', 
     'USER', 
+    'HELPER',
     NULL, 
     FALSE
 ),
@@ -25,21 +31,52 @@ INSERT INTO users (id, name, email, password_hash, role_global, medical_info, pr
     'marc@weave.app', 
     'hash_secret_789', 
     'USER', 
+    'HELPER',
     NULL, 
     FALSE
+),
+(
+    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380e55', -- UUID pour Monique
+    'Monique Durand', 
+    'monique.durand@nomail.com', -- Email fictif requis par la contrainte UNIQUE
+    'hash_secret_000', 
+    'USER',
+    'PC', -- Rôle d'onboarding "Person Cared For"
+    NULL, 
+    TRUE
 );
 
--- 2. Création du Cercle de Soins pour "Mamie Monique" (Créé par Thomas)
-INSERT INTO care_circles (id, senior_name, created_by) VALUES
-('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44', 'Monique Durand', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11');
+-- 2. Création du Cercle de Soins
+-- Correction : On utilise senior_id (UUID de Monique) au lieu de senior_name
+INSERT INTO care_circles (id, senior_id, created_by, invite_code) VALUES
+(
+    'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
+    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380e55', -- ID de Monique
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', -- ID de Thomas (Créateur)
+    'WEAVE12345'
+);
 
--- 3. Tentative avec rôle SUPERADMIN (Thomas)
+-- 3. Attribution des rôles dans le cercle
+-- Ajout de Monique avec le rôle 'PC'
 INSERT INTO user_roles (user_id, circle_id, role) VALUES
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44', 'ADMIN'), -- Thomas est l'admin global
-('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b22', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44', 'HELPER'); -- Sophie aide
+(
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', -- Thomas
+    'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
+    'ADMIN'
+),
+(
+    'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b22', -- Sophie
+    'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
+    'HELPER'
+),
+(
+    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380e55', -- Monique
+    'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
+    'PC' -- Rôle technique pour le bénéficiaire
+);
 
-
--- 4. Création des Tâches (avec descriptions détaillées)
+-- 4. Création des tâches
+-- (Pas de changement de structure ici, juste s'assurer que le circle_id est bon)
 INSERT INTO tasks (circle_id, title, task_type, description, date, time, required_helpers, helper_name) VALUES
 (
     'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
