@@ -12,8 +12,6 @@ import { getJournalEntries, createJournalEntry , addCommentToEntry, deleteCommen
 // --- AJOUT 1 : On importe le routeur des conversations ---
 import conversationRouter from './conversations.js'; 
 
-import { getTasks, createTask, deleteTask } from './tasks.js';
-
 const router = Router();
 
 // Routes modulaires
