@@ -36,20 +36,20 @@ CREATE TYPE severity_type AS ENUM ('LOW', 'MEDIUM', 'HIGH', 'CRITICAL');
 
 -- TABLE UTILISATEURS
 CREATE TABLE users (
-                       id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                       name VARCHAR(255) NOT NULL,
-                       email VARCHAR(255) UNIQUE NOT NULL,
-                       onboarding_role VARCHAR(50),
-                       phone VARCHAR(20),
-                       birth_date DATE,
-                       medical_info TEXT,                       -- Pour stocker les données chiffrées
-                       privacy_consent BOOLEAN DEFAULT FALSE,   -- Pour le consentement RGPD
-                       password_hash VARCHAR(255) NOT NULL,
-                       created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                       role_global global_role_type,
-                       fcm_token TEXT     
-                       skills JSONB DEFAULT '[]'::jsonb;
-                                        -- Pour les notifications push
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    name VARCHAR(255) NOT NULL,
+    email VARCHAR(255) UNIQUE NOT NULL,
+    onboarding_role VARCHAR(50),
+    phone VARCHAR(20),
+    birth_date DATE,
+    medical_info TEXT,                       -- Pour stocker les données chiffrées
+    privacy_consent BOOLEAN DEFAULT FALSE,   -- Pour le consentement RGPD
+    password_hash VARCHAR(255) NOT NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    role_global global_role_type,
+    fcm_token TEXT,
+    skills JSONB DEFAULT '[]'::jsonb
+    -- Pour les notifications push
 );
 
 -- CERCLES DE SOINS
@@ -81,7 +81,7 @@ CREATE TABLE user_availability (
     slots JSONB NOT NULL DEFAULT '[]'::jsonb, 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT fk_availability_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-    CONSTRAINT uq_user_day UNIQUE (user_id, day_of_week)
+    CONSTRAINT uq_user_circle_day UNIQUE (user_id, circle_id, day_of_week)
 );
 
 -- TACHES

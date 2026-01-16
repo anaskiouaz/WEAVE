@@ -1,4 +1,5 @@
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useContext } from 'react';
+import { AuthContext } from '../context/AuthContext';
 import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, Camera, ChevronDown, ChevronUp, Bell, Heart, LogOut } from 'lucide-react';
 import { apiGet, apiPut } from '../api/client';
 
@@ -6,6 +7,7 @@ import { apiGet, apiPut } from '../api/client';
 const USER_ID = "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380c33";
 
 export default function Profile() {
+  const { circleId } = useContext(AuthContext);
   const [isLoading, setIsLoading] = useState(true);
   const fileInputRef = useRef(null);
 
@@ -88,11 +90,14 @@ export default function Profile() {
     } catch (err) { console.error(err); }
   };
 
+  // Remplacer par le vrai cercle sélectionné côté UI !
   const saveAvailability = async () => {
     try {
       const options = { headers: { 'x-user-id': USER_ID } };
-      const dataToSend = availForm.map(item => ({ day: item.day, slots: item.slots }));
-      const data = await apiPut('/module/profile/availability', { availability: dataToSend }, options);
+      if (!circleId) { alert('Aucun cercle sélectionné'); return; }
+      // Conversion pour l'API backend : day -> day_of_week, ajout du circle_id
+      const dataToSend = availForm.map(item => ({ day_of_week: item.day, slots: item.slots }));
+      const data = await apiPut('/module/profile/availability', { circle_id: circleId, availability: dataToSend }, options);
       if (data.success) { setAvailability(dataToSend); setIsEditingAvailability(false); }
     } catch (err) { console.error(err); }
   };

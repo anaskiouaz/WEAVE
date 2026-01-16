@@ -7,29 +7,38 @@ const getUserId = (req) => req.headers['x-user-id'];
 // ============================================================
 // 1. LIRE LE PROFIL (Tout est maintenant dans la table users)
 // ============================================================
+// GET profil + disponibilités (par cercle si circle_id fourni)
 router.get('/', async (req, res) => {
     const userId = getUserId(req);
+    const circleId = req.query.circle_id;
     if (!userId) return res.status(400).json({ success: false, error: 'ID manquant' });
 
     try {
-        // On récupère TOUT d'un coup (y compris availability)
-        const result = await db.query(
-            'SELECT id, name, email, phone, address, skills, availability, created_at FROM users WHERE id = $1',
+        const userResult = await db.query(
+            'SELECT id, name, email, phone, address, skills, created_at FROM users WHERE id = $1',
             [userId]
         );
+        if (userResult.rows.length === 0) return res.status(404).json({ success: false, error: 'User not found' });
+        const user = userResult.rows[0];
 
-        if (result.rows.length === 0) return res.status(404).json({ success: false, error: 'User not found' });
+        let availabilityResult;
+        if (circleId) {
+            availabilityResult = await db.query(
+                'SELECT id, circle_id, day_of_week, slots FROM user_availability WHERE user_id = $1 AND circle_id = $2',
+                [userId, circleId]
+            );
+        } else {
+            availabilityResult = await db.query(
+                'SELECT id, circle_id, day_of_week, slots FROM user_availability WHERE user_id = $1',
+                [userId]
+            );
+        }
 
-        const user = result.rows[0];
-
-        // On renvoie les données. 
-        // Note: user.availability est déjà un tableau JSON grâce à PostgreSQL, pas besoin de conversion complexe.
-        res.json({ 
-            success: true, 
-            user: user, 
-            availability: user.availability || [] 
+        res.json({
+            success: true,
+            user: user,
+            availability: availabilityResult.rows || []
         });
-
     } catch (e) {
         console.error(e);
         res.status(500).json({ success: false, error: e.message });
@@ -69,22 +78,30 @@ router.put('/skills', async (req, res) => {
 // ============================================================
 // 4. SAUVEGARDER DISPONIBILITÉS (Simplifié !)
 // ============================================================
+// PUT disponibilités : écrase toutes les dispos pour ce user et ce cercle
 router.put('/availability', async (req, res) => {
     const userId = getUserId(req);
-    const { availability } = req.body; // C'est directement le tableau JSON envoyé par le front
-
-    console.log("Sauvegarde disponibilités pour", userId, ":", availability);
+    const { circle_id, availability } = req.body; // availability = [{ day_of_week, slots }...]
+    if (!userId || !circle_id || !Array.isArray(availability)) {
+        return res.status(400).json({ success: false, error: 'userId, circle_id et availability requis' });
+    }
 
     try {
-        // Plus besoin de supprimer/insérer dans une autre table. On met juste à jour la colonne.
-        await db.query(
-            'UPDATE users SET availability = $1 WHERE id = $2',
-            [JSON.stringify(availability || []), userId]
-        );
+        // Supprimer les anciennes dispos pour ce user/cercle
+        await db.query('DELETE FROM user_availability WHERE user_id = $1 AND circle_id = $2', [userId, circle_id]);
+
+        // Insérer les nouvelles dispos
+        for (const dispo of availability) {
+            if (!dispo.day_of_week || !dispo.slots) continue;
+            await db.query(
+                'INSERT INTO user_availability (user_id, circle_id, day_of_week, slots) VALUES ($1, $2, $3, $4)',
+                [userId, circle_id, dispo.day_of_week, JSON.stringify(dispo.slots)]
+            );
+        }
         res.json({ success: true });
-    } catch (e) { 
+    } catch (e) {
         console.error(e);
-        res.status(500).json({ success: false, error: e.message }); 
+        res.status(500).json({ success: false, error: e.message });
     }
 });
 
