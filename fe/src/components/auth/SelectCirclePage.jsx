@@ -283,7 +283,7 @@ export default function SelectCirclePage() {
                                 <p className="text-xs text-gray-500">Si laissé vide, un email technique sera généré.</p>
                             </div>
 
-                            <Button type="submit" size="lg" disabled={loading} className="w-full h-14 text-lg font-bold bg-blue-700 hover:bg-blue-800 shadow-md mt-4">
+                            <Button type="submit" size="lg" disabled={loading} className="w-full h-14 text-lg font-bold bg-blue-700 hover:bg-blue-800 shadow-md mt-4 text-white">
                                 {loading ? <Loader2 className="animate-spin mr-2" /> : "Créer le profil et le cercle"}
                             </Button>
                         </form>
