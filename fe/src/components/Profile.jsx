@@ -163,10 +163,9 @@ export default function Profile() {
     }
   };
 
-  // --- LOGOUT ---
-  const handleLogout = () => {
-    logout();
-    navigate('/login');
+   const handleLogout = () => {
+    logout();           // Vide le localStorage et le state user
+    navigate('/login'); // Redirige vers la page de connexion
   };
 
   // --- SAUVEGARDES ---
@@ -228,6 +227,7 @@ export default function Profile() {
       if (data.success) { setAvailability(availForm); setIsEditingAvailability(false); }
     } catch (err) { console.error(err); }
   };
+
 
   if (isLoading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-blue-600 w-8 h-8"/></div>;
 
@@ -509,12 +509,12 @@ export default function Profile() {
 
             {/* DÉCONNEXION */}
             <button 
-              onClick={handleLogout}
-              className="flex items-center gap-3 text-orange-600 hover:text-orange-700 transition-colors w-full text-left pt-4 border-t border-gray-100 mt-2"
+              onClick={handleLogout} // <--- 4. Remplacez l'alert par handleLogout
+              className="flex items-center gap-3 text-orange-600 hover:text-orange-700 hover:bg-orange-50 p-2 rounded-lg transition-colors w-full text-left pt-4 border-t border-gray-100 mt-2"
             >
               <LogOut size={20} />
-              <span className="font-medium">Se déconnecter</span>
-          </button>
+              <span className="font-medium text-lg">Se déconnecter</span>
+            </button>
 
           </div>
         </div>
