@@ -7,6 +7,8 @@ import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../ui/card';
 import { Users, UserPlus, ArrowRight, Loader2, ArrowLeft, Calendar, Phone, Mail, Stethoscope, Check, LogIn } from 'lucide-react';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+
 // Liste des pathologies liées au manque de mobilité (GIR 2-5)
 const MEDICAL_OPTIONS = [
     "Risque d'Escarres",
@@ -61,10 +63,14 @@ export default function SelectCirclePage() {
         setError('');
         
         try {
-            const headers = {
-                'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}`
-            };
+            const res = await fetch(`${API_BASE_URL}/circles${endpoint}`, {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${token}`
+                },
+                body: JSON.stringify(body)
+            });
 
             const config = { method, headers };
             if (body) config.body = JSON.stringify(body);
@@ -225,6 +231,7 @@ export default function SelectCirclePage() {
                                 <h3 className="text-lg font-bold text-gray-800 mb-1">Invité</h3>
                                 <p className="text-center text-xs text-gray-500">J'ai reçu un code d'invitation.</p>
                             </button>
+                            
                         </div>
                     )}
 

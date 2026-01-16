@@ -80,9 +80,6 @@ export default function Dashboard() {
           <p className="text-gray-600">
             Bienvenue sur votre espace d'entraide
           </p>
-          <p className="text-gray-600">
-            Bienvenue sur votre espace d'entraide
-          </p>
         </div>
 
         {/* Stats Grid */}
