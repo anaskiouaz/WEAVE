@@ -14,6 +14,7 @@ import tasksRoutes from './routes/tasks.js';
 import authRoutes from './routes/auth.js';
 import uploadRoutes from './routes/upload.js';
 import circlesRoutes from './routes/circles.js';
+
 const app = express();
 
 // --- Configuration CORS ---
@@ -23,34 +24,45 @@ const allowedOrigins = rawAllowedOrigins
   .map(o => o.trim())
   .filter(Boolean);
 
-// On ajoute ton Frontend local par défaut si la variable d'env est vide (pour le dev)
-if (allowedOrigins.length === 0) {
-    allowedOrigins.push('http://localhost:5173');
-}
+// On ajoute les origines nécessaires pour le développement local et mobile
+const defaultOrigins = [
+  'http://localhost:5173',      // Frontend PC (Vite)
+  'http://localhost',           // Capacitor Android
+  'capacitor://localhost',      // Capacitor iOS
+  'http://192.168.1.XX',        // Remplacer par ton IP locale PC si besoin
+  'http://10.0.2.2'             // Émulateur Android Studio (alias pour localhost PC)
+];
+
+// Fusionner avec les origines existantes sans doublons
+defaultOrigins.forEach(origin => {
+  if (!allowedOrigins.includes(origin)) {
+    allowedOrigins.push(origin);
+  }
+});
 
 console.log('CORS allowed origins:', allowedOrigins);
 
 app.use(cors({
   origin(origin, callback) {
-    // Autoriser les requêtes sans origine (ex: Postman, curl, server-to-server)
+    // Autoriser les requêtes sans origine (Mobile apps, Postman, curl)
     if (!origin) return callback(null, true);
 
-    if (allowedOrigins.length > 0) {
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      }
-      console.warn(`CORS blocked origin: ${origin}`);
-      return callback(new Error('Not allowed by CORS'));
+    // En développement, tu peux commenter la vérification stricte ci-dessous
+    // et juste mettre : return callback(null, true); 
+    // Mais voici la version sécurisée :
+    if (allowedOrigins.some(o => origin.startsWith(o)) || allowedOrigins.includes('*')) {
+       return callback(null, true);
     }
-
-    // Si aucune restriction n'est configurée, on autorise tout (mode dev permissif)
-    return callback(null, true);
-    },
-    methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
-    credentials: true,
-  })
-);
+    
+    console.warn(`CORS blocked origin: ${origin}`);
+    // Pour débloquer temporairement si tu galères, décommente la ligne suivante :
+    // return callback(null, true); 
+    return callback(new Error('Not allowed by CORS'));
+  },
+  methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization'],
+  credentials: true,
+}));
 
 // --- MIDDLEWARES ---
 app.use(helmet());

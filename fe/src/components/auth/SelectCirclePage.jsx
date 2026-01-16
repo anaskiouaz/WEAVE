@@ -7,6 +7,8 @@ import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../ui/card';
 import { Users, UserPlus, ArrowRight, Loader2, ArrowLeft, Calendar, Phone, Mail, Stethoscope, Check } from 'lucide-react';
 
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+
 // Liste des pathologies liées au manque de mobilité (GIR 2-5)
 const MEDICAL_OPTIONS = [
     "Risque d'Escarres",
@@ -62,7 +64,7 @@ export default function SelectCirclePage() {
         const token = localStorage.getItem('weave_token');
 
         try {
-            const res = await fetch(`http://localhost:4000/api/circles${endpoint}`, {
+            const res = await fetch(`${API_BASE_URL}/circles${endpoint}`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -174,6 +176,7 @@ export default function SelectCirclePage() {
                                     Je veux rejoindre une équipe existante (bénévole, famille).
                                 </p>
                             </button>
+                            
                         </div>
                     )}
 
