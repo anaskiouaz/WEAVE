@@ -4,10 +4,11 @@ import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../ui/card';
-import { Users, UserPlus, ArrowRight, Loader2, ArrowLeft, Calendar, Phone, Mail, Stethoscope, Check, LogIn } from 'lucide-react';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
+import { Users, UserPlus, ArrowRight, Loader2, ArrowLeft, Calendar, Phone, Stethoscope, Check, LogIn } from 'lucide-react';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+// URL de base de ton API (à adapter selon ta config d'environnement : Vite ou CRA)
+const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
 
 // Liste des pathologies liées au manque de mobilité (GIR 2-5)
 const MEDICAL_OPTIONS = [
@@ -58,24 +59,22 @@ export default function SelectCirclePage() {
         });
     };
 
+    // --- CORRECTION ICI : Intégration de la résolution du conflit ---
     const apiCall = async (endpoint, method = 'POST', body = null) => {
         setLoading(true);
         setError('');
         
         try {
-            const res = await fetch(`${API_BASE_URL}/circles${endpoint}`, {
-                method: 'POST',
+            const config = { 
+                method, 
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify(body)
-            });
-
-            const config = { method, headers };
+                } 
+            };
             if (body) config.body = JSON.stringify(body);
 
-            const res = await fetch(`http://localhost:4000/api/circles${endpoint}`, config);
+            const res = await fetch(`${API_BASE_URL}/circles${endpoint}`, config);
             const data = await res.json();
 
             if (!res.ok) throw new Error(data.error || "Une erreur est survenue");
@@ -231,7 +230,6 @@ export default function SelectCirclePage() {
                                 <h3 className="text-lg font-bold text-gray-800 mb-1">Invité</h3>
                                 <p className="text-center text-xs text-gray-500">J'ai reçu un code d'invitation.</p>
                             </button>
-                            
                         </div>
                     )}
 
