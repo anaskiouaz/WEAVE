@@ -80,7 +80,7 @@ export default function Memories() {
 
         // 1. On définit l'URL de base de l'API (Port 4000)
         // Si vous avez configuré Vite, on utilise la variable d'env, sinon le lien en dur
-        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
 
         // 2. On fait l'appel vers la bonne route (ex: /api/upload/image)
         const uploadResponse = await fetch(`${API_BASE_URL}/upload/image`, {
@@ -223,7 +223,7 @@ export default function Memories() {
   };
 
   // 🔹 Construire l'URL complète de l'image
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
   // Si la variable inclut /api, on le retire pour servir les fichiers statiques
   const FILES_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, '');
 
@@ -247,7 +247,7 @@ const loadImageAsBase64 = async (url) => {
       } catch {}
 
       if (blobName) {
-        const API_BASE_URL_FULL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+        const API_BASE_URL_FULL = import.meta.env.VITE_API_BASE_URL || '';
         const proxyUrl = `${API_BASE_URL_FULL}/upload/blob/${blobName}`;
         const resp = await fetch(proxyUrl);
         if (!resp.ok) throw new Error('Proxy image fetch failed');

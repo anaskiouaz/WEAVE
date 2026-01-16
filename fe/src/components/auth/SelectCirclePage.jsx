@@ -7,8 +7,8 @@ import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Users, UserPlus, ArrowRight, Loader2, ArrowLeft, Calendar, Phone, Stethoscope, Check, LogIn } from 'lucide-react';
 
-// URL de base de ton API (à adapter selon ta config d'environnement : Vite ou CRA)
-const API_BASE_URL = import.meta.env.VITE_API_URL || "http://localhost:4000/api";
+// URL de base de l'API (doit être fournie via Vite env: VITE_API_BASE_URL)
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
 // Liste des pathologies liées au manque de mobilité (GIR 2-5)
 const MEDICAL_OPTIONS = [

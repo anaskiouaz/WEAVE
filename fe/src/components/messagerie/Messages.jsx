@@ -4,7 +4,7 @@ import io from 'socket.io-client';
 import axios from 'axios'; // J'utilise axios car tu l'as installé, c'est plus propre que fetch
 
 // Configuration
-const BACKEND_URL = 'http://localhost:4000'; // Port 4000 comme configuré
+const BACKEND_URL = import.meta.env.VITE_API_BASE_URL || '';
 
 const Messages = () => {
     const currentUser = { 
