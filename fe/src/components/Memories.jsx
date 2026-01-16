@@ -1,25 +1,41 @@
 import { useState, useEffect } from 'react';
-import { Download, Image, Heart, MessageCircle, Calendar, Loader2, Send } from 'lucide-react';
+import { Download, Image as ImageIcon, Heart, MessageCircle, Calendar, Loader2, Send, Smile, Trash2 } from 'lucide-react';
 import { jsPDF } from 'jspdf';
-import { apiGet, apiPost } from '../api/client'; // Import du client API
+import { Camera, CameraResultType } from '@capacitor/camera';
+import { apiGet, apiPost, apiDelete } from '../api/client'; // Import du client API
+import { useAuth } from '../context/AuthContext'; // Import du hook d'authentification
 
 export default function Memories() {
+  // CONST PHOTO
+  const [tempPhoto, setTempPhoto] = useState(null);
+  const [newContent, setNewContent] = useState('');
+
+  const { user } = useAuth(); // Récupération de l'utilisateur connecté
   const [memories, setMemories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
+
+  // --- ÉTATS POUR LE NOUVEAU SOUVENIR ---
+  const [newText, setNewText] = useState("");
+  const [newMood, setNewMood] = useState(5); // Valeur par défaut
+  const [newPhotoUrl, setNewPhotoUrl] = useState("");
+  const [newPhotoFile, setNewPhotoFile] = useState(null);
+  const [isPublishing, setIsPublishing] = useState(false);
 
   // --- ÉTATS AJOUTÉS POUR LES COMMENTAIRES ---
   const [activeCommentId, setActiveCommentId] = useState(null);
   const [commentText, setCommentText] = useState("");
   const [isSending, setIsSending] = useState(false);
 
-  // ID du cercle (famille) à récupérer (à dynamiser selon l'utilisateur connecté)
-  const CIRCLE_ID = "d0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44"; // Exemple d'ID de cercle
+  // ID du cercle (famille) à récupérer dynamiquement depuis l'utilisateur connecté
+  const CIRCLE_ID = user?.circles?.[0]?.id || "d0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44"; // Fallback au cercle par défaut
 
   // Récupération des données depuis la base de données
   const fetchMemories = async () => {
     try {
       setLoading(true);
+      setError(null); // Reset error state
+      
       const response = await apiGet(`/souvenirs?circle_id=${CIRCLE_ID}`);
 
       if (response && response.data) {
@@ -29,7 +45,7 @@ export default function Memories() {
       }
     } catch (err) {
       console.error("Erreur chargement souvenirs:", err);
-      setError("Impossible de charger les souvenirs.");
+      setError(`Impossible de charger les souvenirs: ${err.message}`);
       setMemories([]);
     } finally {
       setLoading(false);
@@ -40,6 +56,103 @@ export default function Memories() {
     fetchMemories();
   }, [CIRCLE_ID]);
 
+  // Nettoyer les URLs d'objet lors du démontage du composant
+  useEffect(() => {
+    return () => {
+      if (newPhotoUrl && newPhotoUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(newPhotoUrl);
+      }
+    };
+  }, [newPhotoUrl]);
+
+  // --- FONCTION POUR PUBLIER UN SOUVENIR ---
+  const handleAddMemory = async () => {
+    if (!newText.trim() || !user) return;
+
+    setIsPublishing(true);
+    try {
+      let photoBlobName = null;
+
+      // Si un fichier est sélectionné, l'uploader d'abord
+      if (newPhotoFile) {
+        const formData = new FormData();
+        formData.append('image', newPhotoFile);
+
+        // 1. On définit l'URL de base de l'API (Port 4000)
+        // Si vous avez configuré Vite, on utilise la variable d'env, sinon le lien en dur
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+
+        // 2. On fait l'appel vers la bonne route (ex: /api/upload/image)
+        const uploadResponse = await fetch(`${API_BASE_URL}/upload/image`, {
+          method: 'POST',
+          body: formData,
+          // Note : Ne JAMAIS mettre de header 'Content-Type' manuellement avec FormData
+          // Le navigateur le fait tout seul avec le "boundary" correct.
+        });
+
+        if (!uploadResponse.ok) {
+          const errorData = await uploadResponse.json().catch(() => ({}));
+          throw new Error(errorData.message || 'Erreur lors de l\'upload de l\'image');
+        }
+
+  const uploadData = await uploadResponse.json();
+  if (uploadData.status !== 'ok') {
+    throw new Error(uploadData.message || 'Erreur upload');
+  }
+
+  // 3. On récupère le nom du blob renvoyé par le backend
+  photoBlobName = uploadData.data.blobName;
+}
+
+      await apiPost('/souvenirs', {
+        circle_id: CIRCLE_ID,
+        author_id: user.id,
+        text_content: newText,
+        mood: newMood,
+        photo_data: photoBlobName || null
+      });
+
+      // Reset du formulaire
+      setNewText("");
+      setNewPhotoUrl("");
+      setNewPhotoFile(null);
+      setNewMood(5);
+
+      // Nettoyer l'URL d'objet si elle existe
+      if (newPhotoUrl && newPhotoUrl.startsWith('blob:')) {
+        URL.revokeObjectURL(newPhotoUrl);
+      }
+
+      // Rafraîchir la liste
+      await fetchMemories();
+    } catch (err) {
+      console.error("Erreur lors de la publication:", err);
+      alert(`Erreur lors de la publication du souvenir: ${err.message}`);
+    } finally {
+      setIsPublishing(false);
+    }
+  };
+
+// --- NOUVELLE FONCTION CAPACITOR ---
+  const prendrePhoto = async () => {
+    try {
+      const image = await Camera.getPhoto({
+        quality: 90,
+        allowEditing: true, // Permet de recadrer après la prise
+        resultType: CameraResultType.Uri // Récupère un chemin web affichable
+      });
+
+      // image.webPath contient l'URL locale de l'image pour l'affichage
+      setTempPhoto(image.webPath);
+    } catch (error) {
+      console.log('Prise de photo annulée ou erreur:', error);
+    }
+  };
+
+  const clearPhoto = () => {
+    setTempPhoto(null);
+  };
+  
   // --- FONCTION AJOUTÉE POUR ENVOYER UN COMMENTAIRE ---
   const handleSendComment = async (entryId) => {
     if (!commentText.trim()) return;
@@ -47,7 +160,7 @@ export default function Memories() {
     setIsSending(true);
     try {
       await apiPost(`/souvenirs/${entryId}/comments`, {
-        author_name: "Utilisateur", // À dynamiser ultérieurement
+        author_name: user?.name || "Utilisateur", // Utilise le nom de l'utilisateur connecté
         content: commentText
       });
       setCommentText("");
@@ -60,38 +173,176 @@ export default function Memories() {
     }
   };
 
-  // Fonction d'export PDF avec les données réelles
-  const handleDownloadPDF = () => {
-    const doc = new jsPDF();
-    doc.setFontSize(20);
-    doc.text('Journal de bord - Souvenirs Partagés', 20, 20);
-    doc.setFontSize(12);
-    let yPosition = 40;
+  // --- FONCTION AJOUTÉE POUR SUPPRIMER UN COMMENTAIRE ---
+  const handleDeleteComment = async (memoryId, commentId, commentAuthor, memoryAuthor) => {
+    if (!user) return;
 
-    memories.forEach((memory, index) => {
-      if (yPosition > 250) {
-        doc.addPage();
-        yPosition = 20;
-      }
-      const dateStr = new Date(memory.created_at).toLocaleDateString('fr-FR');
-      const authorStr = memory.author_name || "Auteur inconnu";
-      doc.setFontSize(10);
-      doc.setTextColor(100);
-      doc.text(`${dateStr} - Par ${authorStr}`, 20, yPosition);
-      yPosition += 7;
-      doc.setFontSize(11);
-      doc.setTextColor(0);
-      const lines = doc.splitTextToSize(memory.text_content || '', 170);
-      doc.text(lines, 20, yPosition);
-      yPosition += (lines.length * 7) + 10;
-      if (index < memories.length - 1) {
-        doc.setDrawColor(200);
-        doc.line(20, yPosition, 190, yPosition);
-        yPosition += 10;
-      }
-    });
-    doc.save(`journal-souvenirs-${new Date().toISOString().split('T')[0]}.pdf`);
+    // Vérifier que l'utilisateur est l'auteur du commentaire
+    if (commentAuthor !== user.name && memoryAuthor !== user.name) {
+      alert("Vous ne pouvez pas supprimer les commentaires des autres.");
+      return;
+    }
+
+    // Demander confirmation avant suppression
+    const confirmDelete = window.confirm("Êtes-vous sûr de vouloir supprimer ce commentaire ?");
+    if (!confirmDelete) return;
+
+    try {
+      await apiDelete(`/souvenirs/${memoryId}/comments/${commentId}`, {
+        author_name: user.name
+      });
+
+      // Rafraîchir la liste après suppression
+      await fetchMemories();
+    } catch (err) {
+      console.error("Erreur lors de la suppression du commentaire:", err);
+      alert("Erreur lors de la suppression du commentaire: " + err.message);
+    }
   };
+
+  // --- FONCTION POUR SUPPRIMER UN SOUVENIR ---
+  const handleDeleteMemory = async (memoryId) => {
+    if (!user) return;
+
+    // Demander confirmation avant suppression
+    const confirmDelete = window.confirm("Êtes-vous sûr de vouloir supprimer ce souvenir ? Cette action est irréversible.");
+    if (!confirmDelete) return;
+
+    try {
+      await apiDelete(`/souvenirs/${memoryId}`, {
+        author_id: user.id
+      });
+
+      // Rafraîchir la liste après suppression
+      await fetchMemories();
+      alert("Souvenir supprimé avec succès");
+    } catch (err) {
+      console.error("Erreur lors de la suppression:", err);
+      alert("Erreur lors de la suppression du souvenir: " + err.message);
+    }
+  };
+
+  // 🔹 Construire l'URL complète de l'image
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
+  // Si la variable inclut /api, on le retire pour servir les fichiers statiques
+  const FILES_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, '');
+
+const getPhotoUrl = (photo) => {
+  if (!photo) return null;
+  if (photo.startsWith('http')) return photo;
+  return `${FILES_BASE_URL}/uploads/${photo}`;
+};
+
+// 🔹 Charger une image en base64 pour jsPDF
+// Fallback proxy pour les images Azure afin d'éviter les erreurs CORS/canvas
+const loadImageAsBase64 = async (url) => {
+  try {
+    // Si c'est une URL Azure, passer par le proxy backend
+    if (url.includes('.blob.core.windows.net')) {
+      let blobName = null;
+      try {
+        const u = new URL(url);
+        const parts = u.pathname.split('/');
+        blobName = parts[parts.length - 1];
+      } catch {}
+
+      if (blobName) {
+        const API_BASE_URL_FULL = import.meta.env.VITE_API_BASE_URL || '';
+        const proxyUrl = `${API_BASE_URL_FULL}/upload/blob/${blobName}`;
+        const resp = await fetch(proxyUrl);
+        if (!resp.ok) throw new Error('Proxy image fetch failed');
+        const blob = await resp.blob();
+        const reader = new FileReader();
+        const base64 = await new Promise((resolve, reject) => {
+          reader.onloadend = () => resolve(reader.result);
+          reader.onerror = reject;
+          reader.readAsDataURL(blob);
+        });
+        return base64;
+      }
+    }
+
+    // Par défaut: charger via Image + canvas (pour fichiers locaux)
+    const img = new window.Image();
+    img.crossOrigin = 'anonymous';
+    await new Promise((resolve, reject) => {
+      img.onload = resolve;
+      img.onerror = reject;
+      img.src = url;
+    });
+    const canvas = document.createElement('canvas');
+    canvas.width = img.width;
+    canvas.height = img.height;
+    const ctx = canvas.getContext('2d');
+    ctx.drawImage(img, 0, 0);
+    return canvas.toDataURL('image/jpeg', 0.9);
+  } catch (e) {
+    console.error('loadImageAsBase64 failed:', e);
+    throw e;
+  }
+};
+
+  // Fonction d'export PDF avec les données réelles
+  const handleDownloadPDF = async () => {
+  const doc = new jsPDF();
+  doc.setFontSize(20);
+  doc.text('Journal de bord - Souvenirs Partagés', 20, 20);
+
+  let yPosition = 40;
+
+  for (let index = 0; index < memories.length; index++) {
+    const memory = memories[index];
+
+    if (yPosition > 260) {
+      doc.addPage();
+      yPosition = 20;
+    }
+
+    const dateStr = new Date(memory.created_at).toLocaleDateString('fr-FR');
+    const authorStr = memory.author_name || "Auteur inconnu";
+
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`${dateStr} - Par ${authorStr}`, 20, yPosition);
+    yPosition += 7;
+
+    doc.setFontSize(11);
+    doc.setTextColor(0);
+    const lines = doc.splitTextToSize(memory.text_content || '', 170);
+    doc.text(lines, 20, yPosition);
+    yPosition += lines.length * 7 + 5;
+
+    // ✅ AJOUT DE LA PHOTO DANS LE PDF
+    if (memory.photo_data) {
+      try {
+        const imageUrl = getPhotoUrl(memory.photo_data);
+        const imageBase64 = await loadImageAsBase64(imageUrl);
+
+        const imgWidth = 170;
+        const imgHeight = 100;
+
+        if (yPosition + imgHeight > 280) {
+          doc.addPage();
+          yPosition = 20;
+        }
+
+        doc.addImage(imageBase64, 'JPEG', 20, yPosition, imgWidth, imgHeight);
+        yPosition += imgHeight + 10;
+      } catch (err) {
+        console.error("Erreur image PDF :", err);
+      }
+    }
+
+    if (index < memories.length - 1) {
+      doc.setDrawColor(200);
+      doc.line(20, yPosition, 190, yPosition);
+      yPosition += 10;
+    }
+  }
+
+  doc.save(`journal-souvenirs-${new Date().toISOString().split('T')[0]}.pdf`);
+};
+
 
   if (loading) {
     return (
@@ -122,28 +373,79 @@ export default function Memories() {
         {error && (
           <div className="p-4 mb-6 bg-red-50 text-red-600 rounded-lg border border-red-100">
             {error}
-          </div>
-        )}
-
-        {/* Formulaire d'ajout */}
+                </div>
+              )}
+              
+        {/* --- FORMULAIRE D'AJOUT DYNAMISÉ --- */}
         <div className="mb-8 bg-white rounded-lg shadow-sm border p-6">
           <div className="flex gap-4">
             <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <span className="text-blue-600 font-bold">V</span>
+              <span className="text-blue-600 font-bold">{user?.name?.charAt(0) || 'U'}</span>
             </div>
             <div className="flex-1">
               <textarea
+                value={newText}
+                onChange={(e) => setNewText(e.target.value)}
                 placeholder="Partagez une nouvelle ou un souvenir..."
                 className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 rows={3}
               />
+              
+              {/* Aperçu de l'image sélectionnée */}
+              {newPhotoUrl && (
+                <div className="mt-3">
+                  <img 
+                    src={newPhotoUrl} 
+                    alt="Aperçu" 
+                    className="w-full max-h-48 object-cover rounded-lg border"
+                  />
+                </div>
+              )}
+
+              {/* Input caché pour la capture d'image */}
+              <input
+                type="file"
+                accept="image/*"
+                capture="environment"
+                onChange={(e) => {
+                  const file = e.target.files[0];
+                  if (file) {
+                    setNewPhotoFile(file);
+                    setNewPhotoUrl(URL.createObjectURL(file)); // Aperçu temporaire
+                  }
+                }}
+                className="hidden"
+                id="photo-input"
+                  />
+
               <div className="flex justify-between items-center mt-3">
-                <button className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors text-sm">
-                  <Image className="w-5 h-5" />
-                  <span>Ajouter une photo</span>
-                </button>
-                <button className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium">
-                  Publier
+                <div className="flex gap-4">
+                  <button 
+                    onClick={() => document.getElementById('photo-input').click()}
+                    className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors text-sm"
+                  >
+                    <ImageIcon className="w-5 h-5" />
+                    <span>{newPhotoFile ? "Photo sélectionnée" : "Ajouter une photo"}</span>
+                  </button>
+                  
+                  <div className="flex items-center gap-2 text-gray-600 text-sm">
+                    <Smile className="w-4 h-4" />
+                    <select 
+                      value={newMood} 
+                      onChange={(e) => setNewMood(parseInt(e.target.value))}
+                      className="bg-transparent outline-none cursor-pointer border-b border-gray-300"
+                    >
+                      {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>Humeur: {n}/10</option>)}
+                    </select>
+                  </div>
+                </div>
+
+                <button 
+                  onClick={handleAddMemory}
+                  disabled={isPublishing || !newText.trim() || !user}
+                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
+                >
+                  {isPublishing ? "Publication..." : "Publier"}
                 </button>
               </div>
             </div>
@@ -176,9 +478,9 @@ export default function Memories() {
 
                 <p className="text-gray-700 mb-4 whitespace-pre-wrap">{memory.text_content}</p>
 
-                {memory.photo_url && (
+                {memory.photo_data && (
                   <div className="mb-4 rounded-lg overflow-hidden border">
-                    <img src={memory.photo_url} alt="Souvenir" className="w-full h-auto max-h-96 object-cover" />
+                    <img src={getPhotoUrl(memory.photo_data)} alt="Souvenir" className="w-full h-auto max-h-96 object-cover"/>
                   </div>
                 )}
 
@@ -195,6 +497,17 @@ export default function Memories() {
                     <MessageCircle className="w-5 h-5" />
                     <span>Commenter ({memory.comments?.length || 0})</span>
                   </button>
+                  {/* BOUTON DE SUPPRESSION - UNIQUEMENT POUR L'AUTEUR */}
+                  {user && memory.author_id === user.id && (
+                    <button 
+                      onClick={() => handleDeleteMemory(memory.id)}
+                      className="flex items-center gap-2 text-gray-600 hover:text-red-600 transition-colors"
+                      title="Supprimer ce souvenir"
+                    >
+                      <Trash2 className="w-5 h-5" />
+                      <span>Supprimer</span>
+                    </button>
+                  )}
                 </div>
 
                 {/* --- SECTION DES COMMENTAIRES AJOUTÉE --- */}
@@ -204,7 +517,19 @@ export default function Memories() {
                       {memory.comments && memory.comments.length > 0 ? (
                         memory.comments.map((comment, idx) => (
                           <div key={idx} className="bg-gray-50 p-3 rounded-lg text-sm shadow-sm border border-gray-100">
-                            <p className="font-semibold text-blue-700 mb-1">{comment.author}</p>
+                            <div className="flex justify-between items-start mb-1">
+                              <p className="font-semibold text-blue-700">{comment.author}</p>
+                              {/* Bouton de suppression - seulement si l'utilisateur est l'auteur du commentaire */}
+                              {user && (comment.author === user.name || memory.author_name === user.name) && (
+                                <button 
+                                  onClick={() => handleDeleteComment(memory.id, comment.id, comment.author, memory.author_name)}
+                                  className="text-gray-400 hover:text-red-600 transition-colors p-1"
+                                  title="Supprimer ce commentaire"
+                                >
+                                  <Trash2 className="w-4 h-4" />
+                                </button>
+                              )}
+                            </div>
                             <p className="text-gray-700">{comment.content}</p>
                           </div>
                         ))
