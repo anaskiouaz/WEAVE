@@ -1,17 +1,12 @@
-import express from 'express';
-import cors from 'cors';
+import http from 'http';
 import dotenv from 'dotenv';
+import app from './app.js'; // Importe l'app configurée (CORS, routes, etc.)
 import db from './config/db.js';
-import usersRoutes from './routes/users.js';
-import tasksRoutes from './routes/tasks.js';
 import { initFirebase } from './config/firebase.js';
 import initCronJobs from './services/cronService.js';
-import app from './app.js';
+import { initSocket } from './services/socketService.js';
 
 dotenv.config();
-
-import http from 'http';
-import { initSocket } from './services/socketService.js'; // <--- IMPORT IMPORTANT
 
 const PORT = process.env.PORT || 3000;
 
@@ -21,8 +16,7 @@ const server = http.createServer(app);
 // 2. On attache Socket.io à ce serveur
 initSocket(server);
 
-app.use(cors());
-app.use(express.json());
+// NOTE : Pas de app.use(cors()) ici, car c'est déjà géré proprement dans app.js
 
 const initDB = async () => {
   console.log("Vérification de la structure de la base de données...");
@@ -51,7 +45,7 @@ const initDB = async () => {
       );
     `);
 
-    // Ajout des tables si besoin
+    // Ajout des colonnes manquantes (Migration)
     await db.query(`
       DO $$ 
       BEGIN 
@@ -80,7 +74,7 @@ const initDB = async () => {
           ALTER TABLE tasks ADD COLUMN due_date TIMESTAMP; 
         END IF;
 
-        -- TASKS : completed (CELLE QUI VOUS MANQUAIT !)
+        -- TASKS : completed
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='completed') THEN 
           ALTER TABLE tasks ADD COLUMN completed BOOLEAN DEFAULT FALSE; 
         END IF;
@@ -90,7 +84,7 @@ const initDB = async () => {
           ALTER TABLE tasks ADD COLUMN circle_id INTEGER; 
         END IF;
         
-        -- TASKS : date & time (si utilisées)
+        -- TASKS : date & time
         IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='date') THEN 
           ALTER TABLE tasks ADD COLUMN date DATE; 
         END IF;
@@ -101,7 +95,7 @@ const initDB = async () => {
       END $$;
     `);
 
-    // Assouplissement des contraintes NOT NULL
+    // Assouplissement des contraintes
     try {
         await db.query(`ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;`);
         await db.query(`ALTER TABLE tasks ALTER COLUMN circle_id DROP NOT NULL;`);
@@ -110,26 +104,22 @@ const initDB = async () => {
         await db.query(`ALTER TABLE tasks ALTER COLUMN time DROP NOT NULL;`);
         console.log("Base de données prête : Colonnes vérifiées et contraintes assouplies.");
     } catch (e) {
-        console.log("Contraintes déjà ajustées.");
+        // Ignorer si déjà fait
+        console.log("Contraintes déjà ajustées ou erreur mineure.");
     }
     
   } catch (err) {
     console.error("Erreur lors de l'initialisation de la DB :", err.message);
   }
 };
-// ---------------------------------------------------
 
-// Initialisation
+// --- INITIALISATION ---
 initFirebase();
 initDB(); 
 initCronJobs();
 
-// Routes
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date() });
-});
-
-app.listen(PORT, () => {
-  console.log(`API running on port ${PORT}`);
-console.log('Test modification');
+// --- DÉMARRAGE DU SERVEUR ---
+// IMPORTANT : On utilise 'server.listen' et non 'app.listen' pour que Socket.io fonctionne
+server.listen(PORT, () => {
+  console.log(`🚀 API running on port ${PORT}`);
 });

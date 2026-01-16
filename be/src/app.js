@@ -24,9 +24,6 @@ const allowedOrigins = rawAllowedOrigins
   .map(o => o.trim())
   .filter(Boolean);
 
-// En environnement de production, ne pas forcer localhost.
-// Si vous avez besoin d'origines locales pour le développement,
-// définissez `ALLOWED_ORIGINS` dans votre fichier .env (séparées par des virgules).
 if (process.env.NODE_ENV !== 'production') {
   const defaultOrigins = [
     'http://localhost:5173',
@@ -46,16 +43,11 @@ app.use(cors({
     // Autoriser les requêtes sans origine (Mobile apps, Postman, curl)
     if (!origin) return callback(null, true);
 
-    // En développement, tu peux commenter la vérification stricte ci-dessous
-    // et juste mettre : return callback(null, true); 
-    // Mais voici la version sécurisée :
     if (allowedOrigins.some(o => origin.startsWith(o)) || allowedOrigins.includes('*')) {
        return callback(null, true);
     }
     
     console.warn(`CORS blocked origin: ${origin}`);
-    // Pour débloquer temporairement si tu galères, décommente la ligne suivante :
-    // return callback(null, true); 
     return callback(new Error('Not allowed by CORS'));
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
@@ -63,15 +55,23 @@ app.use(cors({
   credentials: true,
 }));
 
-// --- MIDDLEWARES ---
+// --- MIDDLEWARES GLOBAUX ---
 app.use(helmet());
 app.use(morgan('dev'));
-app.use(express.json());
+app.use(express.json()); // Important : Doit être avant les routes et les logs de body
+
+// --- DEBUG LOGGING (Placé AVANT les routes pour voir passer les requêtes) ---
+app.use((req, res, next) => {
+    if (req.method === 'POST' || req.method === 'PUT' || req.method === 'PATCH') {
+        console.log(`📦 REÇU [${req.method}] ${req.path} :`, req.body);
+    }
+    next();
+});
 
 // --- Servir les fichiers statiques (images uploadées) ---
 app.use('/uploads', express.static('uploads'));
 
-// --- 1. LANDING PAGE (Demandé en premier) ---
+// --- 1. LANDING PAGE ---
 app.get('/', (req, res) => {
   res.send(`
     <div style="font-family: sans-serif; text-align: center; padding: 50px;">
@@ -82,54 +82,36 @@ app.get('/', (req, res) => {
   `);
 });
 
-app.use('/api', routes);
-// --- 2. Routes API Spécifiques ---
+// --- 2. Routes API ---
+
+// Routes spécifiques
 app.use('/api/circles', circlesRoutes);
-app.use('/test-db', dbTestRouter);
-app.use('/health', healthRoutes); // Ou '/api/health' selon ta préférence
-app.use('/users', usersRoutes);
-app.use('/api/auth', authRoutes); // <--- CORRECTION ICI
+app.use('/api/auth', authRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/tasks', tasksRoutes);
 
-// --- 3. Routeur Principal (si tu as un index global) ---
-// Toutes les routes définies dans routes/index.js seront préfixées par /api
-
-// --- Gestion des Erreurs (DOIT être à la fin) ---
-
-app.use((req, res, next) => {
-  res.status(404).json({ message: 'Ressource non trouvée', path: req.path });
-// IMPORTANT : Permet de lire le JSON envoyé par le React
-app.use(express.json()); 
-
-// --- DEBUG LOGGING ---
-// J'ajoute ceci pour que tu voies dans la console ce que le serveur reçoit
-app.use((req, res, next) => {
-    if (req.method === 'POST' || req.method === 'PUT') {
-        console.log(`📦 REÇU [${req.method}] ${req.path} :`, req.body);
-    }
-    next();
-});
-
-// --- ROUTES ---
+// Routes utilitaires
+app.use('/health', healthRoutes); // Souvent accessible sans /api pour les load balancers
 app.use('/test-db', dbTestRouter);
 
-// Toutes les routes API (dont conversations) sont montées ici
-app.use('/api', routes); 
+// Routeur Principal (Regroupe le reste)
+// Si routes/index.js contient déjà users, auth, etc., les lignes au-dessus sont peut-être redondantes,
+// mais je les laisse pour assurer la compatibilité avec ton code existant.
+app.use('/api', routes);
 
-// --- GESTION DES ERREURS ---
-// 404 Not Found
+// --- 3. GESTION DES ERREURS (DOIT être à la fin) ---
+
+// 404 Not Found (Si aucune route n'a matché avant)
 app.use((req, res, next) => {
-  res.status(404).json({ message: 'Route introuvable', path: req.path });
+  res.status(404).json({ message: 'Ressource introuvable', path: req.path });
 });
 
-// Global Error Handler
+// Global Error Handler (Pour attraper les crashs / next(err))
 app.use((err, req, res, next) => {
   console.error('❌ Unhandled error:', err);
-  res.status(500).json({ message: 'Erreur serveur interne', error: err.message });
-});
-
+  const message = process.env.NODE_ENV === 'production' ? 'Erreur serveur interne' : err.message;
+  res.status(500).json({ message, error: err.message }); // 'error' affiché pour le debug, à retirer en prod stricte
 });
 
 export default app;
