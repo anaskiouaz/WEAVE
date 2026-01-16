@@ -1,5 +1,5 @@
-import { BrowserRouter, Routes, Route, Link, useLocation, Outlet, Navigate } from 'react-router-dom';
-import { Home, Calendar, Heart, MessageSquare, User, Settings, AlertCircle } from 'lucide-react';
+import { BrowserRouter, Routes, Route, Link, useLocation, Outlet, Navigate, useNavigate } from 'react-router-dom';
+import { Home, Calendar, Heart, MessageSquare, User, Settings, AlertCircle, LogOut } from 'lucide-react';
 import { useState } from 'react';
 
 // Composants de l'application
@@ -25,6 +25,14 @@ function ProtectedLayout() {
   const hideNav = location.pathname.startsWith('/select-circle');
   const [emergencyOpen, setEmergencyOpen] = useState(false);
   const { token } = useAuth(); // Récupération du token
+
+  const { logout } = useAuth();
+  const navigate = useNavigate();
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
 
   // SÉCURITÉ : Si pas de token, redirection vers la page d'accueil
   if (!token) {
@@ -65,6 +73,11 @@ function ProtectedLayout() {
                 <span>{label}</span>
               </Link>
             ))}
+
+            <button onClick={handleLogout} className="flex w-full items-center gap-3 px-4 py-3 rounded-lg transition-colors text-lg text-gray-700 hover:bg-red-50 hover:text-red-600 mt-4">
+              <LogOut className="w-6 h-6" />
+              <span>Déconnexion</span>
+            </button>
           </nav>
 
           <div className="p-4 border-t">
