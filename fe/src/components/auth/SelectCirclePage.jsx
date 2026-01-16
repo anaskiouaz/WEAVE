@@ -1,11 +1,24 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-// import { useAuth } from '../../context/AuthContext'; // Décommente si besoin du contexte
+// import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '../ui/card';
-import { Users, UserPlus, ArrowRight, Loader2, ArrowLeft, Calendar, Phone, Mail } from 'lucide-react';
+import { Users, UserPlus, ArrowRight, Loader2, ArrowLeft, Calendar, Phone, Mail, Stethoscope, Check } from 'lucide-react';
+
+// Liste des pathologies liées au manque de mobilité (GIR 2-5)
+const MEDICAL_OPTIONS = [
+    "Risque d'Escarres",
+    "Phlébite / Thrombose",
+    "Fonte musculaire (Sarcopénie)",
+    "Ankyloses / Raideurs",
+    "Constipation / Fécalome",
+    "Incontinence",
+    "Encombrement bronchique",
+    "Syndrome de glissement / Dépression",
+    "Ostéoporose"
+];
 
 export default function SelectCirclePage() {
     const navigate = useNavigate();
@@ -13,18 +26,33 @@ export default function SelectCirclePage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
 
-    // --- NOUVEAU STATE POUR LES INFOS DU SENIOR ---
+    // --- STATE POUR LES INFOS DU SENIOR ---
     const [seniorData, setSeniorData] = useState({
         name: '',
         birth_date: '',
         phone: '',
-        email: ''
+        email: '',
+        medical_select: [] // Tableau temporaire pour l'UI (cases à cocher)
     });
 
     const [inviteCode, setInviteCode] = useState('');
 
     const handleSeniorChange = (e) => {
         setSeniorData({ ...seniorData, [e.target.name]: e.target.value });
+    };
+
+    // Gestion de la sélection multiple des pathologies
+    const toggleMedicalOption = (option) => {
+        setSeniorData(prev => {
+            const isSelected = prev.medical_select.includes(option);
+            let newSelection;
+            if (isSelected) {
+                newSelection = prev.medical_select.filter(item => item !== option);
+            } else {
+                newSelection = [...prev.medical_select, option];
+            }
+            return { ...prev, medical_select: newSelection };
+        });
     };
 
     // Fonction utilitaire pour les appels API
@@ -61,8 +89,19 @@ export default function SelectCirclePage() {
         e.preventDefault();
         if (!seniorData.name.trim()) return setError("Le nom est requis.");
 
-        // On envoie l'objet complet au backend
-        apiCall('/', { senior_info: seniorData });
+        // Préparation des données pour la BDD
+        // On convertit le tableau medical_select en string pour la colonne 'text' de la DB
+        const payloadInfo = {
+            ...seniorData,
+            medical_info: seniorData.medical_select.length > 0 
+                ? seniorData.medical_select.join(', ') // Ex: "Risque d'Escarres, Phlébite"
+                : null
+        };
+        
+        // On retire la clé temporaire 'medical_select' avant l'envoi
+        delete payloadInfo.medical_select;
+
+        apiCall('/', { senior_info: payloadInfo });
     };
 
     const handleJoin = (e) => {
@@ -138,7 +177,7 @@ export default function SelectCirclePage() {
                         </div>
                     )}
 
-                    {/* VUE 2 : CRÉATION AVEC PLUS D'INFOS */}
+                    {/* VUE 2 : CRÉATION AVEC INFO MÉDICALES */}
                     {view === 'create' && (
                         <form onSubmit={handleCreate} className="space-y-4 max-w-lg mx-auto">
 
@@ -170,7 +209,7 @@ export default function SelectCirclePage() {
                                             id="birth_date"
                                             name="birth_date"
                                             type="date"
-                                            className="pl-10 h-12 bg-white block w-full" // block w-full pour fix date input
+                                            className="pl-10 h-12 bg-white block w-full"
                                             value={seniorData.birth_date}
                                             onChange={handleSeniorChange}
                                         />
@@ -190,6 +229,38 @@ export default function SelectCirclePage() {
                                             value={seniorData.phone}
                                             onChange={handleSeniorChange}
                                         />
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* --- NOUVELLE SECTION INFO MÉDICALE --- */}
+                            <div className="space-y-3 pt-2">
+                                <Label className="text-base font-semibold flex items-center gap-2">
+                                    <Stethoscope className="w-4 h-4 text-blue-600" />
+                                    Pathologies / Risques (Liés à la mobilité)
+                                </Label>
+                                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                                    <p className="text-sm text-gray-500 mb-3">Sélectionnez les complications présentes ou à surveiller :</p>
+                                    <div className="flex flex-wrap gap-2">
+                                        {MEDICAL_OPTIONS.map((option) => {
+                                            const isSelected = seniorData.medical_select.includes(option);
+                                            return (
+                                                <button
+                                                    key={option}
+                                                    type="button"
+                                                    onClick={() => toggleMedicalOption(option)}
+                                                    className={`
+                                                        px-3 py-1.5 rounded-full text-sm font-medium border transition-all flex items-center gap-1.5
+                                                        ${isSelected 
+                                                            ? 'bg-blue-100 text-blue-800 border-blue-300 shadow-sm' 
+                                                            : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'}
+                                                    `}
+                                                >
+                                                    {isSelected && <Check className="w-3.5 h-3.5" />}
+                                                    {option}
+                                                </button>
+                                            )
+                                        })}
                                     </div>
                                 </div>
                             </div>

@@ -1,9 +1,6 @@
-import { BrowserRouter, Routes, Route, Link, useLocation, Outlet } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, Link, useLocation, Outlet, Navigate } from 'react-router-dom';
 import { Home, Calendar, Heart, MessageSquare, User, Settings, AlertCircle } from 'lucide-react';
-import { useState, useEffect } from 'react';
-import { PushNotifications } from '@capacitor/push-notifications';
-import { Capacitor } from '@capacitor/core';
-import { apiPost } from './api/client';
+import { useState } from 'react';
 
 // Composants de l'application
 import Dashboard from './components/Dashboard';
@@ -13,21 +10,26 @@ import Messages from './components/Messages';
 import Profile from './components/Profile';
 import Admin from './components/Admin';
 import EmergencyDialog from './components/EmergencyDialog';
-import Navigation from './components/ui-mobile/navigation'; // <--- IMPORT DU NOUVEAU MENU
+import Navigation from './components/ui-mobile/navigation';
 
 // Nouvelles pages d'authentification et d'accueil
-import SelectCirclePage from './components/auth/SelectCirclePage';
 import LandingPage from './components/LandingPage';
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
-import { AuthProvider } from './context/AuthContext';
+import SelectCirclePage from './components/auth/SelectCirclePage';
+import { useAuth } from './context/AuthContext'; // On importe seulement le hook, pas le Provider
 
 // Layout avec Sidebar (Desktop) et Navigation Flottante (Mobile)
 function ProtectedLayout() {
   const location = useLocation();
+  const hideNav = location.pathname.startsWith('/select-circle');
   const [emergencyOpen, setEmergencyOpen] = useState(false);
+  const { token } = useAuth(); // Récupération du token
 
-  // Note : Plus besoin de mobileNavOpen car on utilise la barre du bas sur mobile
+  // SÉCURITÉ : Si pas de token, redirection vers la page d'accueil
+  if (!token) {
+    return <Navigate to="/" replace />;
+  }
 
   const navItems = [
     { path: '/dashboard', icon: Home, label: 'Accueil' },
@@ -42,7 +44,8 @@ function ProtectedLayout() {
     <div className="flex h-screen bg-gray-50">
 
       {/* --- SIDEBAR (VISIBLE UNIQUEMENT SUR DESKTOP) --- */}
-      <aside className="hidden md:flex w-64 bg-white shadow-lg flex-col z-50">
+      {!hideNav && (
+        <aside className="hidden md:flex w-64 bg-white shadow-lg flex-col z-50">
         <div className="p-6 border-b">
           <h1 className="text-blue-600 text-2xl font-bold">Weave</h1>
           <p className="text-gray-600 mt-1 text-sm">Plateforme d'entraide</p>
@@ -74,13 +77,13 @@ function ProtectedLayout() {
             <span className="text-lg font-bold">Urgence</span>
           </button>
         </div>
-      </aside>
+        </aside>
+      )}
 
       {/* --- CONTENU PRINCIPAL --- */}
-      {/* pb-28 est ajouté pour que le contenu ne soit pas caché par le menu en bas sur mobile */}
       <main className="flex-1 overflow-auto w-full relative pb-28 md:pb-0">
 
-        {/* HEADER MOBILE (Juste le titre et bouton urgence, pas de menu burger) */}
+        {/* HEADER MOBILE */}
         <div className="md:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-4 bg-white border-b shadow-sm">
           <div>
             <p className="text-lg font-bold text-blue-600">Weave</p>
@@ -99,9 +102,11 @@ function ProtectedLayout() {
       </main>
 
       {/* --- NAVIGATION FLOTTANTE (VISIBLE UNIQUEMENT SUR MOBILE) --- */}
-      <div className="md:hidden">
-        <Navigation />
-      </div>
+      {!hideNav && (
+        <div className="md:hidden">
+          <Navigation />
+        </div>
+      )}
 
       <EmergencyDialog open={emergencyOpen} onClose={() => setEmergencyOpen(false)} />
     </div>
@@ -110,23 +115,25 @@ function ProtectedLayout() {
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/register" element={<RegisterPage />} />
+    // AuthProvider a été retiré ici car il est déjà dans main.jsx
+    <BrowserRouter>
+      <Routes>
+        {/* Routes Publiques */}
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/register" element={<RegisterPage />} />
+
+        {/* Routes Protégées : Tout ce qui est ici nécessite d'être connecté */}
+        <Route element={<ProtectedLayout />}>
+          <Route path="/dashboard" element={<Dashboard />} />
+          <Route path="/calendar" element={<CalendarView />} />
+          <Route path="/memories" element={<Memories />} />
+          <Route path="/messages" element={<Messages />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/admin" element={<Admin />} />
           <Route path="/select-circle" element={<SelectCirclePage />} />
-          <Route element={<ProtectedLayout />}>
-            <Route path="/dashboard" element={<Dashboard />} />
-            <Route path="/calendar" element={<CalendarView />} />
-            <Route path="/memories" element={<Memories />} />
-            <Route path="/messages" element={<Messages />} />
-            <Route path="/profile" element={<Profile />} />
-            <Route path="/admin" element={<Admin />} />
-          </Route>
-        </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+        </Route>
+      </Routes>
+    </BrowserRouter>
   );
 }

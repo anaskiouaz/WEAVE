@@ -37,15 +37,16 @@ router.post('/', authenticateToken, async (req, res) => {
     const dummyPassword = await bcrypt.hash("WeaveSenior2024!", 10);
 
     const userRes = await client.query(
-      `INSERT INTO users (name, email, password_hash, birth_date, phone, onboarding_role, role_global) 
-       VALUES ($1, $2, $3, $4, $5, 'PC', 'USER') 
+      `INSERT INTO users (name, email, password_hash, birth_date, phone, medical_info, onboarding_role, role_global) 
+       VALUES ($1, $2, $3, $4, $5, $6, 'PC', 'USER') 
        RETURNING id`,
       [
-        senior_info.name, 
-        emailToUse, 
-        dummyPassword, 
-        senior_info.birth_date || null, 
-        senior_info.phone || null
+        senior_info.name,
+        emailToUse,
+        dummyPassword,
+        senior_info.birth_date || null,
+        senior_info.phone || null,
+        senior_info.medical_info || null
       ]
     );
     const seniorId = userRes.rows[0].id;
