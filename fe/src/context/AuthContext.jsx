@@ -1,4 +1,4 @@
-import { createContext, useContext, useState, useEffect } from 'react';
+import { createContext, useContext, useState } from 'react';
 import { apiPost } from '../api/client';
 
 export const AuthContext = createContext(null);
@@ -12,8 +12,11 @@ export const AuthProvider = ({ children }) => {
     const saved = localStorage.getItem('weave_user');
     return saved ? JSON.parse(saved) : null;
   });
-  const [circleId, setCircleId] = useState(() => localStorage.getItem('circle_id'));
-  const [circleNom, setCircleNom] = useState(() => localStorage.getItem('circle_nom'));
+  // `circleId` and `circleNom` are set only when the user selects a circle
+  // (via `SelectCirclePage`). We don't read them from localStorage here so
+  // initialization happens in a single place.
+  const [circleId, setCircleId] = useState(null);
+  const [circleNom, setCircleNom] = useState(null);
   // si local storage est vide, ce sera null par défaut
   
   const [loading, setLoading] = useState(false);
@@ -23,11 +26,9 @@ export const AuthProvider = ({ children }) => {
   const saveCircleData = (id, nom) => {
     if (id) {
         setCircleId(id);
-        localStorage.setItem('circle_id', id);
     }
     if (nom) {
         setCircleNom(nom);
-        localStorage.setItem('circle_nom', nom);
     }
   };
 
@@ -43,8 +44,8 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('weave_token', data.token);
         localStorage.setItem('weave_user', JSON.stringify(data.user));
 
-        // Mise à jour du Cercle (via notre utilitaire)
-        saveCircleData(data.circle_id, data.circle_nom);
+        // Le cercle n'est pas initialisé ici : la sélection doit se faire
+        // uniquement depuis la page de sélection.
         
         return { success: true };
       }
@@ -78,32 +79,8 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // 6. SYNCHRONISATION (Refresh)
-  // Si on a un token mais PAS d'info de cercle (ex: refresh page), on va les chercher.
-  useEffect(() => {
-    const fetchCircleInfo = async () => {
-      if (!token) return;
-
-      try {
-        // Note: Assure-toi que apiPost ou un équivalent apiGet gère le header Authorization
-        // Ici je garde le fetch natif pour être sûr que ça marche avec ton token
-        const res = await fetch('/api/circles/me', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (res.ok) {
-            const data = await res.json();
-            saveCircleData(data.circle_id, data.circle_nom);
-        }
-      } catch (err) {
-        console.error("Erreur auto-fetch cercle:", err);
-      }
-    };
-
-    if (token && (!circleId || !circleNom)) {
-      fetchCircleInfo();
-    }
-  }, [token, circleId, circleNom]);
+  // NOTE: Synchronisation automatique supprimée — le cercle doit être choisi
+  // explicitement par l'utilisateur depuis `SelectCirclePage`.
 
   return (
     <AuthContext.Provider value={{
