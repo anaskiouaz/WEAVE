@@ -5,7 +5,6 @@ dotenv.config();
 
 const { Pool } = pg;
 
-// Support pour DATABASE_URL (production) ou variables PG* séparées (développement)
 const poolConfig = process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== ''
   ? { connectionString: process.env.DATABASE_URL }
   : {
@@ -16,9 +15,9 @@ const poolConfig = process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !
       database: process.env.PGDATABASE || 'weave_local',
     };
 
-const pool = new Pool(poolConfig);
+// AJOUT : Ajoutez 'export' devant const pool ou exportez-le à la fin
+export const pool = new Pool(poolConfig); 
 
-// Test de connexion à la base de données
 pool.connect((err, client, release) => {
   if (err) {
     console.error('❌ Erreur de connexion à la base de données:', err.stack);
@@ -28,6 +27,7 @@ pool.connect((err, client, release) => {
   }
 }); 
 
+// On garde l'export par défaut pour la compatibilité avec le reste de votre code
 export default {
   query: (text, params) => pool.query(text, params),
 };

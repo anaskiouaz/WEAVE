@@ -137,3 +137,6 @@ dist
 # Vite logs files
 vite.config.js.timestamp-*
 vite.config.ts.timestamp-*
+
+# Service Account FireBase afin de pas commit la clé privé dans le git
+**/service-account.json

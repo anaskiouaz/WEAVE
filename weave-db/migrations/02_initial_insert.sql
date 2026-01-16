@@ -1,88 +1,140 @@
--- 1. Création de 3 utilisateurs (Un admin famille, un bénévole, une voisine)
-INSERT INTO users (id, name, email, password_hash, role_global) VALUES
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'Thomas Durand', 'thomas@weave.app', 'hash_secret_123', 'USER'),
-('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b22', 'Sophie Martin', 'sophie@weave.app', 'hash_secret_456', 'USER'),
-('c0eebc99-9c0b-4ef8-bb6d-6bb9bd380c33', 'Marc Voisin', 'marc@weave.app', 'hash_secret_789', 'USER');
+-- ============================================================
+-- SEED DATA (DONNÉES DE TEST)
+-- ============================================================
 
--- 2. Création du Cercle de Soins pour "Mamie Monique" (Créé par Thomas)
-INSERT INTO care_circles (id, senior_name, created_by) VALUES
-('d0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44', 'Monique Durand', 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11');
-
--- 3. Définition des rôles dans le cercle
-INSERT INTO user_roles (user_id, circle_id, role) VALUES
-('a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44', 'ADMIN'), -- Thomas est l'admin
-('b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b22', 'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44', 'HELPER'); -- Sophie aide
-
-
-INSERT INTO tasks (circle_id, title, task_type, date, time, required_helpers, helper_name) VALUES
--- Tâche 1 : Rendez-vous médical (Déjà assigné à Sophie)
+-- 1. Création des utilisateurs
+-- NOTE : On doit créer "Mamie Monique" en tant qu'utilisateur car care_circles demande un senior_id
+INSERT INTO users (id, name, email, password_hash, role_global, onboarding_role, medical_info, privacy_consent) VALUES
 (
-    'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44', -- ID du Cercle Monique
-    'Consultation Cardiologue',              -- Titre
-    'medical',                               -- Type
-    '2025-06-12',                            -- Date
-    '14:30:00',                              -- Heure
-    1,                                       -- 1 personne requise
-    'Sophie Martin'                          -- Déjà pris par Sophie (Affichage simple)
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 
+    'Thomas Durand', 
+    'thomas@weave.app', 
+    'hash_secret_123', 
+    'SUPERADMIN',
+    'ADMIN',
+    NULL,
+    TRUE
 ),
+(
+    'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b22', 
+    'Sophie Martin', 
+    'sophie@weave.app', 
+    'hash_secret_456', 
+    'USER', 
+    'HELPER',
+    NULL, 
+    FALSE
+),
+(
+    'c0eebc99-9c0b-4ef8-bb6d-6bb9bd380c33', 
+    'Marc Voisin', 
+    'marc@weave.app', 
+    'hash_secret_789', 
+    'USER', 
+    'HELPER',
+    NULL, 
+    FALSE
+),
+(
+    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380e55', -- UUID pour Monique
+    'Monique Durand', 
+    'monique.durand@nomail.com', -- Email fictif requis par la contrainte UNIQUE
+    'hash_secret_000', 
+    'USER',
+    'PC', -- Rôle d'onboarding "Person Cared For"
+    NULL, 
+    TRUE
+);
 
--- Tâche 2 : Courses hebdomadaires (Disponible - Personne n'a encore pris la tâche)
+-- 2. Création du Cercle de Soins
+-- Correction : On utilise senior_id (UUID de Monique) au lieu de senior_name
+INSERT INTO care_circles (id, senior_id, created_by, invite_code) VALUES
+(
+    'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
+    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380e55', -- ID de Monique
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', -- ID de Thomas (Créateur)
+    'WEAVE12345'
+);
+
+-- 3. Attribution des rôles dans le cercle
+-- Ajout de Monique avec le rôle 'PC'
+INSERT INTO user_roles (user_id, circle_id, role) VALUES
+(
+    'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', -- Thomas
+    'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
+    'ADMIN'
+),
+(
+    'b0eebc99-9c0b-4ef8-bb6d-6bb9bd380b22', -- Sophie
+    'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
+    'HELPER'
+),
+(
+    'e0eebc99-9c0b-4ef8-bb6d-6bb9bd380e55', -- Monique
+    'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
+    'PC' -- Rôle technique pour le bénéficiaire
+);
+
+-- 4. Création des tâches
+-- (Pas de changement de structure ici, juste s'assurer que le circle_id est bon)
+INSERT INTO tasks (circle_id, title, task_type, description, date, time, required_helpers, helper_name) VALUES
+(
+    'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
+    'Consultation Cardiologue',
+    'medical',
+    'Accompagner Monique à sa visite de suivi chez le cardiologue à la clinique Saint-Jean.',
+    '2025-06-12',
+    '14:30:00',
+    1,
+    'Sophie Martin'
+),
 (
     'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
     'Courses au Supermarché (Lait, Eau, Fruits)',
     'shopping',
+    'Faire les achats hebdomadaires pour remplir le frigo et vérifier les stocks de produits frais.',
     '2025-06-13',
     '10:00:00',
     1,
-    NULL                                     -- NULL car personne n'a encore accepté
+    NULL
 ),
-
--- Tâche 3 : Visite de courtoisie (Lien social - Disponible)
 (
     'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
     'Prendre le thé et discuter',
     'social',
+    'Moment convivial à la maison pour maintenir le lien social et écouter les nouvelles de Monique.',
     '2025-06-14',
     '16:00:00',
-    2,                                       -- Idéalement 2 personnes pour plus de convivialité
+    2,
     NULL
 ),
-
--- Tâche 4 : Passage Pharmacie (Petit service rapide)
 (
     'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
     'Récupérer ordonnance pharmacie centrale',
     'logistics',
+    'Aller chercher l’ordonnance et vérifier qu’il ne manque aucun médicament prescrit.',
     '2025-06-12',
     '18:00:00',
     1,
-    'Marc Voisin'                            -- Marc s'en occupe en rentrant du travail
+    'Marc Voisin'
 ),
-
--- Tâche 5 : Aide ménagère (Besoin physique)
 (
     'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
     'Sortir les poubelles et arroser les plantes',
     'home',
+    'Gestion des sacs poubelles du soir et arrosage des plantes du salon et du balcon.',
     '2025-06-15',
     '19:00:00',
     1,
     NULL
 ),
-
--- Tâche 6 : Transport vers le club de bridge
 (
     'd0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44',
     'Déposer Monique au club de bridge',
     'transport',
+    'Trajet aller-retour en voiture pour déposer Monique et l’aider à s’installer à la table de jeu.',
     '2025-06-16',
     '13:45:00',
     1,
     NULL
 );
-
-
--- Exemple : Sophie confirme qu'elle fait la tâche 1 (Cardiologue)
--- Attention : Il faut connaitre l'UUID de la tache. 
--- Dans ton code backend, tu feras ça dynamiquement.
--- Pour le test SQL pur, tu peux faire :
