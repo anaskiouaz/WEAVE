@@ -1,40 +1,41 @@
 import db from '../config/db.js';
 import admin from '../config/firebase.js';
 
+import { Router } from 'express';
 const router = Router();
 
 router.get('/', async (req, res) => {
     try {
         // Insertion en base de données
-          const result = await db.query(
-            `SELECT 
-          t.id,
-          t.circle_id,
-          t.date,
-          t.time,
-          t.title,
-          t.task_type,
-          t.helper_name,
-          t.required_helpers,
-          u.name AS senior_name
-         FROM tasks t
-         LEFT JOIN care_circles c ON c.id = t.circle_id
-         LEFT JOIN users u ON c.senior_id = u.id
-         ORDER BY t.date ASC, t.time ASC`
-       );
+        const result = await db.query(`
+          SELECT 
+            t.id,
+            t.circle_id,
+            t.date,
+            t.time,
+            t.title,
+            t.task_type,
+            t.helper_name,
+            t.required_helpers,
+            u.name AS senior_name
+          FROM tasks t
+          LEFT JOIN care_circles c ON c.id = t.circle_id
+          LEFT JOIN users u ON c.senior_id = u.id
+          ORDER BY t.date ASC, t.time ASC
+        `);
     
-    res.json({
-      status: 'ok',
-      data: result.rows,
-      count: result.rows.length,
-    });
-  } catch (err) {
-    console.error('Error fetching tasks:', err);
-    res.status(500).json({
-      status: 'error',
-      message: err.message,
-    });
-  }
+        res.json({
+            status: 'ok',
+            data: result.rows,
+            count: result.rows.length,
+        });
+    } catch (err) {
+        console.error('Error fetching tasks:', err);
+        res.status(500).json({
+            status: 'error',
+            message: err.message,
+        });
+    }
 });
 
 router.post('/', async (req, res) => {
@@ -173,4 +174,6 @@ router.delete('/:id', async (req, res) => {
       status: 'error',
       message: err.message,
     });
-    }}
+    }
+});
+export default router;
