@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import Sidebar from './sidebar';
+import Sidebar from './Sidebar';
 import io from 'socket.io-client';
 import axios from 'axios'; // J'utilise axios car tu l'as installé, c'est plus propre que fetch
 
