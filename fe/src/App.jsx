@@ -2,6 +2,7 @@ import { BrowserRouter, Routes, Route, Link, useLocation, Outlet, Navigate } fro
 import { Home, Calendar, Heart, MessageSquare, User, Settings, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
 
+// Composants de l'application
 import Dashboard from './components/Dashboard';
 import CalendarView from './components/CalendarView';
 import Memories from './components/Memories';
@@ -18,6 +19,7 @@ import RegisterPage from './components/auth/RegisterPage';
 import SelectCirclePage from './components/auth/SelectCirclePage';
 import { useAuth } from './context/AuthContext'; // On importe seulement le hook, pas le Provider
 
+// Layout avec Sidebar (Desktop) et Navigation Flottante (Mobile)
 function ProtectedLayout() {
   const location = useLocation();
   const hideNav = location.pathname.startsWith('/select-circle');
@@ -35,19 +37,8 @@ function ProtectedLayout() {
     { path: '/memories', icon: Heart, label: 'Souvenirs' },
     { path: '/messages', icon: MessageSquare, label: 'Messages' },
     { path: '/profile', icon: User, label: 'Profil' },
+    { path: '/admin', icon: Settings, label: 'Administration' },
   ];
-
-  // 2. Vérification ROBUSTE (Majuscules et Minuscules acceptées)
-  // On convertit tout en majuscules (.toUpperCase) pour comparer sans erreur
-  const userRole = user?.onboarding_role ? user.onboarding_role.toUpperCase() : '';
-  const globalRole = user?.role_global ? user.role_global.toUpperCase() : '';
-  
-  const isAdmin = userRole === 'ADMIN' || globalRole === 'ADMIN';
-
-  // 3. Ajout du bouton si c'est un admin
-  if (isAdmin) {
-    navItems.push({ path: '/admin', icon: Settings, label: 'Administration' });
-  }
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -55,36 +46,36 @@ function ProtectedLayout() {
       {/* --- SIDEBAR (VISIBLE UNIQUEMENT SUR DESKTOP) --- */}
       {!hideNav && (
         <aside className="hidden md:flex w-64 bg-white shadow-lg flex-col z-50">
-        <div className="p-6 border-b">
-          <h1 className="text-blue-600 text-2xl font-bold">Weave</h1>
-          <p className="text-gray-600 mt-1 text-sm">Plateforme d'entraide</p>
-        </div>
+          <div className="p-6 border-b">
+            <h1 className="text-blue-600 text-2xl font-bold">Weave</h1>
+            <p className="text-gray-600 mt-1 text-sm">Plateforme d'entraide</p>
+          </div>
 
-        <nav className="flex-1 p-4 space-y-2">
-          {navItems.map(({ path, icon: Icon, label }) => (
-            <Link
-              key={path}
-              to={path}
-              className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-lg ${location.pathname === path
-                ? 'bg-blue-50 text-blue-600 font-medium'
-                : 'text-gray-700 hover:bg-gray-50'
-                }'}
+          <nav className="flex-1 p-4 space-y-2">
+            {navItems.map(({ path, icon: Icon, label }) => (
+              <Link
+                key={path}
+                to={path}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-lg ${location.pathname === path
+                  ? 'bg-blue-50 text-blue-600 font-medium'
+                  : 'text-gray-700 hover:bg-gray-50'
+                  }`}
+              >
+                <Icon className="w-6 h-6" />
+                <span>{label}</span>
+              </Link>
+            ))}
+          </nav>
+
+          <div className="p-4 border-t">
+            <button
+              onClick={() => setEmergencyOpen(true)}
+              className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors shadow-md"
             >
-              <Icon className="w-6 h-6" />
-              <span>{label}</span>
-            </Link>
-          ))}
-        </nav>
-
-        <div className="p-4 border-t">
-          <button
-            onClick={() => setEmergencyOpen(true)}
-            className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors shadow-md"
-          >
-            <AlertCircle className="w-6 h-6" />
-            <span className="text-lg font-bold">Urgence</span>
-          </button>
-        </div>
+              <AlertCircle className="w-6 h-6" />
+              <span className="text-lg font-bold">Urgence</span>
+            </button>
+          </div>
         </aside>
       )}
 
@@ -104,6 +95,8 @@ function ProtectedLayout() {
             <AlertCircle className="w-6 h-6" />
           </button>
         </div>
+
+        {/* Le contenu de la page change ici */}
         <Outlet />
       </main>
 
