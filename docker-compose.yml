@@ -14,7 +14,7 @@ services:
     networks:
       - weave-net
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U weave_user -d weave_local"]
       interval: 5s
       timeout: 5s
       retries: 5
@@ -40,7 +40,7 @@ services:
 
       DATABASE_URL: "postgres://weave_user:toto@postgres:5432/weave_local"
 
-      ALLOWED_ORIGINS: "http://localhost:5173"
+      ALLOWED_ORIGINS: "http://localhost:5173,http://localhost,capacitor://localhost"
       JWT_SECRET: "super-secret"
 
       AZURE_STORAGE_CONTAINER_NAME: "images"
