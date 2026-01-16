@@ -61,34 +61,33 @@ export default function CalendarView() {
   };
   // --- FIN UTILITAIRES ---
 
-  useEffect(() => {
-    async function fetchTasks() {
-      try {
-        setLoading(true);
+  // Central helper to load tasks filtered by current circle
+  const loadTasks = async () => {
+    try {
+      setLoading(true);
 
-        // If no circle selected in context, show no tasks
-        if (!circleId) {
-          setTasks([]);
-          setError(null);
-          return;
-        }
-
-        // Fetch all tasks, then filter client-side by circle_id to ensure
-        // we only display tasks for the current care circle.
-        const data = await apiGet('/tasks');
-        const allTasks = data.data || [];
-        const filtered = allTasks.filter(t => String(t.circle_id) === String(circleId));
-        setTasks(filtered);
-        setError(null);
-      } catch (err) {
-        console.error('Error fetching tasks:', err);
-        setError(err.message);
+      if (!circleId) {
         setTasks([]);
-      } finally {
-        setLoading(false);
+        setError(null);
+        return;
       }
+
+      const data = await apiGet('/tasks');
+      const allTasks = data.data || [];
+      const filtered = allTasks.filter(t => String(t.circle_id) === String(circleId));
+      setTasks(filtered);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching tasks:', err);
+      setError(err.message);
+      setTasks([]);
+    } finally {
+      setLoading(false);
     }
-    fetchTasks();
+  };
+
+  useEffect(() => {
+    loadTasks();
   }, [circleId]);
 
   function getTasksForDate(dateISO) {
@@ -127,8 +126,8 @@ export default function CalendarView() {
 
       await apiPost('/tasks', taskPayload);
 
-      const data = await apiGet('/tasks');
-      setTasks(data.data || []);
+      // Refresh tasks for the current circle only
+      await loadTasks();
 
       setShowAddTask(false);
       setNewTask({
@@ -150,8 +149,7 @@ export default function CalendarView() {
 
     try {
       await apiDelete(`/tasks/${taskId}`);
-      const data = await apiGet('/tasks');
-      setTasks(data.data || []);
+      await loadTasks();
       // Si la modale détails était ouverte, on la ferme
       setSelectedTask(null);
     } catch (err) {
@@ -169,8 +167,7 @@ export default function CalendarView() {
       alert("Vous êtes maintenant volontaire pour cette tâche !");
 
       // On recharge les tâches pour voir la mise à jour
-      const data = await apiGet('/tasks');
-      setTasks(data.data || []);
+      await loadTasks();
       setSelectedTask(null); // On ferme la modale
     } catch (err) {
       console.error('Error volunteering:', err);
