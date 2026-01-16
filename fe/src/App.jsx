@@ -2,11 +2,12 @@ import { BrowserRouter, Routes, Route, Link, useLocation, Outlet, Navigate, useN
 import { Home, Calendar, Heart, MessageSquare, User, Settings, AlertCircle, LogOut } from 'lucide-react';
 import { useState } from 'react';
 
-// Composants de l'application
+// --- IMPORTS DES COMPOSANTS ---
 import Dashboard from './components/Dashboard';
 import CalendarView from './components/CalendarView';
 import Memories from './components/Memories';
-import Messages from './components/Messages';
+// C'est le bon import pour ta nouvelle messagerie
+import Messages from './components/messagerie/Messages'; 
 import Profile from './components/Profile';
 import Admin from './components/Admin';
 import EmergencyDialog from './components/EmergencyDialog';
@@ -43,7 +44,7 @@ function ProtectedLayout() {
     { path: '/dashboard', icon: Home, label: 'Accueil' },
     { path: '/calendar', icon: Calendar, label: 'Calendrier' },
     { path: '/memories', icon: Heart, label: 'Souvenirs' },
-    { path: '/messages', icon: MessageSquare, label: 'Messages' },
+    { path: '/messages', icon: MessageSquare, label: 'Messages' }, // Le seul lien nécessaire
     { path: '/profile', icon: User, label: 'Profil' },
     { path: '/admin', icon: Settings, label: 'Administration' },
   ];
@@ -67,7 +68,7 @@ function ProtectedLayout() {
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-lg ${location.pathname === path
                   ? 'bg-blue-50 text-blue-600 font-medium'
                   : 'text-gray-700 hover:bg-gray-50'
-                  }`}
+                  }}
               >
                 <Icon className="w-6 h-6" />
                 <span>{label}</span>
@@ -106,11 +107,18 @@ function ProtectedLayout() {
             aria-label="Urgence"
           >
             <AlertCircle className="w-6 h-6" />
+            className="w-full flex items-center justify-center gap-2 px-4 py-3 bg-orange-500 text-white rounded-lg hover:bg-orange-600 transition-colors shadow-sm"
+          >
+            <AlertCircle className="w-5 h-5" />
+            <span className="font-medium">Urgence</span>
           </button>
         </div>
 
         {/* Le contenu de la page change ici */}
         <Outlet />
+      {/* Main Content */}
+      <main className="flex-1 overflow-auto bg-gray-50 relative">
+        {children}
       </main>
 
       {/* --- NAVIGATION FLOTTANTE (VISIBLE UNIQUEMENT SUR MOBILE) --- */}
@@ -140,7 +148,12 @@ export default function App() {
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/calendar" element={<CalendarView />} />
           <Route path="/memories" element={<Memories />} />
+          
+          {/* ✅ LA SEULE ROUTE MESSAGERIE NÉCESSAIRE */}
           <Route path="/messages" element={<Messages />} />
+          
+          {/* J'ai supprimé la route "/chat" qui causait l'erreur */}
+
           <Route path="/profile" element={<Profile />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/select-circle" element={<SelectCirclePage />} />
