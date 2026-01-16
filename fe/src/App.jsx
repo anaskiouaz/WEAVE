@@ -2,7 +2,6 @@ import { BrowserRouter, Routes, Route, Link, useLocation, Outlet, Navigate } fro
 import { Home, Calendar, Heart, MessageSquare, User, Settings, AlertCircle } from 'lucide-react';
 import { useState } from 'react';
 
-// Composants de l'application
 import Dashboard from './components/Dashboard';
 import CalendarView from './components/CalendarView';
 import Memories from './components/Memories';
@@ -19,7 +18,6 @@ import RegisterPage from './components/auth/RegisterPage';
 import SelectCirclePage from './components/auth/SelectCirclePage';
 import { useAuth } from './context/AuthContext'; // On importe seulement le hook, pas le Provider
 
-// Layout avec Sidebar (Desktop) et Navigation Flottante (Mobile)
 function ProtectedLayout() {
   const location = useLocation();
   const hideNav = location.pathname.startsWith('/select-circle');
@@ -37,8 +35,19 @@ function ProtectedLayout() {
     { path: '/memories', icon: Heart, label: 'Souvenirs' },
     { path: '/messages', icon: MessageSquare, label: 'Messages' },
     { path: '/profile', icon: User, label: 'Profil' },
-    { path: '/admin', icon: Settings, label: 'Administration' },
   ];
+
+  // 2. Vérification ROBUSTE (Majuscules et Minuscules acceptées)
+  // On convertit tout en majuscules (.toUpperCase) pour comparer sans erreur
+  const userRole = user?.onboarding_role ? user.onboarding_role.toUpperCase() : '';
+  const globalRole = user?.role_global ? user.role_global.toUpperCase() : '';
+  
+  const isAdmin = userRole === 'ADMIN' || globalRole === 'ADMIN';
+
+  // 3. Ajout du bouton si c'est un admin
+  if (isAdmin) {
+    navItems.push({ path: '/admin', icon: Settings, label: 'Administration' });
+  }
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -59,7 +68,7 @@ function ProtectedLayout() {
               className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-lg ${location.pathname === path
                 ? 'bg-blue-50 text-blue-600 font-medium'
                 : 'text-gray-700 hover:bg-gray-50'
-                }`}
+                }'}
             >
               <Icon className="w-6 h-6" />
               <span>{label}</span>
@@ -67,7 +76,6 @@ function ProtectedLayout() {
           ))}
         </nav>
 
-        {/* Bouton d'urgence (Desktop) */}
         <div className="p-4 border-t">
           <button
             onClick={() => setEmergencyOpen(true)}
@@ -96,8 +104,6 @@ function ProtectedLayout() {
             <AlertCircle className="w-6 h-6" />
           </button>
         </div>
-
-        {/* Le contenu de la page change ici */}
         <Outlet />
       </main>
 

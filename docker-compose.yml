@@ -40,7 +40,7 @@ services:
 
       DATABASE_URL: "postgres://weave_user:toto@postgres:5432/weave_local"
 
-      ALLOWED_ORIGINS: "http://localhost:5173"
+      ALLOWED_ORIGINS: "http://localhost:5173,http://localhost,capacitor://localhost"
       JWT_SECRET: "super-secret"
 
       AZURE_STORAGE_CONTAINER_NAME: "images"

@@ -1,4 +1,3 @@
-import { Router } from 'express';
 import db from '../config/db.js';
 import admin from '../config/firebase.js';
 
@@ -116,7 +115,7 @@ router.post('/', async (req, res) => {
                         title: `Nouvelle activité :  ${time}`,
                         body: `Tâche ajoutée : ${title}`
                     },
-                    data: { taskId: newTask.id.toString(), type: 'task_created' },
+                    data: { taskId: result.rows[0].id.toString(), type: 'task_created' },
                     tokens: tokens
                  };
 
@@ -174,7 +173,4 @@ router.delete('/:id', async (req, res) => {
       status: 'error',
       message: err.message,
     });
-    }
-});
-
-export default router;
+    }}
