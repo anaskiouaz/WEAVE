@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Plus, X, ShoppingCart, Stethoscope, Activity, User, Users, ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle } from 'lucide-react'; // J'ai ajouté quelques icônes pour la popup détails
 import { apiGet, apiPost, apiDelete } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 
 export default function CalendarView() {
   const [showAddTask, setShowAddTask] = useState(false);
+  const { circleId } = useAuth();
 
   // 1. NOUVEAU : État pour la modale de détails
   const [selectedTask, setSelectedTask] = useState(null);
@@ -63,18 +65,31 @@ export default function CalendarView() {
     async function fetchTasks() {
       try {
         setLoading(true);
+
+        // If no circle selected in context, show no tasks
+        if (!circleId) {
+          setTasks([]);
+          setError(null);
+          return;
+        }
+
+        // Fetch all tasks, then filter client-side by circle_id to ensure
+        // we only display tasks for the current care circle.
         const data = await apiGet('/tasks');
-        setTasks(data.data || []);
+        const allTasks = data.data || [];
+        const filtered = allTasks.filter(t => String(t.circle_id) === String(circleId));
+        setTasks(filtered);
         setError(null);
       } catch (err) {
         console.error('Error fetching tasks:', err);
         setError(err.message);
+        setTasks([]);
       } finally {
         setLoading(false);
       }
     }
     fetchTasks();
-  }, []);
+  }, [circleId]);
 
   function getTasksForDate(dateISO) {
     return tasks.filter(task => {
@@ -105,6 +120,10 @@ export default function CalendarView() {
         required_helpers: parseInt(newTask.required_helpers, 10),
         helper_name: 'À pourvoir',
       };
+
+      // Attach circle_id if present in auth context so the backend inserts
+      // the task in the correct care circle instead of using the default.
+      if (circleId) taskPayload.circle_id = circleId;
 
       await apiPost('/tasks', taskPayload);
 
