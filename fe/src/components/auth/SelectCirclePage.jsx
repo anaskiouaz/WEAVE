@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext'; // On utilise le contexte
+import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -22,17 +22,13 @@ const MEDICAL_OPTIONS = [
 
 export default function SelectCirclePage() {
     const navigate = useNavigate();
-    // On récupère les setters du contexte pour mettre à jour l'app et le localStorage
     const { setCircleId, setCircleNom, token } = useAuth(); 
 
-    const [view, setView] = useState('selection'); // 'selection', 'create', 'join', 'list'
+    const [view, setView] = useState('selection'); 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
-
-    // State pour la liste des cercles existants
     const [myCircles, setMyCircles] = useState([]);
 
-    // --- STATE POUR LES INFOS DU SENIOR (Création) ---
     const [seniorData, setSeniorData] = useState({
         name: '',
         birth_date: '',
@@ -60,8 +56,6 @@ export default function SelectCirclePage() {
         });
     };
 
-    // --- FONCTION GÉNÉRIQUE APPEL API ---
-    // Note: On retourne les données pour pouvoir les utiliser (id du cercle créé, etc.)
     const apiCall = async (endpoint, method = 'POST', body = null) => {
         setLoading(true);
         setError('');
@@ -69,7 +63,7 @@ export default function SelectCirclePage() {
         try {
             const headers = {
                 'Content-Type': 'application/json',
-                'Authorization': `Bearer ${token}` // Utilise le token du contexte ou localStorage
+                'Authorization': `Bearer ${token}`
             };
 
             const config = { method, headers };
@@ -80,11 +74,11 @@ export default function SelectCirclePage() {
 
             if (!res.ok) throw new Error(data.error || "Une erreur est survenue");
 
-            return data; // On retourne la réponse (qui contient souvent { circle_id, circle_name })
+            return data; 
 
         } catch (err) {
             setError(err.message);
-            throw err; // On relance l'erreur pour arrêter l'exécution
+            throw err; 
         } finally {
             setLoading(false);
         }
@@ -92,14 +86,11 @@ export default function SelectCirclePage() {
 
     // --- ACTIONS ---
 
-    // 1. Charger la liste des cercles de l'utilisateur
+    // 1. Charger la liste
     const handleViewList = async () => {
         try {
-            // Suppose que tu as une route GET /api/circles qui renvoie les cercles de l'user
             const data = await apiCall('/', 'GET'); 
-            // Si l'API renvoie { circles: [...] } ou directement [...]
             const circles = Array.isArray(data) ? data : (data.circles || []);
-            
             setMyCircles(circles);
             setView('list');
         } catch (err) {
@@ -109,9 +100,14 @@ export default function SelectCirclePage() {
 
     // 2. Sélectionner un cercle existant
     const selectExistingCircle = (circle) => {
-        // Mise à jour du Contexte + LocalStorage via AuthContext
+        // --- MISE A JOUR LOCALSTORAGE ---
+        localStorage.setItem('circle_id', circle.id);
+        localStorage.setItem('circle_nom', circle.name);
+        
+        // Mise à jour du Contexte
         setCircleId(circle.id);
         setCircleNom(circle.name); 
+        
         navigate('/dashboard');
     };
 
@@ -131,14 +127,20 @@ export default function SelectCirclePage() {
         try {
             const data = await apiCall('/', 'POST', { senior_info: payloadInfo });
             
-            // IMPORTANT : On met à jour le contexte avec le nouveau cercle créé
             if (data.circle_id) {
+                // --- MISE A JOUR LOCALSTORAGE ---
+                const nomCercle = data.circle_name || seniorData.name;
+                localStorage.setItem('circle_id', data.circle_id);
+                localStorage.setItem('circle_nom', nomCercle);
+
+                // Mise à jour Contexte
                 setCircleId(data.circle_id);
-                setCircleNom(data.circle_name || seniorData.name); // Fallback nom
+                setCircleNom(nomCercle); 
+                
                 navigate('/dashboard');
             }
         } catch (err) {
-            // Erreur déjà gérée dans apiCall
+            // Erreur gérée dans apiCall
         }
     };
 
@@ -150,10 +152,16 @@ export default function SelectCirclePage() {
         try {
             const data = await apiCall('/join', 'POST', { invite_code: inviteCode });
             
-            // IMPORTANT : On met à jour le contexte
             if (data.circle_id) {
+                // --- MISE A JOUR LOCALSTORAGE ---
+                const nomCercle = data.circle_name || "Nouveau Cercle";
+                localStorage.setItem('circle_id', data.circle_id);
+                localStorage.setItem('circle_nom', nomCercle);
+
+                // Mise à jour Contexte
                 setCircleId(data.circle_id);
-                setCircleNom(data.circle_name || "Nouveau Cercle");
+                setCircleNom(nomCercle);
+
                 navigate('/dashboard');
             }
         } catch (err) {
@@ -192,70 +200,44 @@ export default function SelectCirclePage() {
                         </div>
                     )}
 
-                    {/* VUE 1 : MENU PRINCIPAL */}
                     {view === 'selection' && (
                         <div className="grid md:grid-cols-3 gap-4">
-                            {/* Option 1 : Liste des cercles existants */}
-                            <button
-                                onClick={handleViewList}
-                                className="flex flex-col items-center justify-center p-6 border-2 border-blue-100 rounded-xl bg-white hover:border-blue-500 hover:shadow-lg hover:-translate-y-1 transition-all group"
-                            >
+                            <button onClick={handleViewList} className="flex flex-col items-center justify-center p-6 border-2 border-blue-100 rounded-xl bg-white hover:border-blue-500 hover:shadow-lg hover:-translate-y-1 transition-all group">
                                 <div className="p-3 bg-blue-50 rounded-full text-blue-600 mb-3 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                                     <LogIn className="w-8 h-8" />
                                 </div>
                                 <h3 className="text-lg font-bold text-gray-800 mb-1">Continuer</h3>
-                                <p className="text-center text-xs text-gray-500">
-                                    Accéder à mes cercles existants.
-                                </p>
+                                <p className="text-center text-xs text-gray-500">Accéder à mes cercles existants.</p>
                             </button>
 
-                            {/* Option 2 : Créer */}
-                            <button
-                                onClick={() => setView('create')}
-                                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:border-green-500 hover:bg-green-50 hover:shadow-lg hover:-translate-y-1 transition-all group"
-                            >
+                            <button onClick={() => setView('create')} className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:border-green-500 hover:bg-green-50 hover:shadow-lg hover:-translate-y-1 transition-all group">
                                 <div className="p-3 bg-white rounded-full text-gray-500 mb-3 border border-gray-200 group-hover:border-green-500 group-hover:bg-green-500 group-hover:text-white transition-colors">
                                     <UserPlus className="w-8 h-8" />
                                 </div>
                                 <h3 className="text-lg font-bold text-gray-800 mb-1">Nouveau</h3>
-                                <p className="text-center text-xs text-gray-500">
-                                    Je crée un dossier pour un proche.
-                                </p>
+                                <p className="text-center text-xs text-gray-500">Je crée un dossier pour un proche.</p>
                             </button>
 
-                            {/* Option 3 : Rejoindre */}
-                            <button
-                                onClick={() => setView('join')}
-                                className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:border-purple-500 hover:bg-purple-50 hover:shadow-lg hover:-translate-y-1 transition-all group"
-                            >
+                            <button onClick={() => setView('join')} className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:border-purple-500 hover:bg-purple-50 hover:shadow-lg hover:-translate-y-1 transition-all group">
                                 <div className="p-3 bg-white rounded-full text-gray-500 mb-3 border border-gray-200 group-hover:border-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-colors">
                                     <Users className="w-8 h-8" />
                                 </div>
                                 <h3 className="text-lg font-bold text-gray-800 mb-1">Invité</h3>
-                                <p className="text-center text-xs text-gray-500">
-                                    J'ai reçu un code d'invitation.
-                                </p>
+                                <p className="text-center text-xs text-gray-500">J'ai reçu un code d'invitation.</p>
                             </button>
                         </div>
                     )}
 
-                    {/* VUE 4 : LISTE DES CERCLES */}
                     {view === 'list' && (
                         <div className="space-y-4">
                             {loading ? (
                                 <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-600 w-8 h-8" /></div>
                             ) : myCircles.length === 0 ? (
-                                <div className="text-center py-8 text-gray-500">
-                                    Aucun cercle trouvé. Créez-en un ou rejoignez une équipe.
-                                </div>
+                                <div className="text-center py-8 text-gray-500">Aucun cercle trouvé. Créez-en un ou rejoignez une équipe.</div>
                             ) : (
                                 <div className="grid gap-3">
                                     {myCircles.map((circle) => (
-                                        <div 
-                                            key={circle.id}
-                                            onClick={() => selectExistingCircle(circle)}
-                                            className="flex items-center justify-between p-4 border rounded-lg hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-all bg-white shadow-sm"
-                                        >
+                                        <div key={circle.id} onClick={() => selectExistingCircle(circle)} className="flex items-center justify-between p-4 border rounded-lg hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-all bg-white shadow-sm">
                                             <div className="flex items-center gap-3">
                                                 <div className="bg-blue-100 p-2 rounded-full text-blue-700">
                                                     <Users className="w-5 h-5" />
@@ -273,7 +255,6 @@ export default function SelectCirclePage() {
                         </div>
                     )}
 
-                    {/* VUE 2 : CRÉATION (Reste inchangée sauf l'appel API) */}
                     {view === 'create' && (
                         <form onSubmit={handleCreate} className="space-y-4 max-w-lg mx-auto">
                             <div className="space-y-2">
@@ -283,8 +264,6 @@ export default function SelectCirclePage() {
                                     <Input id="name" name="name" placeholder="ex: Mamie Jeanne" className="pl-10 h-12 bg-white" value={seniorData.name} onChange={handleSeniorChange} required autoFocus />
                                 </div>
                             </div>
-                            {/* ... Reste des champs (Date, Tel, Email) identique ... */}
-                            {/* Pour abréger l'affichage ici, je garde la logique existante des champs */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="birth_date">Date de naissance</Label>
@@ -301,7 +280,6 @@ export default function SelectCirclePage() {
                                     </div>
                                 </div>
                             </div>
-
                             <div className="space-y-3 pt-2">
                                 <Label className="flex items-center gap-2"><Stethoscope className="w-4 h-4 text-blue-600" /> Pathologies / Risques</Label>
                                 <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
@@ -317,14 +295,12 @@ export default function SelectCirclePage() {
                                     </div>
                                 </div>
                             </div>
-
                             <Button type="submit" size="lg" disabled={loading} className="w-full h-12 bg-blue-700 hover:bg-blue-800 text-white mt-4">
                                 {loading ? <Loader2 className="animate-spin mr-2" /> : "Créer le cercle"}
                             </Button>
                         </form>
                     )}
 
-                    {/* VUE 3 : REJOINDRE (Mise à jour avec API call) */}
                     {view === 'join' && (
                         <form onSubmit={handleJoin} className="space-y-6 max-w-md mx-auto mt-4">
                             <div className="space-y-3">
