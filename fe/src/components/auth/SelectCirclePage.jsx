@@ -1,65 +1,51 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext';
+import { useAuth } from '../../context/AuthContext'; // On garde ça, c'est important pour le contexte
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Users, UserPlus, ArrowRight, Loader2, ArrowLeft, Calendar, Phone, Stethoscope, Check, LogIn } from 'lucide-react';
 
-// URL de base de l'API (doit être fournie via Vite env: VITE_API_BASE_URL)
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
-// Liste des pathologies liées au manque de mobilité (GIR 2-5)
+// On garde ta liste d'options médicales qui est très bien
 const MEDICAL_OPTIONS = [
-    "Risque d'Escarres",
-    "Phlébite / Thrombose",
-    "Fonte musculaire (Sarcopénie)",
-    "Ankyloses / Raideurs",
-    "Constipation / Fécalome",
-    "Incontinence",
-    "Encombrement bronchique",
-    "Syndrome de glissement / Dépression",
-    "Ostéoporose"
+    "Risque d'Escarres", "Phlébite / Thrombose", "Fonte musculaire",
+    "Ankyloses / Raideurs", "Constipation", "Incontinence",
+    "Encombrement bronchique", "Syndrome de glissement", "Ostéoporose"
 ];
 
 export default function SelectCirclePage() {
     const navigate = useNavigate();
+    // On utilise le contexte pour sauvegarder le choix de l'utilisateur
     const { setCircleId, setCircleNom, token } = useAuth(); 
 
     const [view, setView] = useState('selection'); 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [myCircles, setMyCircles] = useState([]);
-
-    const [seniorData, setSeniorData] = useState({
-        name: '',
-        birth_date: '',
-        phone: '',
-        email: '',
-        medical_select: [] 
-    });
-
     const [inviteCode, setInviteCode] = useState('');
 
-    const handleSeniorChange = (e) => {
-        setSeniorData({ ...seniorData, [e.target.name]: e.target.value });
-    };
+    const [seniorData, setSeniorData] = useState({
+        name: '', birth_date: '', phone: '', email: '', medical_select: []
+    });
+
+    const handleSeniorChange = (e) => setSeniorData({ ...seniorData, [e.target.name]: e.target.value });
 
     const toggleMedicalOption = (option) => {
         setSeniorData(prev => {
             const isSelected = prev.medical_select.includes(option);
-            let newSelection;
-            if (isSelected) {
-                newSelection = prev.medical_select.filter(item => item !== option);
-            } else {
-                newSelection = [...prev.medical_select, option];
-            }
-            return { ...prev, medical_select: newSelection };
+            return { 
+                ...prev, 
+                medical_select: isSelected 
+                    ? prev.medical_select.filter(item => item !== option) 
+                    : [...prev.medical_select, option] 
+            };
         });
     };
 
-    // --- CORRECTION ICI : Intégration de la résolution du conflit ---
+    // La version améliorée de apiCall (gère les méthodes et le token)
     const apiCall = async (endpoint, method = 'POST', body = null) => {
         setLoading(true);
         setError('');
@@ -78,7 +64,6 @@ export default function SelectCirclePage() {
             const data = await res.json();
 
             if (!res.ok) throw new Error(data.error || "Une erreur est survenue");
-
             return data; 
 
         } catch (err) {
@@ -91,7 +76,7 @@ export default function SelectCirclePage() {
 
     // --- ACTIONS ---
 
-    // 1. Charger la liste
+    // 1. Charger la liste des cercles existants (Nouvelle feature !)
     const handleViewList = async () => {
         try {
             const data = await apiCall('/', 'GET'); 
@@ -105,14 +90,10 @@ export default function SelectCirclePage() {
 
     // 2. Sélectionner un cercle existant
     const selectExistingCircle = (circle) => {
-        // --- MISE A JOUR LOCALSTORAGE ---
         localStorage.setItem('circle_id', circle.id);
         localStorage.setItem('circle_nom', circle.name);
-        
-        // Mise à jour du Contexte
         setCircleId(circle.id);
         setCircleNom(circle.name); 
-        
         navigate('/dashboard');
     };
 
@@ -132,15 +113,14 @@ export default function SelectCirclePage() {
         try {
             const data = await apiCall('/', 'POST', { senior_info: payloadInfo });
             
-            if (data.circle_id) {
-                // --- MISE A JOUR LOCALSTORAGE ---
-                const nomCercle = data.circle_name || seniorData.name;
-                localStorage.setItem('circle_id', data.circle_id);
-                localStorage.setItem('circle_nom', nomCercle);
+            if (data.circle_id || data.circle?.id) {
+                const finalId = data.circle_id || data.circle.id;
+                const finalName = data.circle_name || data.circle.senior_id || seniorData.name; // Fallback nom
 
-                // Mise à jour Contexte
-                setCircleId(data.circle_id);
-                setCircleNom(nomCercle); 
+                localStorage.setItem('circle_id', finalId);
+                localStorage.setItem('circle_nom', finalName);
+                setCircleId(finalId);
+                setCircleNom(finalName); 
                 
                 navigate('/dashboard');
             }
@@ -157,15 +137,15 @@ export default function SelectCirclePage() {
         try {
             const data = await apiCall('/join', 'POST', { invite_code: inviteCode });
             
-            if (data.circle_id) {
-                // --- MISE A JOUR LOCALSTORAGE ---
-                const nomCercle = data.circle_name || "Nouveau Cercle";
-                localStorage.setItem('circle_id', data.circle_id);
-                localStorage.setItem('circle_nom', nomCercle);
+            if (data.circle_id || data.circle?.id) {
+                const finalId = data.circle_id || data.circle.id;
+                // On essaie de récupérer le nom, sinon "Nouveau Cercle"
+                const finalName = data.circle_name || data.circle?.senior_name || "Mon Cercle";
 
-                // Mise à jour Contexte
-                setCircleId(data.circle_id);
-                setCircleNom(nomCercle);
+                localStorage.setItem('circle_id', finalId);
+                localStorage.setItem('circle_nom', finalName);
+                setCircleId(finalId);
+                setCircleNom(finalName);
 
                 navigate('/dashboard');
             }
@@ -180,11 +160,9 @@ export default function SelectCirclePage() {
 
                 <CardHeader className="text-center pb-6 space-y-2">
                     {view !== 'selection' && (
-                        <div className="w-full flex justify-start">
-                            <Button variant="ghost" onClick={() => { setView('selection'); setError(''); }} className="text-gray-500 hover:text-blue-700">
-                                <ArrowLeft className="w-4 h-4 mr-2" /> Retour
-                            </Button>
-                        </div>
+                        <Button variant="ghost" onClick={() => setView('selection')} className="mb-2">
+                            <ArrowLeft className="w-4 h-4 mr-2" /> Retour
+                        </Button>
                     )}
                     <CardTitle className="text-3xl font-bold text-blue-900">
                         {view === 'selection' && "Bienvenue sur Weave"}
@@ -197,7 +175,7 @@ export default function SelectCirclePage() {
                         {view === 'list' && "Sélectionnez le senior dont vous voulez voir le suivi."}
                     </CardDescription>
                 </CardHeader>
-
+                
                 <CardContent className="px-8 pb-10">
                     {error && (
                         <div className="mb-6 p-4 text-red-700 bg-red-100 rounded-lg text-sm font-medium border border-red-200 flex items-center">
@@ -207,6 +185,7 @@ export default function SelectCirclePage() {
 
                     {view === 'selection' && (
                         <div className="grid md:grid-cols-3 gap-4">
+                            {/* Option 1 : Voir mes cercles existants */}
                             <button onClick={handleViewList} className="flex flex-col items-center justify-center p-6 border-2 border-blue-100 rounded-xl bg-white hover:border-blue-500 hover:shadow-lg hover:-translate-y-1 transition-all group">
                                 <div className="p-3 bg-blue-50 rounded-full text-blue-600 mb-3 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                                     <LogIn className="w-8 h-8" />
@@ -215,6 +194,7 @@ export default function SelectCirclePage() {
                                 <p className="text-center text-xs text-gray-500">Accéder à mes cercles existants.</p>
                             </button>
 
+                            {/* Option 2 : Créer */}
                             <button onClick={() => setView('create')} className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:border-green-500 hover:bg-green-50 hover:shadow-lg hover:-translate-y-1 transition-all group">
                                 <div className="p-3 bg-white rounded-full text-gray-500 mb-3 border border-gray-200 group-hover:border-green-500 group-hover:bg-green-500 group-hover:text-white transition-colors">
                                     <UserPlus className="w-8 h-8" />
@@ -223,6 +203,7 @@ export default function SelectCirclePage() {
                                 <p className="text-center text-xs text-gray-500">Je crée un dossier pour un proche.</p>
                             </button>
 
+                            {/* Option 3 : Rejoindre */}
                             <button onClick={() => setView('join')} className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:border-purple-500 hover:bg-purple-50 hover:shadow-lg hover:-translate-y-1 transition-all group">
                                 <div className="p-3 bg-white rounded-full text-gray-500 mb-3 border border-gray-200 group-hover:border-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-colors">
                                     <Users className="w-8 h-8" />
@@ -248,8 +229,8 @@ export default function SelectCirclePage() {
                                                     <Users className="w-5 h-5" />
                                                 </div>
                                                 <div>
-                                                    <h4 className="font-bold text-gray-800">{circle.name}</h4>
-                                                    <p className="text-xs text-gray-500">ID: {circle.id} • Rôle: {circle.role || 'Membre'}</p>
+                                                    <h4 className="font-bold text-gray-800">{circle.name || circle.senior_name}</h4>
+                                                    <p className="text-xs text-gray-500">Rôle: {circle.role || 'Membre'}</p>
                                                 </div>
                                             </div>
                                             <ArrowRight className="w-5 h-5 text-gray-400" />
@@ -317,7 +298,6 @@ export default function SelectCirclePage() {
                             </Button>
                         </form>
                     )}
-
                 </CardContent>
             </Card>
         </div>

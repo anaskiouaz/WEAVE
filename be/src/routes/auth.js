@@ -7,7 +7,8 @@ const router = Router();
 
 // --- INSCRIPTION (REGISTER) ---
 router.post('/register', async (req, res) => {
-  const { name, email, password, role, phone, birth_date } = req.body;
+  // On récupère bien 'onboarding_role'
+  const { name, email, password, onboarding_role, phone, birth_date } = req.body;
 
   try {
     // 1. Vérifier si l'email existe déjà
@@ -21,11 +22,11 @@ router.post('/register', async (req, res) => {
     const passwordHash = await bcrypt.hash(password, salt);
 
     // 3. Insérer le nouvel utilisateur
-    // Note: Adapte les colonnes selon ton schéma de base de données réel (ex: onboarding_role vs role)
     const newUser = await db.query(
-      `INSERT INTO users (name, email, password_hash, role, phone, birth_date) 
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, email, role`,
-      [name, email, passwordHash, role, phone, birth_date]
+      `INSERT INTO users (name, email, password_hash, onboarding_role, phone, birth_date) 
+       VALUES ($1, $2, $3, $4, $5, $6) 
+       RETURNING id, name, email, onboarding_role`,
+      [name, email, passwordHash, onboarding_role, phone, birth_date]
     );
 
     res.status(201).json({ success: true, user: newUser.rows[0] });
@@ -40,16 +41,11 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   
-  console.log('--- Tentative de connexion ---');
-  console.log('Email reçu:', email);
-
   try {
     // 1. Chercher l'utilisateur
     const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
     
     if (result.rows.length === 0) {
-      console.log('Échec: Email introuvable.');
-      // Message spécifique pour le frontend
       return res.status(404).json({ success: false, error: "Aucun compte associé à cet email." });
     }
 
@@ -59,16 +55,13 @@ router.post('/login', async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password_hash);
     
     if (!isMatch) {
-      console.log('Échec: Mot de passe incorrect.');
-      // Message spécifique
       return res.status(401).json({ success: false, error: "Mot de passe incorrect." });
     }
 
-    console.log('Succès: Mot de passe validé pour', user.name);
-
-    // 3. Récupérer les cercles (Logique existante)
+    // 3. Récupérer les cercles (AVEC LE CODE D'INVITATION)
+    // C'est ici la modification importante : cc.invite_code
     const circlesResult = await db.query(`
-      SELECT cc.id, u.name AS senior_name, ur.role
+      SELECT cc.id, cc.invite_code, u.name AS senior_name, ur.role
       FROM care_circles cc
       JOIN user_roles ur ON cc.id = ur.circle_id
       JOIN users u ON cc.senior_id = u.id
@@ -76,7 +69,6 @@ router.post('/login', async (req, res) => {
     `, [user.id]);
 
     const circles = circlesResult.rows;
-
     let mainCircleId = null;
     let mainCircleNom = null;
 
@@ -86,8 +78,13 @@ router.post('/login', async (req, res) => {
     }
 
     // Génération du token
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET || 'secret', { expiresIn: '30d' });
-    delete user.password_hash; // On ne renvoie pas le hash
+    const token = jwt.sign(
+        { id: user.id, role: user.onboarding_role }, 
+        process.env.JWT_SECRET || 'secret', 
+        { expiresIn: '30d' }
+    );
+    
+    delete user.password_hash; 
 
     res.json({ 
         success: true, 

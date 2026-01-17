@@ -1,5 +1,5 @@
 import express from 'express';
-import { pool } from '../config/db.js'; // On privilégie pool partout pour la cohérence
+import { pool } from '../config/db.js'; // On privilégie pool comme dans la branche dev
 import { authenticateToken } from './../middleware/auth.js';
 import bcrypt from 'bcryptjs';
 
@@ -10,13 +10,35 @@ const generateInviteCode = () => {
 };
 
 // ============================================================
-// 1. LISTER MES CERCLES (Pour la vue "Liste" du Frontend)
+// 1. RÉCUPÉRER LES MEMBRES (Fonctionnalité Admin - TA PARTIE)
+// ============================================================
+router.get('/:circleId/members', authenticateToken, async (req, res) => {
+  const { circleId } = req.params;
+
+  try {
+    // Note: On utilise pool.query ici pour la cohérence
+    const result = await pool.query(`
+      SELECT u.id, u.name, u.email, u.phone, ur.role, u.created_at
+      FROM user_roles ur
+      JOIN users u ON ur.user_id = u.id
+      WHERE ur.circle_id = $1
+      ORDER BY ur.role ASC, u.name ASC
+    `, [circleId]);
+
+    res.json(result.rows);
+  } catch (error) {
+    console.error('Erreur récupération membres:', error);
+    res.status(500).json({ error: "Impossible de récupérer les membres." });
+  }
+});
+
+// ============================================================
+// 2. LISTER MES CERCLES (Fonctionnalité Dev - NOUVEAU)
 // ============================================================
 router.get('/', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
 
-        // On récupère ID du cercle, NOM du senior (bénéficiaire) et le RÔLE de l'utilisateur
         const query = `
             SELECT 
                 c.id, 
@@ -30,8 +52,6 @@ router.get('/', authenticateToken, async (req, res) => {
         `;
 
         const { rows } = await pool.query(query, [userId]);
-        
-        // Le frontend attend un tableau d'objets { id, name, role }
         res.json(rows); 
     } catch (err) {
         console.error("Erreur liste cercles:", err);
@@ -40,10 +60,10 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // ============================================================
-// 2. CRÉER UN CERCLE
+// 3. CRÉER UN CERCLE
 // ============================================================
 router.post('/', authenticateToken, async (req, res) => {
-  const client = await pool.connect(); // Transaction nécessaire
+  const client = await pool.connect(); 
   
   try {
     const { senior_info } = req.body;
@@ -58,6 +78,7 @@ router.post('/', authenticateToken, async (req, res) => {
     // A. CRÉER LE COMPTE SENIOR
     const fakeEmail = `senior.${Date.now()}@weave.local`;
     const emailToUse = senior_info.email || fakeEmail;
+    // On utilise le mot de passe par défaut de la branche dev
     const dummyPassword = await bcrypt.hash("WeaveSeniorInit!", 10);
 
     const userRes = await client.query(
@@ -79,7 +100,7 @@ router.post('/', authenticateToken, async (req, res) => {
     let inviteCode = generateInviteCode();
     const circleRes = await client.query(
       `INSERT INTO care_circles (senior_id, created_by, invite_code) 
-       VALUES ($1, $2, $3) RETURNING id, invite_code`, // On retourne juste ce dont on a besoin
+       VALUES ($1, $2, $3) RETURNING id, invite_code`, 
       [seniorId, creatorId, inviteCode]
     );
     const newCircle = circleRes.rows[0];
@@ -90,6 +111,7 @@ router.post('/', authenticateToken, async (req, res) => {
       `INSERT INTO user_roles (user_id, circle_id, role) VALUES ($1, $2, 'ADMIN')`,
       [creatorId, newCircle.id]
     );
+
     // Senior (PC)
     await client.query(
       `INSERT INTO user_roles (user_id, circle_id, role) VALUES ($1, $2, 'PC')`,
@@ -98,11 +120,11 @@ router.post('/', authenticateToken, async (req, res) => {
 
     await client.query('COMMIT');
 
-    // IMPORTANT : On renvoie les clés standardisées pour le Frontend
+    // IMPORTANT : On renvoie les clés standardisées pour le Frontend (Version Dev)
     res.status(201).json({ 
         success: true, 
         circle_id: newCircle.id,
-        circle_name: senior_info.name, // Le nom du cercle est le nom du senior
+        circle_name: senior_info.name, 
         invite_code: newCircle.invite_code
     });
 
@@ -119,20 +141,21 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // ============================================================
-// 3. REJOINDRE UN CERCLE
+// 4. REJOINDRE UN CERCLE
 // ============================================================
 router.post('/join', authenticateToken, async (req, res) => {
   try {
     const { invite_code } = req.body;
     const userId = req.user.id;
 
-    // 1. Trouver le cercle + le nom du senior associé (via JOIN)
+    // 1. Trouver le cercle + le nom du senior associé
+    // (Version Dev : plus robuste car elle renvoie le nom directement)
     const circleRes = await pool.query(
       `SELECT c.id, u.name as senior_name 
        FROM care_circles c
        JOIN users u ON c.senior_id = u.id
        WHERE c.invite_code = $1`, 
-      [invite_code]
+      [invite_code.toUpperCase().trim()]
     );
 
     if (circleRes.rows.length === 0) {
@@ -157,7 +180,7 @@ router.post('/join', authenticateToken, async (req, res) => {
       [userId, circle.id]
     );
 
-    // IMPORTANT : Retour standardisé pour le Frontend
+    // Retour standardisé
     res.json({ 
         success: true, 
         circle_id: circle.id,
@@ -171,25 +194,20 @@ router.post('/join', authenticateToken, async (req, res) => {
 });
 
 // ============================================================
-// 4. RÉCUPÉRER MON CERCLE ACTIF (Pour le context refresh)
+// 5. RÉCUPÉRER MON CERCLE ACTIF
 // ============================================================
 router.get('/me', authenticateToken, async (req, res) => {
   try {
     const userId = req.user.id;
 
-    // On prend le dernier cercle rejoint ou créé
     const query = `
       SELECT c.id as circle_id, s.name as circle_nom
       FROM care_circles c
       JOIN user_roles ur ON c.id = ur.circle_id
       JOIN users s ON c.senior_id = s.id
       WHERE ur.user_id = $1
-      ORDER BY ur.joined_at DESC 
       LIMIT 1
     `;
-    
-    // Note: Assure-toi que ta table user_roles a une colonne joined_at ou created_at. 
-    // Sinon retire "ORDER BY..." et prends juste le premier trouvé.
     
     const { rows } = await pool.query(query, [userId]);
 
