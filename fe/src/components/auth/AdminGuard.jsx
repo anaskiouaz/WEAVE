@@ -4,26 +4,31 @@ import { useAuth } from '../../context/AuthContext';
 const AdminGuard = ({ children }) => {
   const { user, loading } = useAuth();
 
+  // 1. Chargement
   if (loading) {
-    return <div>Chargement...</div>;
+    return <div className="p-10 text-center">Chargement...</div>;
   }
 
-  // 1. Si pas connecté du tout -> Login
+  // 2. Si pas connecté du tout -> Login
   if (!user) {
     return <Navigate to="/login" replace />;
   }
 
-  // 2. Vérification du Rôle
-  // On vérifie si l'utilisateur a le role "admin" (celui qu'on a mis dans la base de données)
-  const isAdmin = user.onboarding_role === 'admin' || user.role_global === 'ADMIN';
+  // 3. Vérification du Rôle (ROBUSTE)
+  // On met tout en MAJUSCULES pour éviter les bugs 'Admin' vs 'admin'
+  const userRole = user.onboarding_role ? user.onboarding_role.toUpperCase() : '';
+  const globalRole = user.role_global ? user.role_global.toUpperCase() : '';
+
+  // On accepte soit le rôle local d'admin (choisi à l'inscription), soit un superadmin global
+  const isAdmin = userRole === 'ADMIN' || globalRole === 'ADMIN' || globalRole === 'SUPERADMIN';
 
   if (!isAdmin) {
-    console.warn("⛔ Accès refusé : Utilisateur non-admin a tenté d'accéder au backoffice.");
     // Si pas admin, on le renvoie au Dashboard
+    console.warn(`⛔ Accès refusé pour ${user.email} (Rôle détecté: ${userRole})`);
     return <Navigate to="/dashboard" replace />;
   }
 
-  // 3. Si tout est bon, on laisse passer (on affiche la page Admin)
+  // 4. Si tout est bon, on affiche la page Admin
   return children;
 };
 

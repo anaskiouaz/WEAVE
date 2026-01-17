@@ -6,7 +6,6 @@ import { useState } from 'react';
 import Dashboard from './components/Dashboard';
 import CalendarView from './components/CalendarView';
 import Memories from './components/Memories';
-// C'est le bon import pour ta nouvelle messagerie
 import Messages from './components/messagerie/Messages'; 
 import Profile from './components/Profile';
 import Admin from './components/Admin';
@@ -18,6 +17,7 @@ import LandingPage from './components/LandingPage';
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
 import SelectCirclePage from './components/auth/SelectCirclePage';
+import AdminGuard from './components/auth/AdminGuard'; // J'ai ajouté l'import du Guard
 import { useAuth } from './context/AuthContext'; 
 
 // Layout avec Sidebar (Desktop) et Navigation Flottante (Mobile)
@@ -25,7 +25,9 @@ function ProtectedLayout() {
   const location = useLocation();
   const hideNav = location.pathname.startsWith('/select-circle');
   const [emergencyOpen, setEmergencyOpen] = useState(false);
-  const { token, logout } = useAuth(); 
+  
+  // 1. On récupère 'user' ici pour vérifier le rôle
+  const { token, logout, user } = useAuth(); 
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -38,14 +40,27 @@ function ProtectedLayout() {
     return <Navigate to="/" replace />;
   }
 
+  // --- LOGIQUE DE SÉCURITÉ ADMIN ---
+  // On met tout en majuscules pour éviter les bugs
+  const userRole = user?.onboarding_role ? user.onboarding_role.toUpperCase() : '';
+  const globalRole = user?.role_global ? user.role_global.toUpperCase() : '';
+  
+  // Est-ce un admin ?
+  const isAdmin = userRole === 'ADMIN' || globalRole === 'ADMIN' || globalRole === 'SUPERADMIN';
+
+  // 2. Liste des liens DE BASE (accessibles à tous)
   const navItems = [
     { path: '/dashboard', icon: Home, label: 'Accueil' },
     { path: '/calendar', icon: Calendar, label: 'Calendrier' },
     { path: '/memories', icon: Heart, label: 'Souvenirs' },
     { path: '/messages', icon: MessageSquare, label: 'Messages' }, 
     { path: '/profile', icon: User, label: 'Profil' },
-    { path: '/admin', icon: Settings, label: 'Administration' },
   ];
+
+  // 3. On ajoute le bouton Administration SEULEMENT si c'est un admin
+  if (isAdmin) {
+    navItems.push({ path: '/admin', icon: Settings, label: 'Administration' });
+  }
 
   return (
     <div className="flex h-screen bg-gray-50">
@@ -142,7 +157,14 @@ export default function App() {
           <Route path="/memories" element={<Memories />} />
           <Route path="/messages" element={<Messages />} />
           <Route path="/profile" element={<Profile />} />
-          <Route path="/admin" element={<Admin />} />
+          
+          {/* Route Admin protégée par le Guard */}
+          <Route path="/admin" element={
+            <AdminGuard>
+              <Admin />
+            </AdminGuard>
+          } />
+          
           <Route path="/select-circle" element={<SelectCirclePage />} />
         </Route>
       </Routes>
