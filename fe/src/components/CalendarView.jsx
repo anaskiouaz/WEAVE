@@ -1,10 +1,12 @@
 import { useState, useEffect } from 'react';
 import { Plus, X, ShoppingCart, Stethoscope, Activity, User, Users, ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle } from 'lucide-react'; // J'ai ajouté quelques icônes pour la popup détails
 import { apiGet, apiPost, apiDelete } from '../api/client';
+import { useAuth } from '../context/AuthContext';
 
 
 export default function CalendarView() {
   const [showAddTask, setShowAddTask] = useState(false);
+  const { circleId } = useAuth();
 
   // 1. NOUVEAU : État pour la modale de détails
   const [selectedTask, setSelectedTask] = useState(null);
@@ -59,22 +61,34 @@ export default function CalendarView() {
   };
   // --- FIN UTILITAIRES ---
 
-  useEffect(() => {
-    async function fetchTasks() {
-      try {
-        setLoading(true);
-        const data = await apiGet('/tasks');
-        setTasks(data.data || []);
+  // Central helper to load tasks filtered by current circle
+  const loadTasks = async () => {
+    try {
+      setLoading(true);
+
+      if (!circleId) {
+        setTasks([]);
         setError(null);
-      } catch (err) {
-        console.error('Error fetching tasks:', err);
-        setError(err.message);
-      } finally {
-        setLoading(false);
+        return;
       }
+
+      const data = await apiGet('/tasks');
+      const allTasks = data.data || [];
+      const filtered = allTasks.filter(t => String(t.circle_id) === String(circleId));
+      setTasks(filtered);
+      setError(null);
+    } catch (err) {
+      console.error('Error fetching tasks:', err);
+      setError(err.message);
+      setTasks([]);
+    } finally {
+      setLoading(false);
     }
-    fetchTasks();
-  }, []);
+  };
+
+  useEffect(() => {
+    loadTasks();
+  }, [circleId]);
 
   function getTasksForDate(dateISO) {
     return tasks.filter(task => {
@@ -106,10 +120,14 @@ export default function CalendarView() {
         helper_name: 'À pourvoir',
       };
 
+      // Attach circle_id if present in auth context so the backend inserts
+      // the task in the correct care circle instead of using the default.
+      if (circleId) taskPayload.circle_id = circleId;
+
       await apiPost('/tasks', taskPayload);
 
-      const data = await apiGet('/tasks');
-      setTasks(data.data || []);
+      // Refresh tasks for the current circle only
+      await loadTasks();
 
       setShowAddTask(false);
       setNewTask({
@@ -131,8 +149,7 @@ export default function CalendarView() {
 
     try {
       await apiDelete(`/tasks/${taskId}`);
-      const data = await apiGet('/tasks');
-      setTasks(data.data || []);
+      await loadTasks();
       // Si la modale détails était ouverte, on la ferme
       setSelectedTask(null);
     } catch (err) {
@@ -150,8 +167,7 @@ export default function CalendarView() {
       alert("Vous êtes maintenant volontaire pour cette tâche !");
 
       // On recharge les tâches pour voir la mise à jour
-      const data = await apiGet('/tasks');
-      setTasks(data.data || []);
+      await loadTasks();
       setSelectedTask(null); // On ferme la modale
     } catch (err) {
       console.error('Error volunteering:', err);

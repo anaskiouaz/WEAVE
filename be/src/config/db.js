@@ -8,7 +8,7 @@ const { Pool } = pg;
 const poolConfig = process.env.DATABASE_URL && process.env.DATABASE_URL.trim() !== ''
   ? { connectionString: process.env.DATABASE_URL }
   : {
-      host: process.env.PGHOST || 'localhost',
+      host: process.env.PGHOST,
       port: process.env.PGPORT || 5432,
       user: process.env.PGUSER || 'weave_user',
       password: process.env.PGPASSWORD,

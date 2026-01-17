@@ -24,21 +24,20 @@ const allowedOrigins = rawAllowedOrigins
   .map(o => o.trim())
   .filter(Boolean);
 
-// On ajoute les origines nécessaires pour le développement local et mobile
-const defaultOrigins = [
-  'http://localhost:5173',      // Frontend PC (Vite)
-  'http://localhost',           // Capacitor Android
-  'capacitor://localhost',      // Capacitor iOS
-  'http://192.168.1.XX',        // Remplacer par ton IP locale PC si besoin
-  'http://10.0.2.2'             // Émulateur Android Studio (alias pour localhost PC)
-];
-
-// Fusionner avec les origines existantes sans doublons
-defaultOrigins.forEach(origin => {
-  if (!allowedOrigins.includes(origin)) {
-    allowedOrigins.push(origin);
-  }
-});
+// En environnement de production, ne pas forcer localhost.
+// Si vous avez besoin d'origines locales pour le développement,
+// définissez `ALLOWED_ORIGINS` dans votre fichier .env (séparées par des virgules).
+if (process.env.NODE_ENV !== 'production') {
+  const defaultOrigins = [
+    'http://localhost:5173',
+    'http://localhost',
+    'capacitor://localhost',
+    'http://10.0.2.2'
+  ];
+  defaultOrigins.forEach(origin => {
+    if (!allowedOrigins.includes(origin)) allowedOrigins.push(origin);
+  });
+}
 
 console.log('CORS allowed origins:', allowedOrigins);
 
