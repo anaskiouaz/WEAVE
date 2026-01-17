@@ -1,5 +1,11 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
+const getHeaders = (options = {}) => {
+  return {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}), // Permet de passer x-user-id
+  };
+};
 /**
  * Fonction utilitaire pour gérer la réponse du fetch.
  * Si le statut est en erreur (4xx, 5xx), on tente de lire le JSON 
@@ -23,23 +29,43 @@ async function handleResponse(res) {
   return res.json();
 }
 
-export async function apiGet(path) {
+export async function apiGet(path, options = {}) {
   const res = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    method: 'GET',
+    headers: getHeaders(options),
   });
+  if (!res.ok) throw new Error(`API GET error: ${res.status}`);
+  return res.json();
   return handleResponse(res);
 }
 
-export async function apiPost(path, data) {
+export async function apiPost(path, body, options = {}) {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
+    headers: getHeaders(options),
+    body: JSON.stringify(body),
   });
+  if (!res.ok) throw new Error(`API POST error: ${res.status}`);
+  return res.json();
+}
+
+export async function apiPut(path, body, options = {}) {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'PUT',
+    headers: getHeaders(options),
+    body: JSON.stringify(body),
+  });
+  if (!res.ok) throw new Error(`API PUT error: ${res.status}`);
+  return res.json();
+}
+
+export async function apiDelete(path, options = {}) {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'DELETE',
+    headers: getHeaders(options),
+  });
+  if (!res.ok) throw new Error(`API DELETE error: ${res.status}`);
+  return res.json();
   return handleResponse(res);
 }
 

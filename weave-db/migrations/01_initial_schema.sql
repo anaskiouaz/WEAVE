@@ -174,7 +174,19 @@
                             CONSTRAINT fk_role_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE
 );
 
--- 5. TACHES (VERSION FUSIONNÉE ET MISE À JOUR)
+-- DISPONIBILITÉS
+CREATE TABLE user_availability (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id UUID NOT NULL,
+    circle_id UUID NOT NULL,
+    day_of_week VARCHAR(20) NOT NULL, 
+    slots JSONB NOT NULL DEFAULT '[]'::jsonb, 
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_availability_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT uq_user_circle_day UNIQUE (user_id, circle_id, day_of_week)
+);
+
+-- TACHES
 CREATE TABLE tasks (
                        id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
                        circle_id UUID NOT NULL,
@@ -203,6 +215,7 @@ CREATE TABLE task_signups (
                               user_id UUID NOT NULL,
                               confirmed BOOLEAN DEFAULT FALSE,
                               created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    
                               PRIMARY KEY (task_id, user_id),
                               CONSTRAINT fk_signup_task FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE,
                               CONSTRAINT fk_signup_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
@@ -241,13 +254,17 @@ CREATE TABLE message (
 
 -- 11. JOURNAL DE BORD
 CREATE TABLE journal_entries (
-                                 id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-                                 circle_id UUID NOT NULL,
-                                 mood INT CHECK (mood BETWEEN 1 AND 10),
-                                 text_content TEXT,
-                                 photo_url VARCHAR(2048),
-                                 created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-                                 CONSTRAINT fk_journal_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    circle_id UUID NOT NULL,
+    author_id UUID NOT NULL,
+    mood INT CHECK (mood BETWEEN 1 AND 10),
+    text_content TEXT,
+    photo_data VARCHAR, -- Stockage du nom du blob Azure (privé avec SAS token)
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    comments JSONB DEFAULT '[]'::jsonb,
+
+    CONSTRAINT fk_journal_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE,
+    CONSTRAINT fk_journal_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL
 );
 
 -- 12. INCIDENTS

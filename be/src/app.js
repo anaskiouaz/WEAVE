@@ -13,6 +13,7 @@ import usersRoutes from './routes/users.js';
 import tasksRoutes from './routes/tasks.js';
 import authRoutes from './routes/auth.js';
 import uploadRoutes from './routes/upload.js';
+import profile_module from   './routes/profile_module.js';  
 import circlesRoutes from './routes/circles.js';
 
 const app = express();
@@ -59,7 +60,8 @@ app.use(cors({
     return callback(new Error('Not allowed by CORS'));
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  // 👇 AJOUTE 'x-user-id' ICI (C'est le plus important) 👇
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id'], 
   credentials: true,
 }));
 
@@ -90,6 +92,7 @@ app.use('/health', healthRoutes); // Ou '/api/health' selon ta préférence
 app.use('/users', usersRoutes);
 app.use('/api/auth', authRoutes); // <--- CORRECTION ICI
 app.use('/api/upload', uploadRoutes);
+app.use('/profile_module', profile_module);
 app.use('/api/users', usersRoutes);
 app.use('/api/tasks', tasksRoutes);
 
