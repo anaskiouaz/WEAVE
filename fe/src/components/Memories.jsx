@@ -80,8 +80,7 @@ export default function Memories() {
 
         // 1. On définit l'URL de base de l'API (Port 4000)
         // Si vous avez configuré Vite, on utilise la variable d'env, sinon le lien en dur
-        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
         // 2. On fait l'appel vers la bonne route (ex: /api/upload/image)
         const uploadResponse = await fetch(`${API_BASE_URL}/upload/image`, {
           method: 'POST',

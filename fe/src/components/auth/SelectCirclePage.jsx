@@ -74,7 +74,7 @@ export default function SelectCirclePage() {
             };
             if (body) config.body = JSON.stringify(body);
 
-            const res = await fetch(`${API_BASE_URL}/circles${endpoint}`, config);
+            const res = await fetch(`${API_BASE_URL}/api/circles${endpoint}`, config);
             const data = await res.json();
 
             if (!res.ok) throw new Error(data.error || "Une erreur est survenue");
