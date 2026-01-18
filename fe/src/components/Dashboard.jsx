@@ -1,91 +1,106 @@
 import { useState, useEffect } from 'react';
-import { apiPost } from '../api/client';
-import { Calendar, Heart, MessageSquare, Users, TrendingUp, Clock } from 'lucide-react';
+import { apiGet, apiPost } from '../api/client';
+import { Calendar, Heart, MessageSquare, Users, Clock, Activity, ShoppingCart, Stethoscope } from 'lucide-react';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 
+// 1. IMPORT DU HOOK useAuth DEPUIS TON FICHIER CONTEXT
+import { useAuth } from '../context/AuthContext'; 
+
 export default function Dashboard() {
+  // 2. RECUPERATION DU CIRCLE ID VIA LE CONTEXTE
+  // Ce circleId vient directement du localStorage grâce à ton AuthProvider
+  const { circleId, user } = useAuth(); 
   
-   const upcomingTasks = [
-    { id: 1, title: 'Visite médicale', time: '14:00', helper: 'Marie Dupont', type: 'medical' },
-    { id: 2, title: 'Courses alimentaires', time: '16:30', helper: 'À pourvoir', type: 'shopping' },
-    { id: 3, title: 'Promenade au parc', time: 'Demain 10:00', helper: 'Jean Martin', type: 'activity' },
-  ];
-  
-  // Fonction pour activer les notifications
-  const activerNotifs = async () => {
-    if (Capacitor.getPlatform() === 'web') return; 
-    console.log("--- Démarrage Activer Notifs ---");
+  const [loading, setLoading] = useState(true);
+  const [upcomingTasks, setUpcomingTasks] = useState([]);
+  const [dashboardStats, setDashboardStats] = useState({
+    active_helpers: 0,
+    tasks_this_week: 0,
+    memories: 0,
+    unread_messages: 0
+  });
+
+  // Fonction de chargement des données
+  const loadTasks = async () => {
     try {
-        const storedUser = localStorage.getItem('user');
-        const userId = storedUser ? JSON.parse(storedUser).id : null;
-
-        // Nettoyage
-        await PushNotifications.removeAllListeners(); 
-
-        // Écouteurs
-        await PushNotifications.addListener('registration', async (token) => {
-            console.log(`Token reçu : ${token.value}`);
-            try {
-                await apiPost('/users/device-token', { userId, token: token.value });
-                console.log("Token envoyé au serveur avec SUCCÈS !");
-            } catch (err) {
-                 console.error(`Erreur API: ${err.message}`);
-            }
-        });
-
-        await PushNotifications.addListener('registrationError', (error) => {
-            console.error(`Erreur Firebase: ${JSON.stringify(error)}`);
-        });
-
-        await PushNotifications.addListener('pushNotificationReceived', (notification) => {
-            alert(`${notification.title}\n${notification.body}`);
-        });
-
-        // Demande de permission
-        let perm = await PushNotifications.checkPermissions();
-        if (perm.receive === 'prompt') {
-            perm = await PushNotifications.requestPermissions();
-        }
-        
-        if (perm.receive !== 'granted') {
-            console.log("Permission REFUSÉE par l'utilisateur.");
-            return;
-        }
-
-        // Enregistrement
-        await PushNotifications.register();
-
-    } catch (e) {
-        console.error(`Crash JS Notifs: ${e.message}`);
+      setLoading(true);
+      
+      // 3. ENVOI DU CIRCLE_ID AU BACKEND
+      // Si circleId existe dans le context, on l'ajoute à l'URL
+      // Sinon, on appelle /dashboard sans paramètre (le backend prendra celui par défaut)
+      const endpoint = circleId ? `/dashboard?circle_id=${circleId}` : '/dashboard';
+      
+      console.log(`Chargement dashboard pour le cercle : ${circleId || 'Défaut'}`);
+      
+      const response = await apiGet(endpoint);
+      
+      if (response.data) {
+        setUpcomingTasks(response.data.upcomingTasks);
+        setDashboardStats(response.data.stats);
+      }
+    } catch (err) {
+      console.error("Erreur chargement dashboard:", err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  useEffect(() => {
-    activerNotifs();
-  }, []);
+  // Gestion des Notifications (inchangée mais utilise user.id du context si dispo)
+  const activerNotifs = async () => {
+    if (Capacitor.getPlatform() === 'web') return; 
+    try {
+        const userId = user ? user.id : null; // Utilise le user du contexte
 
-  const stats = [
-    { label: 'Aidants actifs', value: '8', icon: Users, color: 'blue' },
-    { label: 'Tâches cette semaine', value: '12', icon: Calendar, color: 'green' },
-    { label: 'Souvenirs partagés', value: '45', icon: Heart, color: 'pink' },
-    { label: 'Messages non lus', value: '3', icon: MessageSquare, color: 'purple' },
+        await PushNotifications.removeAllListeners(); 
+        await PushNotifications.addListener('registration', async (token) => {
+            if(userId) await apiPost('/users/device-token', { userId, token: token.value });
+        });
+        await PushNotifications.addListener('pushNotificationReceived', (n) => alert(`${n.title}\n${n.body}`));
+        
+        let perm = await PushNotifications.checkPermissions();
+        if (perm.receive === 'prompt') perm = await PushNotifications.requestPermissions();
+        if (perm.receive === 'granted') await PushNotifications.register();
+    } catch (e) { console.error(`Erreur Notifs: ${e.message}`); }
+  };
+
+  // 4. DECLENCHEMENT AUTOMATIQUE
+  // Dès que 'circleId' change dans le contexte (ou localStorage), le useEffect se relance
+  useEffect(() => {
+    loadTasks();
+    activerNotifs();
+  }, [circleId]); 
+
+  // --- RENDU GRAPHIQUE (inchangé) ---
+  const statsDisplay = [
+    { label: 'Aidants actifs', value: dashboardStats.active_helpers, icon: Users, color: 'blue' },
+    { label: 'Tâches cette semaine', value: dashboardStats.tasks_this_week, icon: Calendar, color: 'green' },
+    { label: 'Souvenirs partagés', value: dashboardStats.memories, icon: Heart, color: 'pink' },
+    { label: 'Messages non lus', value: dashboardStats.unread_messages, icon: MessageSquare, color: 'purple' },
   ];
 
+  if (loading && !upcomingTasks.length) {
+    return (
+        <div className="flex h-screen items-center justify-center bg-gray-50">
+            <div className="text-gray-500 text-lg animate-pulse">Chargement des données...</div>
+        </div>
+    );
+  }
+
   return (
-    <div className="p-8">
+    <div className="p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         <div className="mb-8">
-            <h1 className="text-gray-900 mb-2">Tableau de bord</h1>
-          <p className="text-gray-600">
-            Bienvenue sur votre espace d'entraide
-          </p>
+            <h1 className="text-gray-900 text-2xl font-bold mb-2">Tableau de bord</h1>
+            <p className="text-gray-600">
+                {/* Petit bonus : afficher l'ID pour debug si besoin */}
+                Vue d'ensemble {circleId && <span className="text-xs text-gray-400">(Cercle #{circleId})</span>}
+            </p>
         </div>
 
         {/* Stats Grid */}
-        {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-          {stats.map((stat) => {
+          {statsDisplay.map((stat) => {
             const Icon = stat.icon;
             const colorClass = {
               blue: 'bg-blue-50 text-blue-600',
@@ -98,8 +113,8 @@ export default function Dashboard() {
               <div key={stat.label} className="bg-white rounded-lg shadow p-6">
                 <div className="flex items-center justify-between">
                   <div>
-                    <p className="text-gray-600 mb-1">{stat.label}</p>
-                    <p className="text-gray-900">{stat.value}</p>
+                    <p className="text-gray-600 mb-1 font-medium">{stat.label}</p>
+                    <p className="text-gray-900 text-2xl font-bold">{stat.value}</p>
                   </div>
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center ${colorClass}`}>
                     <Icon className="w-6 h-6" />
@@ -110,123 +125,51 @@ export default function Dashboard() {
           })}
         </div>
 
-        {/* État de la personne aidée */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 className="text-gray-900 mb-4">État de santé</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <div>
-                <p className="text-gray-900">Moral</p>
-                <p className="text-gray-600">Bon</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <div>
-                <p className="text-gray-900">Santé générale</p>
-                <p className="text-gray-600">Stable</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-              <div>
-                <p className="text-gray-900">Dernier contact</p>
-                <p className="text-gray-600">Aujourd'hui 10:00</p>
-              </div>
-            </div>
-          </div>
-        </div>
-
         {/* Prochaines interventions */}
         <div className="bg-white rounded-lg shadow p-6">
           <div className="flex items-center justify-between mb-6">
-            <h2 className="text-gray-900">Prochaines interventions</h2>
+            <h2 className="text-gray-900 font-semibold text-lg">Prochaines interventions</h2>
             <Clock className="w-5 h-5 text-gray-400" />
           </div>
 
           <div className="space-y-4">
-            {upcomingTasks.map((task) => {
-              const typeColor = {
-                medical: 'bg-red-50 border-red-200',
-                shopping: 'bg-blue-50 border-blue-200',
-                activity: 'bg-green-50 border-green-200',
-              }[task.type];
-
-              return (
-                <div key={task.id} className={`border rounded-lg p-4 ${typeColor}`}>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-gray-900 mb-1">{task.title}</p>
-                      <p className="text-gray-600">{task.time}</p>
-                    </div>
-                    <div className="text-right">
-                      <p className="text-gray-700">{task.helper}</p>
-                    </div>
-                  </div>
+            {upcomingTasks.length === 0 ? (
+                <div className="text-center py-6 bg-gray-50 rounded-lg">
+                    <p className="text-gray-500 italic">Aucune tâche prévue pour le moment.</p>
                 </div>
-              );
-            })}
-          </div>
-        </div>
+            ) : (
+                upcomingTasks.map((task) => {
+                const typeStyle = {
+                    medical: { color: 'bg-red-50 border-red-200', icon: Stethoscope },
+                    shopping: { color: 'bg-blue-50 border-blue-200', icon: ShoppingCart },
+                    activity: { color: 'bg-green-50 border-green-200', icon: Activity },
+                }[task.task_type] || { color: 'bg-gray-50 border-gray-200', icon: Activity };
 
-        {/* État de la personne aidée */}
-        <div className="bg-white rounded-lg shadow p-6 mb-6">
-          <h2 className="text-gray-900 mb-4">État de santé</h2>
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <div>
-                <p className="text-gray-900">Moral</p>
-                <p className="text-gray-600">Bon</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <div>
-                <p className="text-gray-900">Santé générale</p>
-                <p className="text-gray-600">Stable</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-3">
-              <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-              <div>
-                <p className="text-gray-900">Dernier contact</p>
-                <p className="text-gray-600">Aujourd'hui 10:00</p>
-              </div>
-            </div>
-          </div>
-        </div>
+                const TypeIcon = typeStyle.icon;
 
-        {/* Prochaines interventions */}
-        <div className="bg-white rounded-lg shadow p-6">
-          <div className="flex items-center justify-between mb-6">
-            <h2 className="text-gray-900">Prochaines interventions</h2>
-            <Clock className="w-5 h-5 text-gray-400" />
-          </div>
-
-          <div className="space-y-4">
-            {upcomingTasks.map((task) => {
-              const typeColor = {
-                medical: 'bg-red-50 border-red-200',
-                shopping: 'bg-blue-50 border-blue-200',
-                activity: 'bg-green-50 border-green-200',
-              }[task.type];
-
-              return (
-                <div key={task.id} className={`border rounded-lg p-4 ${typeColor}`}>
-                  <div className="flex justify-between items-start">
-                    <div>
-                      <p className="text-gray-900 mb-1">{task.title}</p>
-                      <p className="text-gray-600">{task.time}</p>
+                return (
+                    <div key={task.id} className={`border rounded-lg p-4 ${typeStyle.color} transition hover:shadow-sm`}>
+                    <div className="flex justify-between items-start">
+                        <div className="flex gap-3">
+                            <div className="mt-1"><TypeIcon className="w-5 h-5 text-gray-600 opacity-70" /></div>
+                            <div>
+                                <p className="text-gray-900 font-medium mb-1">{task.title}</p>
+                                <p className="text-gray-600 text-sm flex items-center gap-1">
+                                    <Clock className="w-3 h-3" /> 
+                                    {new Date(task.date).toLocaleDateString('fr-FR')} à {task.time.slice(0, 5)}
+                                </p>
+                            </div>
+                        </div>
+                        <div className="text-right">
+                        <span className="inline-block bg-white px-2 py-1 rounded text-xs font-semibold text-gray-700 border border-gray-200">
+                            {task.helper_name || 'À pourvoir'}
+                        </span>
+                        </div>
                     </div>
-                    <div className="text-right">
-                      <p className="text-gray-700">{task.helper}</p>
                     </div>
-                  </div>
-                </div>
-              );
-            })}
+                );
+                })
+            )}
           </div>
         </div>
       </div>

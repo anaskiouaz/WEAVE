@@ -14,6 +14,7 @@ import tasksRoutes from './routes/tasks.js';
 import authRoutes from './routes/auth.js';
 import uploadRoutes from './routes/upload.js';
 import circlesRoutes from './routes/circles.js';
+import dashboardRoutes from './routes/dashboard.js';
 
 const app = express();
 
@@ -95,7 +96,7 @@ app.use('/api/auth', authRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/tasks', tasksRoutes);
-
+app.use('/api/dashboard', dashboardRoutes);
 // Routeur global
 app.use('/api', routes);
 
