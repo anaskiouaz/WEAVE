@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256" width="256" height="256">
+  <defs>
+    <style>
+      .house { fill: none; stroke: #2f6fb3; stroke-width:12; stroke-linejoin:round; }
+      .heart { fill: #f59e0b; stroke: #f59e0b; }
+    </style>
+  </defs>
+  <!-- House outline -->
+  <path class="house" d="M40 120 L128 48 L216 120 V196 A12 12 0 0 1 204 208 H52 A12 12 0 0 1 40 196 Z" />
+  <!-- Heart centered inside -->
+  <path class="heart" d="M128 156
+    C118 146, 100 134, 96 116
+    C92 98, 108 84, 128 96
+    C148 84, 164 98, 160 116
+    C156 134, 138 146, 128 156 Z" />
+</svg>

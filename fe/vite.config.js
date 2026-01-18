@@ -3,20 +3,25 @@ import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
 // https://vite.dev/config/
+// Le proxy cible par défaut localhost:4000 (développement local).
+// Si vous exécutez l'ensemble dans Docker, définissez l'env `API_PROXY_TARGET`
+// (ex: weave-api:4000) avant de démarrer Vite pour utiliser le nom de service Docker.
+const proxyTarget = process.env.API_PROXY_TARGET || 'http://weave-api:4000';
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     proxy: {
       '/api': {
-        target: 'http://localhost:4000',
+        target: proxyTarget,
         changeOrigin: true
       },
       '/upload': {
-        target: 'http://localhost:4000',
+        target: proxyTarget,
         changeOrigin: true
       },
       '/uploads': {
-        target: 'http://localhost:4000',
+        target: proxyTarget,
         changeOrigin: true
       }
     }

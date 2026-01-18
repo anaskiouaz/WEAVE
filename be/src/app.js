@@ -11,31 +11,56 @@ import tasksRoutes from './routes/tasks.js';
 import auditRoutes from './routes/audit.js'; 
 import authRoutes from './routes/auth.js'; 
 import circlesRoutes from './routes/circles.js';
+import dashboardRoutes from './routes/dashboard.js';
 
 const app = express();
 
-// --- Configuration CORS ---
-const rawAllowedOrigins = process.env.ALLOWED_ORIGINS || '';
-const allowedOrigins = rawAllowedOrigins.split(',').map(o => o.trim()).filter(Boolean);
+// --- Configuration CORS BLINDÉE ---
 
-if (process.env.NODE_ENV !== 'production') {
-  const defaultOrigins = ['http://localhost:5173', 'http://localhost', 'capacitor://localhost', 'http://10.0.2.2'];
-  defaultOrigins.forEach(origin => {
-    if (!allowedOrigins.includes(origin)) allowedOrigins.push(origin);
-  });
-}
+// 1. Origines venant de l'environnement Azure
+const envOrigins = (process.env.ALLOWED_ORIGINS || '')
+  .split(',')
+  .map(o => o.trim())
+  .filter(Boolean);
+
+// 2. Origines "en dur" (Filet de sécurité pour la Prod)
+const hardcodedOrigins = [
+  'https://weave-steel.vercel.app', 
+  'https://weave-steel.vercel.app/'
+];
+
+// 3. Origines locales (Dev uniquement)
+const devOrigins = process.env.NODE_ENV !== 'production' ? [
+  'http://localhost:5173',
+  'http://localhost:3000',
+  'http://localhost',
+  'capacitor://localhost',
+  'http://10.0.2.2'
+] : [];
+
+// Fusion de toutes les listes
+const allowedOrigins = [...new Set([...envOrigins, ...hardcodedOrigins, ...devOrigins])];
+
+console.log('✅ CORS - Origines autorisées :', allowedOrigins);
 
 app.use(cors({
-  origin(origin, callback) {
+  origin: function(origin, callback) {
+    // Autoriser les requêtes sans origine (Mobile apps, Postman, curl)
     if (!origin) return callback(null, true);
-    if (allowedOrigins.some(o => origin.startsWith(o)) || allowedOrigins.includes('*')) {
-       return callback(null, true);
-    }
-    console.warn(`CORS blocked origin: ${origin}`);
-    return callback(new Error('Not allowed by CORS'));
+
+    const isAllowed = allowedOrigins.some(o => origin.startsWith(o)) || allowedOrigins.includes('*');
+
+    if (isAllowed) {
+      return callback(null, true);
+    } 
+    
+    console.error(`🔴 CORS BLOQUÉ : "${origin}" n'est pas dans la liste autorisée.`);
+    // En cas de désespoir total, décommentez la ligne suivante pour tout autoriser temporairement :
+    // return callback(null, true);
+    return callback(new Error(`CORS policy: Origin ${origin} not allowed`));
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept'],
   credentials: true,
 }));
 
@@ -43,25 +68,43 @@ app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json());
 
-app.get('/', (req, res) => {
-  res.send('API Weave en ligne');
+// --- LOGGING (Avant les routes) ---
+app.use((req, res, next) => {
+    if (['POST', 'PUT', 'PATCH'].includes(req.method)) {
+        console.log(`📦 [${req.method}] ${req.path}`, req.body);
+    }
+    next();
 });
 
-// ✅ ROUTES
+// --- ROUTES ---
+app.use('/uploads', express.static('uploads'));
+
+// Health check
+app.get('/', (req, res) => {
+  res.status(200).send('API Weave en ligne.');
+});
+app.use('/health', healthRoutes);
+app.use('/test-db', dbTestRouter);
+
+// API Routes
+app.use('/api/circles', circlesRoutes);
 app.use('/api/auth', authRoutes);
+app.use('/api/upload', uploadRoutes);
 app.use('/api/users', usersRoutes);
 app.use('/api/tasks', tasksRoutes);
-app.use('/api/audit', auditRoutes);
-app.use('/api/circles', circlesRoutes);
+app.use('/api/dashboard', dashboardRoutes);
+// Routeur global
+app.use('/api', routes);
 
-// ERREURS
+// --- GESTION DES ERREURS ---
 app.use((req, res, next) => {
-  res.status(404).json({ message: 'Route introuvable', path: req.path });
+  res.status(404).json({ message: 'Ressource introuvable', path: req.path });
 });
 
 app.use((err, req, res, next) => {
-  console.error('❌ Unhandled error:', err);
-  res.status(500).json({ message: 'Erreur serveur interne', error: err.message });
+  console.error('❌ Erreur Serveur :', err);
+  const message = process.env.NODE_ENV === 'production' ? 'Erreur interne' : err.message;
+  res.status(500).json({ message: 'Erreur serveur interne', error: message });
 });
 
 export default app;

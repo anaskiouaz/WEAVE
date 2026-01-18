@@ -1,10 +1,10 @@
-import express from 'express';
-import cors from 'cors';
+import http from 'http';
 import dotenv from 'dotenv';
+import app from './app.js';
 import db from './config/db.js';
 import { initFirebase } from './config/firebase.js';
 import initCronJobs from './services/cronService.js';
-import app from './app.js';
+import { initSocket } from './services/socketService.js';
 
 // --- IMPORTS DES ROUTES ---
 import usersRoutes from './routes/users.js';
@@ -12,25 +12,19 @@ import tasksRoutes from './routes/tasks.js';
 import circlesRoutes from './routes/circles.js'; 
 import auditRoutes from './routes/audit.js';     
 
-dotenv.config();
-
 const PORT = process.env.PORT || 3000;
 
-// Middleware
-app.use(cors());
-app.use(express.json());
+// 1. Création du serveur HTTP
+const server = http.createServer(app);
 
-// --- ROUTES ---
-app.use('/api/users', usersRoutes);
-app.use('/api/tasks', tasksRoutes);
-// app.use('/api/circles', circlesRoutes);
-app.use('/api/audit', auditRoutes);      // ✅ C'est cette ligne qui corrige l'erreur 404
+// 2. Initialisation Socket.io
+initSocket(server);
 
-// --- INIT DB ---
+// 3. Initialisation DB
 const initDB = async () => {
   console.log("🛠️  Vérification de la Base de Données...");
   try {
-    // 1. Table USERS
+    // Table Users
     await db.query(`
       CREATE TABLE IF NOT EXISTS users (
         id SERIAL PRIMARY KEY,
@@ -56,16 +50,7 @@ const initDB = async () => {
       );
     `);
 
-    // 🚨 PATCH AUTOMATIQUE (Pour corriger ta table existante qui est en INTEGER)
-    // Cette commande va transformer la colonne INTEGER en TEXT sans perdre les données
-    try {
-        await db.query(`ALTER TABLE audit_logs ALTER COLUMN user_id TYPE TEXT;`);
-        console.log("✅ Colonne audit_logs.user_id convertie en TEXT avec succès.");
-    } catch (e) {
-        // On ignore l'erreur si c'est déjà fait
-    }
-
-    // 3. Table TASKS
+    // Table Tasks
     await db.query(`
       CREATE TABLE IF NOT EXISTS tasks (
         id SERIAL PRIMARY KEY,
@@ -84,24 +69,65 @@ const initDB = async () => {
       );
     `);
 
-    console.log("✅ Base de données prête.");
-    
+    // Migrations dynamiques (Colonnes manquantes)
+    await db.query(`
+      DO $$ 
+      BEGIN 
+        -- USERS
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='users' AND column_name='fcm_token') THEN 
+          ALTER TABLE users ADD COLUMN fcm_token TEXT; 
+        END IF;
+
+        -- TASKS
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='description') THEN 
+          ALTER TABLE tasks ADD COLUMN description TEXT; 
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='task_type') THEN 
+          ALTER TABLE tasks ADD COLUMN task_type VARCHAR(50); 
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='assigned_to') THEN 
+          ALTER TABLE tasks ADD COLUMN assigned_to VARCHAR(100); 
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='due_date') THEN 
+          ALTER TABLE tasks ADD COLUMN due_date TIMESTAMP; 
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='completed') THEN 
+          ALTER TABLE tasks ADD COLUMN completed BOOLEAN DEFAULT FALSE; 
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='circle_id') THEN 
+          ALTER TABLE tasks ADD COLUMN circle_id INTEGER; 
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='date') THEN 
+          ALTER TABLE tasks ADD COLUMN date DATE; 
+        END IF;
+        IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='tasks' AND column_name='time') THEN 
+          ALTER TABLE tasks ADD COLUMN time TIME; 
+        END IF;
+      END $$;
+    `);
+
+    // Assouplissement des contraintes
+    try {
+        await db.query(`ALTER TABLE users ALTER COLUMN password_hash DROP NOT NULL;`);
+        await db.query(`ALTER TABLE tasks ALTER COLUMN circle_id DROP NOT NULL;`);
+        await db.query(`ALTER TABLE tasks ALTER COLUMN task_type DROP NOT NULL;`);
+        await db.query(`ALTER TABLE tasks ALTER COLUMN date DROP NOT NULL;`);
+        await db.query(`ALTER TABLE tasks ALTER COLUMN time DROP NOT NULL;`);
+        console.log("Base de données prête.");
+    } catch (e) {
+        console.log("Contraintes DB déjà OK.");
+    }
   } catch (err) {
-    console.error("❌ Erreur Init DB:", err.message);
+    console.error("Erreur Init DB :", err.message);
   }
 };
 
-// Initialisation
+// Initialisation Services
 initFirebase();
 initDB();
 initCronJobs();
 
-// Route de test
-app.get('/api/health', (req, res) => {
-  res.json({ status: 'ok', timestamp: new Date() });
-});
-
-// Démarrage
-app.listen(PORT, () => {
-  console.log(`🚀 API en ligne sur le port ${PORT}`);
+// Démarrage Serveur
+server.listen(PORT, () => {
+  console.log(`🚀 API running on port ${PORT}`);
 });

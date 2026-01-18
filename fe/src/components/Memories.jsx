@@ -10,7 +10,7 @@ export default function Memories() {
   const [tempPhoto, setTempPhoto] = useState(null);
   const [newContent, setNewContent] = useState('');
 
-  const { user } = useAuth(); // Récupération de l'utilisateur connecté
+  const { user, circleId } = useAuth(); // Récupération de l'utilisateur connecté et du cercle sélectionné via le context/localStorage
   const [memories, setMemories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -28,7 +28,7 @@ export default function Memories() {
   const [isSending, setIsSending] = useState(false);
 
   // ID du cercle (famille) à récupérer dynamiquement depuis l'utilisateur connecté
-  const CIRCLE_ID = user?.circles?.[0]?.id || "d0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44"; // Fallback au cercle par défaut
+  const CIRCLE_ID = circleId || user?.circles?.[0]?.id || "d0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44"; // Priorité au cercle sélectionné (localStorage/context), sinon fallback
 
   // Récupération des données depuis la base de données
   const fetchMemories = async () => {
@@ -80,8 +80,7 @@ export default function Memories() {
 
         // 1. On définit l'URL de base de l'API (Port 4000)
         // Si vous avez configuré Vite, on utilise la variable d'env, sinon le lien en dur
-        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
         // 2. On fait l'appel vers la bonne route (ex: /api/upload/image)
         const uploadResponse = await fetch(`${API_BASE_URL}/upload/image`, {
           method: 'POST',

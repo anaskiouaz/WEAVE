@@ -102,8 +102,7 @@
         helper_name VARCHAR(100),
 
         -- Suivi
-        assigned_to VARCHAR(255),       
-        due_date TIMESTAMP,             
+        assigned_to UUID[] DEFAULT '{}',
         completed BOOLEAN DEFAULT FALSE, 
 
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
