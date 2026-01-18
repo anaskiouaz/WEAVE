@@ -1,106 +1,115 @@
-import { Router } from 'express';
+import express from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
-import db from '../config/db.js';
+import db from '../config/db.js'; // ✅ On utilise le nouvel import direct du pool
+import { authenticateToken } from '../middleware/auth.js';
 
-const router = Router();
+const router = express.Router();
 
-// --- INSCRIPTION (REGISTER) ---
-router.post('/register', async (req, res) => {
-  const { name, email, password, role, phone, birth_date } = req.body;
-
-  try {
-    // 1. Vérifier si l'email existe déjà
-    const userCheck = await db.query('SELECT * FROM users WHERE email = $1', [email]);
-    if (userCheck.rows.length > 0) {
-      return res.status(400).json({ success: false, error: "Cet email est déjà utilisé par un autre compte." });
+// Fonction utilitaire pour récupérer les cercles (utilisée au login et au refresh)
+const getUserCircles = async (userId) => {
+    try {
+        const res = await db.query(`
+            SELECT ur.circle_id as id, ur.role, c.invite_code, c.senior_id
+            FROM user_roles ur
+            JOIN care_circles c ON ur.circle_id = c.id
+            WHERE ur.user_id = $1
+        `, [userId]);
+        return res.rows;
+    } catch (error) {
+        console.error("Erreur récupération cercles:", error);
+        return [];
     }
+};
 
-    // 2. Hacher le mot de passe
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password, salt);
+// 1. INSCRIPTION (C'est ici que tu avais le problème)
+router.post('/register', async (req, res) => {
+    console.log("📝 Tentative d'inscription pour :", req.body.email);
+    
+    try {
+        const { name, email, password } = req.body;
 
-    // 3. Insérer le nouvel utilisateur
-    // Note: Adapte les colonnes selon ton schéma de base de données réel (ex: onboarding_role vs role)
-    const newUser = await db.query(
-      `INSERT INTO users (name, email, password_hash, role, phone, birth_date) 
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, email, role`,
-      [name, email, passwordHash, role, phone, birth_date]
-    );
+        // 1. Vérifier si l'email existe déjà
+        const userCheck = await db.query('SELECT id FROM users WHERE email = $1', [email]);
+        if (userCheck.rows.length > 0) {
+            console.log("❌ Email déjà existant");
+            return res.status(400).json({ success: false, error: "Cet email est déjà utilisé." });
+        }
 
-    res.status(201).json({ success: true, user: newUser.rows[0] });
+        // 2. Hashage du mot de passe
+        const hashedPassword = await bcrypt.hash(password, 10);
 
-  } catch (error) {
-    console.error('ERREUR REGISTER:', error);
-    res.status(500).json({ success: false, error: "Erreur lors de l'inscription." });
-  }
+        // 3. Insertion du nouvel utilisateur
+        // Note : on ne met pas de 'created_by' ici car c'est la table USERS, pas CIRCLES
+        const result = await db.query(
+            'INSERT INTO users (name, email, password_hash, role_global) VALUES ($1, $2, $3, $4) RETURNING id, name, email, role_global',
+            [name, email, hashedPassword, 'USER']
+        );
+        
+        const newUser = result.rows[0];
+        console.log("✅ Utilisateur créé avec succès ID:", newUser.id);
+
+        // 4. Création du token
+        const token = jwt.sign({ id: newUser.id }, process.env.JWT_SECRET || 'secret', { expiresIn: '30d' });
+
+        res.status(201).json({ 
+            success: true, 
+            token, 
+            user: { ...newUser, circles: [] } 
+        });
+
+    } catch (err) {
+        console.error("❌ CRASH REGISTER:", err);
+        res.status(500).json({ success: false, error: "Erreur serveur lors de l'inscription." });
+    }
 });
 
-// --- CONNEXION (LOGIN) ---
+// 2. CONNEXION
 router.post('/login', async (req, res) => {
-  const { email, password } = req.body;
-  
-  console.log('--- Tentative de connexion ---');
-  console.log('Email reçu:', email);
+    try {
+        const { email, password } = req.body;
+        
+        const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
+        if (result.rows.length === 0) return res.status(400).json({ success: false, error: "Identifiants incorrects" });
 
-  try {
-    // 1. Chercher l'utilisateur
-    const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
-    
-    if (result.rows.length === 0) {
-      console.log('Échec: Email introuvable.');
-      // Message spécifique pour le frontend
-      return res.status(404).json({ success: false, error: "Aucun compte associé à cet email." });
+        const user = result.rows[0];
+        const validPass = await bcrypt.compare(password, user.password_hash);
+        if (!validPass) return res.status(400).json({ success: false, error: "Identifiants incorrects" });
+
+        const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET || 'secret', { expiresIn: '30d' });
+        
+        // On récupère les cercles
+        const circles = await getUserCircles(user.id);
+
+        res.json({ 
+            success: true,
+            token, 
+            user: { ...user, circles: circles } 
+        });
+    } catch (err) {
+        console.error("Erreur Login:", err);
+        res.status(500).json({ success: false, error: "Erreur serveur" });
     }
+});
 
-    const user = result.rows[0];
+// 3. RECHARGEMENT PROFIL (/me)
+router.get('/me', authenticateToken, async (req, res) => {
+    try {
+        const userRes = await db.query('SELECT id, name, email, role_global FROM users WHERE id = $1', [req.user.id]);
+        const user = userRes.rows[0];
+        
+        if (!user) return res.status(404).json({ success: false, error: "Utilisateur introuvable" });
 
-    // 2. Vérifier le mot de passe
-    const isMatch = await bcrypt.compare(password, user.password_hash);
-    
-    if (!isMatch) {
-      console.log('Échec: Mot de passe incorrect.');
-      // Message spécifique
-      return res.status(401).json({ success: false, error: "Mot de passe incorrect." });
+        const circles = await getUserCircles(req.user.id);
+
+        res.json({
+            success: true,
+            user: { ...user, circles: circles }
+        });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ success: false, error: "Erreur serveur" });
     }
-
-    console.log('Succès: Mot de passe validé pour', user.name);
-
-    // 3. Récupérer les cercles (Logique existante)
-    const circlesResult = await db.query(`
-      SELECT cc.id, u.name AS senior_name, ur.role
-      FROM care_circles cc
-      JOIN user_roles ur ON cc.id = ur.circle_id
-      JOIN users u ON cc.senior_id = u.id
-      WHERE ur.user_id = $1
-    `, [user.id]);
-
-    const circles = circlesResult.rows;
-
-    let mainCircleId = null;
-    let mainCircleNom = null;
-
-    if (circles.length > 0) {
-        mainCircleId = circles[0].id;           
-        mainCircleNom = circles[0].senior_name; 
-    }
-
-    // Génération du token
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET || 'secret', { expiresIn: '30d' });
-    delete user.password_hash; // On ne renvoie pas le hash
-
-    res.json({ 
-        success: true, 
-        token, 
-        user: { ...user, circles }, 
-        circle_id: mainCircleId,    
-        circle_nom: mainCircleNom   
-    });
-
-  } catch (error) {
-    console.error('ERREUR LOGIN:', error);
-    res.status(500).json({ success: false, error: "Erreur serveur lors de la connexion." });
-  }
 });
 
 export default router;

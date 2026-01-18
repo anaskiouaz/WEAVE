@@ -1,210 +1,210 @@
-import express from 'express';
-import { pool } from '../config/db.js'; // On privilégie pool partout pour la cohérence
-import { authenticateToken } from './../middleware/auth.js';
-import bcrypt from 'bcryptjs';
+import { Router } from 'express';
+import db from '../config/db.js'; 
+import { authenticateToken } from '../middleware/auth.js';
 
-const router = express.Router();
+const router = Router();
 
-const generateInviteCode = () => {
-  return 'W-' + Math.random().toString(36).substring(2, 7).toUpperCase();
-};
-
-// ============================================================
-// 1. LISTER MES CERCLES (Pour la vue "Liste" du Frontend)
-// ============================================================
+// 1. RÉCUPÉRER MES CERCLES
 router.get('/', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
-
-        // On récupère ID du cercle, NOM du senior (bénéficiaire) et le RÔLE de l'utilisateur
         const query = `
             SELECT 
-                c.id, 
-                u.name, 
-                ur.role
+                c.id, c.invite_code, ur.role,
+                COALESCE(u.name, 'Cercle sans nom') as name,
+                u.name as senior_name
             FROM care_circles c
             JOIN user_roles ur ON c.id = ur.circle_id
-            JOIN users u ON c.senior_id = u.id
+            LEFT JOIN users u ON c.senior_id = u.id
             WHERE ur.user_id = $1
             ORDER BY c.created_at DESC
         `;
-
-        const { rows } = await pool.query(query, [userId]);
-        
-        // Le frontend attend un tableau d'objets { id, name, role }
-        res.json(rows); 
+        const { rows } = await db.query(query, [userId]);
+        res.json(rows);
     } catch (err) {
-        console.error("Erreur liste cercles:", err);
-        res.status(500).json({ error: "Erreur serveur lors de la récupération des cercles." });
+        console.error("Erreur cercles:", err);
+        res.status(500).json({ error: "Impossible de charger les cercles" });
     }
 });
 
-// ============================================================
-// 2. CRÉER UN CERCLE
-// ============================================================
+// 2. CRÉER UN CERCLE (Correction ici)
 router.post('/', authenticateToken, async (req, res) => {
-  const client = await pool.connect(); // Transaction nécessaire
-  
-  try {
-    const { senior_info } = req.body;
-    const creatorId = req.user.id; 
-    
-    if (!senior_info || !senior_info.name) {
-      return res.status(400).json({ error: "Le nom du bénéficiaire est requis." });
+    const client = await db.connect(); 
+    try {
+        await client.query('BEGIN');
+        
+        const userId = req.user.id;
+        const { senior_info } = req.body;
+
+        if (!senior_info || !senior_info.name) {
+            throw new Error("Le nom du bénéficiaire est obligatoire");
+        }
+
+        const seniorEmailVal = senior_info.email || `senior_${Date.now()}@weave.local`;
+
+        // 1. Création du Senior (Role USER)
+        const seniorRes = await client.query(
+            `INSERT INTO users (name, email, role_global) VALUES ($1, $2, 'USER') RETURNING id`,
+            [senior_info.name, seniorEmailVal]
+        );
+        const seniorId = seniorRes.rows[0].id;
+
+        const inviteCode = 'W-' + Math.random().toString(36).substring(2, 7).toUpperCase();
+
+        // ✅ CORRECTION ICI : On ajoute "created_by"
+        const circleRes = await client.query(
+            `INSERT INTO care_circles (senior_id, created_by, invite_code) VALUES ($1, $2, $3) RETURNING id`,
+            [seniorId, userId, inviteCode]
+        );
+        const circleId = circleRes.rows[0].id;
+
+        // 3. Le créateur devient ADMIN
+        await client.query(
+            `INSERT INTO user_roles (user_id, circle_id, role) VALUES ($1, $2, 'ADMIN')`,
+            [userId, circleId]
+        );
+
+        await client.query('COMMIT');
+        
+        res.json({ 
+            success: true, 
+            circle_id: circleId, 
+            circle_name: senior_info.name 
+        });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error("❌ Erreur Création Cercle:", err);
+        res.status(500).json({ error: "Erreur lors de la création : " + err.message });
+    } finally {
+        client.release();
     }
-
-    await client.query('BEGIN');
-
-    // A. CRÉER LE COMPTE SENIOR
-    const fakeEmail = `senior.${Date.now()}@weave.local`;
-    const emailToUse = senior_info.email || fakeEmail;
-    const dummyPassword = await bcrypt.hash("WeaveSeniorInit!", 10);
-
-    const userRes = await client.query(
-      `INSERT INTO users (name, email, password_hash, birth_date, phone, medical_info, onboarding_role, role_global) 
-       VALUES ($1, $2, $3, $4, $5, $6, 'PC', 'USER') 
-       RETURNING id`,
-      [
-        senior_info.name,
-        emailToUse,
-        dummyPassword,
-        senior_info.birth_date || null,
-        senior_info.phone || null,
-        senior_info.medical_info || null
-      ]
-    );
-    const seniorId = userRes.rows[0].id;
-
-    // B. CRÉER LE CERCLE
-    let inviteCode = generateInviteCode();
-    const circleRes = await client.query(
-      `INSERT INTO care_circles (senior_id, created_by, invite_code) 
-       VALUES ($1, $2, $3) RETURNING id, invite_code`, // On retourne juste ce dont on a besoin
-      [seniorId, creatorId, inviteCode]
-    );
-    const newCircle = circleRes.rows[0];
-
-    // C. ASSIGNER LES RÔLES
-    // Admin (Créateur)
-    await client.query(
-      `INSERT INTO user_roles (user_id, circle_id, role) VALUES ($1, $2, 'ADMIN')`,
-      [creatorId, newCircle.id]
-    );
-    // Senior (PC)
-    await client.query(
-      `INSERT INTO user_roles (user_id, circle_id, role) VALUES ($1, $2, 'PC')`,
-      [seniorId, newCircle.id]
-    );
-
-    await client.query('COMMIT');
-
-    // IMPORTANT : On renvoie les clés standardisées pour le Frontend
-    res.status(201).json({ 
-        success: true, 
-        circle_id: newCircle.id,
-        circle_name: senior_info.name, // Le nom du cercle est le nom du senior
-        invite_code: newCircle.invite_code
-    });
-
-  } catch (err) {
-    await client.query('ROLLBACK');
-    console.error("Erreur création cercle:", err);
-    if (err.code === '23505') {
-        return res.status(400).json({ error: "Un utilisateur avec cet email existe déjà." });
-    }
-    res.status(500).json({ error: "Erreur lors de la création du cercle." });
-  } finally {
-    client.release();
-  }
 });
 
-// ============================================================
-// 3. REJOINDRE UN CERCLE
-// ============================================================
+// 3. REJOINDRE
 router.post('/join', authenticateToken, async (req, res) => {
-  try {
-    const { invite_code } = req.body;
-    const userId = req.user.id;
+    try {
+        const { invite_code } = req.body;
+        const userId = req.user.id;
 
-    // 1. Trouver le cercle + le nom du senior associé (via JOIN)
-    const circleRes = await pool.query(
-      `SELECT c.id, u.name as senior_name 
-       FROM care_circles c
-       JOIN users u ON c.senior_id = u.id
-       WHERE c.invite_code = $1`, 
-      [invite_code]
-    );
+        const circleRes = await db.query(`SELECT id, senior_id FROM care_circles WHERE invite_code = $1`, [invite_code]);
+        if (circleRes.rows.length === 0) return res.status(404).json({ error: "Code invalide" });
+        
+        const circle = circleRes.rows[0];
+        
+        const check = await db.query(`SELECT 1 FROM user_roles WHERE user_id = $1 AND circle_id = $2`, [userId, circle.id]);
+        if (check.rows.length > 0) return res.status(400).json({ error: "Vous êtes déjà membre" });
 
-    if (circleRes.rows.length === 0) {
-      return res.status(404).json({ error: "Code d'invitation invalide." });
+        await db.query(
+            `INSERT INTO user_roles (user_id, circle_id, role) VALUES ($1, $2, 'HELPER')`,
+            [userId, circle.id]
+        );
+
+        const seniorRes = await db.query(`SELECT name FROM users WHERE id = $1`, [circle.senior_id]);
+        res.json({ success: true, circle_id: circle.id, circle_name: seniorRes.rows[0]?.name });
+
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Erreur serveur" });
     }
-
-    const circle = circleRes.rows[0];
-
-    // 2. Vérifier si déjà membre
-    const roleCheck = await pool.query(
-      `SELECT * FROM user_roles WHERE user_id = $1 AND circle_id = $2`,
-      [userId, circle.id]
-    );
-
-    if (roleCheck.rows.length > 0) {
-      return res.status(400).json({ error: "Vous faites déjà partie de ce cercle." });
-    }
-
-    // 3. Ajouter l'utilisateur
-    await pool.query(
-      `INSERT INTO user_roles (user_id, circle_id, role) VALUES ($1, $2, 'HELPER')`,
-      [userId, circle.id]
-    );
-
-    // IMPORTANT : Retour standardisé pour le Frontend
-    res.json({ 
-        success: true, 
-        circle_id: circle.id,
-        circle_name: circle.senior_name
-    });
-
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Erreur serveur." });
-  }
 });
 
-// ============================================================
-// 4. RÉCUPÉRER MON CERCLE ACTIF (Pour le context refresh)
-// ============================================================
-router.get('/me', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user.id;
+// 4. MEMBRES
+router.get('/:id/members', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const check = await db.query('SELECT 1 FROM user_roles WHERE user_id = $1 AND circle_id = $2', [req.user.id, id]);
+        if (check.rows.length === 0) return res.status(403).json({ error: "Accès refusé" });
 
-    // On prend le dernier cercle rejoint ou créé
-    const query = `
-      SELECT c.id as circle_id, s.name as circle_nom
-      FROM care_circles c
-      JOIN user_roles ur ON c.id = ur.circle_id
-      JOIN users s ON c.senior_id = s.id
-      WHERE ur.user_id = $1
-      ORDER BY ur.joined_at DESC 
-      LIMIT 1
-    `;
-    
-    // Note: Assure-toi que ta table user_roles a une colonne joined_at ou created_at. 
-    // Sinon retire "ORDER BY..." et prends juste le premier trouvé.
-    
-    const { rows } = await pool.query(query, [userId]);
-
-    if (rows.length > 0) {
-      res.json({ 
-        circle_id: rows[0].circle_id, 
-        circle_nom: rows[0].circle_nom 
-      });
-    } else {
-      res.json({ circle_id: null, circle_nom: null });
+        const query = `
+            SELECT u.id, u.name, u.email, ur.role
+            FROM user_roles ur
+            JOIN users u ON ur.user_id = u.id
+            WHERE ur.circle_id = $1
+            ORDER BY ur.role ASC, u.name ASC
+        `;
+        const { rows } = await db.query(query, [id]);
+        res.json(rows);
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Erreur serveur" });
     }
-  } catch (err) {
-    console.error(err);
-    res.status(500).json({ error: "Erreur récupération cercle" });
-  }
 });
+
+// 5. SUPPRIMER UN MEMBRE DU CERCLE
+router.delete('/:circleId/members/:userIdToRemove', authenticateToken, async (req, res) => {
+    const { circleId, userIdToRemove } = req.params;
+    const requesterId = req.user.id;
+
+    try {
+        // 1. Vérifier que celui qui demande est bien ADMIN du cercle
+        const adminCheck = await db.query(
+            'SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2',
+            [requesterId, circleId]
+        );
+        
+        if (adminCheck.rows.length === 0 || adminCheck.rows[0].role !== 'ADMIN') {
+            return res.status(403).json({ error: "Seul un admin peut supprimer des membres." });
+        }
+
+        // 2. On ne peut pas se supprimer soi-même via ce bouton (il faut quitter le cercle)
+        if (requesterId === userIdToRemove) {
+            return res.status(400).json({ error: "Vous ne pouvez pas vous bannir vous-même." });
+        }
+
+        // 3. Suppression
+        await db.query(
+            'DELETE FROM user_roles WHERE circle_id = $1 AND user_id = $2',
+            [circleId, userIdToRemove]
+        );
+
+        res.json({ success: true, message: "Membre retiré du cercle." });
+
+    } catch (err) {
+        console.error("Erreur suppression membre:", err);
+        res.status(500).json({ error: "Erreur serveur." });
+    }
+});
+
+// 6. SUPPRIMER LE CERCLE DÉFINITIVEMENT
+router.delete('/:circleId', authenticateToken, async (req, res) => {
+    const { circleId } = req.params;
+    const requesterId = req.user.id;
+
+    const client = await db.connect();
+    try {
+        await client.query('BEGIN');
+
+        // 1. Vérif Admin
+        const adminCheck = await client.query(
+            'SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2',
+            [requesterId, circleId]
+        );
+        
+        if (adminCheck.rows.length === 0 || adminCheck.rows[0].role !== 'ADMIN') {
+            return res.status(403).json({ error: "Seul un admin peut supprimer le cercle." });
+        }
+
+        // 2. Suppressions en cascade
+        // D'abord les rôles
+        await client.query('DELETE FROM user_roles WHERE circle_id = $1', [circleId]);
+        // Puis les logs (si tu veux nettoyer)
+        // await client.query('DELETE FROM audit_logs WHERE ...'); 
+        
+        // Enfin le cercle lui-même
+        await client.query('DELETE FROM care_circles WHERE id = $1', [circleId]);
+
+        await client.query('COMMIT');
+        res.json({ success: true, message: "Cercle supprimé définitivement." });
+
+    } catch (err) {
+        await client.query('ROLLBACK');
+        console.error("Erreur suppression cercle:", err);
+        res.status(500).json({ error: "Erreur serveur." });
+    } finally {
+        client.release();
+    }
+});
+
 
 export default router;

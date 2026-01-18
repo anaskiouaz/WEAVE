@@ -6,13 +6,10 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 
 // --- Imports des Routes ---
-import routes from './routes/index.js';
-import dbTestRouter from './routes/testDb.js';
-import healthRoutes from './routes/health.js';
 import usersRoutes from './routes/users.js';
 import tasksRoutes from './routes/tasks.js';
-import authRoutes from './routes/auth.js';
-import uploadRoutes from './routes/upload.js';
+import auditRoutes from './routes/audit.js'; 
+import authRoutes from './routes/auth.js'; 
 import circlesRoutes from './routes/circles.js';
 import dashboardRoutes from './routes/dashboard.js';
 
@@ -67,7 +64,6 @@ app.use(cors({
   credentials: true,
 }));
 
-// --- MIDDLEWARES ---
 app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json());

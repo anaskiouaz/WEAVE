@@ -18,8 +18,7 @@ import {
   AlertDialogTitle,
 } from "../ui/alert-dialog";
 
-export default function LoginPage() {
-  const navigate = useNavigate();
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
   // On récupère login, loading, MAIS AUSSI user et logout pour la vérification
   const { login, loading, user, logout } = useAuth();
@@ -54,16 +53,34 @@ export default function LoginPage() {
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
+    setLoading(true);
 
-    // Appel au Backend via le Contexte
-    const result = await login(formData.email, formData.password);
+    try {
+        const res = await fetch(`${API_BASE_URL}/auth/login`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+        });
 
-    if (result.success) {
-      // Si le backend dit "OK", on redirige
-      navigate('/select-circle');
-    } else {
-      // Sinon, on affiche l'erreur (ex: "Mot de passe incorrect")
-      setError(result.error || "Email ou mot de passe incorrect.");
+        const result = await res.json();
+
+        if (result.success) {
+            // 1. On sauvegarde le token et le user
+            login(result.token, result.user);
+
+            // 2. 🛑 ON FORCE LE PASSAGE PAR LA SÉLECTION 🛑
+            // C'est ça qui va réparer ton bouton Admin.
+            // On ne réfléchit pas, on va choisir son cercle.
+            window.location.href = '/select-circle';
+
+        } else {
+            setError(result.error || "Email ou mot de passe incorrect.");
+        }
+    } catch (err) {
+        console.error(err);
+        setError("Impossible de contacter le serveur.");
+    } finally {
+        setLoading(false);
     }
   };
 
@@ -105,9 +122,9 @@ export default function LoginPage() {
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
 
-            {/* Zone d'affichage des erreurs */}
             {error && (
-              <div className="p-3 text-red-700 bg-red-100 rounded-md text-sm font-medium border border-red-200">
+              <div className="p-3 text-red-700 bg-red-100 rounded-md text-sm font-medium border border-red-200 flex items-center gap-2">
+                <AlertCircle className="w-4 h-4" />
                 {error}
               </div>
             )}

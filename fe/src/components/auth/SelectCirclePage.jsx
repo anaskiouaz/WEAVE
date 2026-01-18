@@ -7,20 +7,12 @@ import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Users, UserPlus, ArrowRight, Loader2, ArrowLeft, Calendar, Phone, Stethoscope, Check, LogIn } from 'lucide-react';
 
-// URL de base de l'API (doit être fournie via Vite env: VITE_API_BASE_URL)
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
-// Liste des pathologies liées au manque de mobilité (GIR 2-5)
 const MEDICAL_OPTIONS = [
-    "Risque d'Escarres",
-    "Phlébite / Thrombose",
-    "Fonte musculaire (Sarcopénie)",
-    "Ankyloses / Raideurs",
-    "Constipation / Fécalome",
-    "Incontinence",
-    "Encombrement bronchique",
-    "Syndrome de glissement / Dépression",
-    "Ostéoporose"
+    "Risque d'Escarres", "Phlébite / Thrombose", "Fonte musculaire",
+    "Ankyloses / Raideurs", "Constipation", "Incontinence",
+    "Encombrement bronchique", "Syndrome de glissement", "Ostéoporose"
 ];
 
 export default function SelectCirclePage() {
@@ -31,35 +23,26 @@ export default function SelectCirclePage() {
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [myCircles, setMyCircles] = useState([]);
-
-    const [seniorData, setSeniorData] = useState({
-        name: '',
-        birth_date: '',
-        phone: '',
-        email: '',
-        medical_select: [] 
-    });
-
     const [inviteCode, setInviteCode] = useState('');
 
-    const handleSeniorChange = (e) => {
-        setSeniorData({ ...seniorData, [e.target.name]: e.target.value });
-    };
+    const [seniorData, setSeniorData] = useState({
+        name: '', birth_date: '', phone: '', email: '', medical_select: []
+    });
+
+    const handleSeniorChange = (e) => setSeniorData({ ...seniorData, [e.target.name]: e.target.value });
 
     const toggleMedicalOption = (option) => {
         setSeniorData(prev => {
             const isSelected = prev.medical_select.includes(option);
-            let newSelection;
-            if (isSelected) {
-                newSelection = prev.medical_select.filter(item => item !== option);
-            } else {
-                newSelection = [...prev.medical_select, option];
-            }
-            return { ...prev, medical_select: newSelection };
+            return { 
+                ...prev, 
+                medical_select: isSelected 
+                    ? prev.medical_select.filter(item => item !== option) 
+                    : [...prev.medical_select, option] 
+            };
         });
     };
 
-    // --- CORRECTION ICI : Intégration de la résolution du conflit ---
     const apiCall = async (endpoint, method = 'POST', body = null) => {
         setLoading(true);
         setError('');
@@ -78,7 +61,6 @@ export default function SelectCirclePage() {
             const data = await res.json();
 
             if (!res.ok) throw new Error(data.error || "Une erreur est survenue");
-
             return data; 
 
         } catch (err) {
@@ -89,9 +71,14 @@ export default function SelectCirclePage() {
         }
     };
 
-    // --- ACTIONS ---
+    const forceReloadToDashboard = (id, name) => {
+        localStorage.setItem('circle_id', id);
+        localStorage.setItem('circle_nom', name);
+        setCircleId(id);
+        setCircleNom(name);
+        window.location.href = '/dashboard';
+    };
 
-    // 1. Charger la liste
     const handleViewList = async () => {
         try {
             const data = await apiCall('/', 'GET'); 
@@ -103,20 +90,10 @@ export default function SelectCirclePage() {
         }
     };
 
-    // 2. Sélectionner un cercle existant
     const selectExistingCircle = (circle) => {
-        // --- MISE A JOUR LOCALSTORAGE ---
-        localStorage.setItem('circle_id', circle.id);
-        localStorage.setItem('circle_nom', circle.name);
-        
-        // Mise à jour du Contexte
-        setCircleId(circle.id);
-        setCircleNom(circle.name); 
-        
-        navigate('/dashboard');
+        forceReloadToDashboard(circle.id, circle.name || circle.senior_name);
     };
 
-    // 3. Créer un nouveau cercle
     const handleCreate = async (e) => {
         e.preventDefault();
         if (!seniorData.name.trim()) return setError("Le nom est requis.");
@@ -132,24 +109,16 @@ export default function SelectCirclePage() {
         try {
             const data = await apiCall('/', 'POST', { senior_info: payloadInfo });
             
-            if (data.circle_id) {
-                // --- MISE A JOUR LOCALSTORAGE ---
-                const nomCercle = data.circle_name || seniorData.name;
-                localStorage.setItem('circle_id', data.circle_id);
-                localStorage.setItem('circle_nom', nomCercle);
-
-                // Mise à jour Contexte
-                setCircleId(data.circle_id);
-                setCircleNom(nomCercle); 
-                
-                navigate('/dashboard');
+            if (data.circle_id || data.circle?.id) {
+                const finalId = data.circle_id || data.circle.id;
+                const finalName = data.circle_name || data.circle.senior_id || seniorData.name;
+                forceReloadToDashboard(finalId, finalName);
             }
         } catch (err) {
-            // Erreur gérée dans apiCall
+            // Erreur gérée par le catch du apiCall
         }
     };
 
-    // 4. Rejoindre un cercle via code
     const handleJoin = async (e) => {
         e.preventDefault();
         if (!inviteCode.trim()) return setError("Le code est requis.");
@@ -157,17 +126,10 @@ export default function SelectCirclePage() {
         try {
             const data = await apiCall('/join', 'POST', { invite_code: inviteCode });
             
-            if (data.circle_id) {
-                // --- MISE A JOUR LOCALSTORAGE ---
-                const nomCercle = data.circle_name || "Nouveau Cercle";
-                localStorage.setItem('circle_id', data.circle_id);
-                localStorage.setItem('circle_nom', nomCercle);
-
-                // Mise à jour Contexte
-                setCircleId(data.circle_id);
-                setCircleNom(nomCercle);
-
-                navigate('/dashboard');
+            if (data.circle_id || data.circle?.id) {
+                const finalId = data.circle_id || data.circle.id;
+                const finalName = data.circle_name || data.circle?.senior_name || "Mon Cercle";
+                forceReloadToDashboard(finalId, finalName);
             }
         } catch (err) {
             // Erreur gérée
@@ -177,27 +139,24 @@ export default function SelectCirclePage() {
     return (
         <div className="min-h-screen bg-blue-50/50 flex items-center justify-center p-4">
             <Card className="w-full max-w-2xl shadow-xl border-t-6 border-blue-600 animate-in fade-in zoom-in duration-500">
-
                 <CardHeader className="text-center pb-6 space-y-2">
                     {view !== 'selection' && (
-                        <div className="w-full flex justify-start">
-                            <Button variant="ghost" onClick={() => { setView('selection'); setError(''); }} className="text-gray-500 hover:text-blue-700">
-                                <ArrowLeft className="w-4 h-4 mr-2" /> Retour
-                            </Button>
-                        </div>
+                        <Button variant="ghost" onClick={() => setView('selection')} className="mb-2">
+                            <ArrowLeft className="w-4 h-4 mr-2" /> Retour
+                        </Button>
                     )}
                     <CardTitle className="text-3xl font-bold text-blue-900">
-                        {view === 'selection' && "Bienvenue sur Weave"}
-                        {view === 'create' && "Créer un Cercle de Soins"}
-                        {view === 'join' && "Rejoindre un Cercle"}
-                        {view === 'list' && "Vos Cercles"}
+                        {view === 'selection' ? "Bienvenue sur Weave" : 
+                         view === 'create' ? "Créer un Cercle" : 
+                         view === 'join' ? "Rejoindre un Cercle" : "Vos Cercles"}
                     </CardTitle>
                     <CardDescription className="text-lg text-gray-600">
                         {view === 'selection' && "Choisissez votre espace de travail."}
                         {view === 'list' && "Sélectionnez le senior dont vous voulez voir le suivi."}
+                        {view === 'create' && "Renseignez les informations du bénéficiaire."}
                     </CardDescription>
                 </CardHeader>
-
+                
                 <CardContent className="px-8 pb-10">
                     {error && (
                         <div className="mb-6 p-4 text-red-700 bg-red-100 rounded-lg text-sm font-medium border border-red-200 flex items-center">
@@ -248,8 +207,8 @@ export default function SelectCirclePage() {
                                                     <Users className="w-5 h-5" />
                                                 </div>
                                                 <div>
-                                                    <h4 className="font-bold text-gray-800">{circle.name}</h4>
-                                                    <p className="text-xs text-gray-500">ID: {circle.id} • Rôle: {circle.role || 'Membre'}</p>
+                                                    <h4 className="font-bold text-gray-800">{circle.name || circle.senior_name}</h4>
+                                                    <p className="text-xs text-gray-500">Rôle: {circle.role || 'Membre'}</p>
                                                 </div>
                                             </div>
                                             <ArrowRight className="w-5 h-5 text-gray-400" />
@@ -262,6 +221,7 @@ export default function SelectCirclePage() {
 
                     {view === 'create' && (
                         <form onSubmit={handleCreate} className="space-y-4 max-w-lg mx-auto">
+                            {/* ✅ J'ai remis tous les champs ici */}
                             <div className="space-y-2">
                                 <Label htmlFor="name">Nom complet du Bénéficiaire *</Label>
                                 <div className="relative">
@@ -317,7 +277,6 @@ export default function SelectCirclePage() {
                             </Button>
                         </form>
                     )}
-
                 </CardContent>
             </Card>
         </div>

@@ -1,9 +1,19 @@
+import { Router } from 'express';
 import db from '../config/db.js';
 import admin from '../config/firebase.js';
-import { Router } from 'express';
+
+// Imports pour l'Audit et la Sécurité
+import { authenticateToken } from '../middleware/auth.js';
+import { logAudit } from '../utils/audits.js';
 
 const router = Router();
 
+// --- 1. RÉCUPÉRER LES TÂCHES (CORRIGÉ POUR LA DATE) ---
+router.get('/', authenticateToken, async (req, res) => {
+    try {
+        // MODIFICATION ICI : On utilise to_char(t.date, 'YYYY-MM-DD')
+        // Cela force la date à rester une chaine de caractères fixe (ex: "2024-12-24")
+        // sans conversion de fuseau horaire.
 
 router.post('/:id/volunteer', async (req, res) => {
     try {
@@ -75,7 +85,7 @@ router.get('/', async (req, res) => {
             `SELECT 
           t.id,
           t.circle_id,
-          t.date,
+          to_char(t.date, 'YYYY-MM-DD') as date, 
           t.time,
           t.title,
           t.task_type,
@@ -87,7 +97,7 @@ router.get('/', async (req, res) => {
          LEFT JOIN care_circles c ON c.id = t.circle_id
          LEFT JOIN users u ON c.senior_id = u.id
          ORDER BY t.date ASC, t.time ASC`
-        );
+        );    
 
         res.json({
             status: 'ok',
@@ -188,6 +198,7 @@ router.post('/:id/volunteer', async (req, res) => {
             // Si quelqu'un est déjà dessus, on ajoute le nom à la suite
             newHelperName = `${newHelperName}, ${userName}`;
         }
+    }
 
         // 4. Mise à jour de la base de données
         // array_append : ajoute l'ID au tableau existant
