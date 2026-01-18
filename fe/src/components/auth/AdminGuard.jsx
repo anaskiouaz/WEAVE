@@ -1,35 +1,38 @@
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 
-const AdminGuard = ({ children }) => {
-  const { user, loading } = useAuth();
+export default function AdminGuard({ children }) {
+  const { user, circleId } = useAuth();
+  
+  // 1. On récupère l'ID du cercle actif (Priorité au Context, sinon LocalStorage)
+  const currentCircleId = circleId || localStorage.getItem('circle_id');
 
-  // 1. Chargement
-  if (loading) {
-    return <div className="p-10 text-center">Chargement...</div>;
-  }
-
-  // 2. Si pas connecté du tout -> Login
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  // 3. Vérification du Rôle (ROBUSTE)
-  // On met tout en MAJUSCULES pour éviter les bugs 'Admin' vs 'admin'
-  const userRole = user.onboarding_role ? user.onboarding_role.toUpperCase() : '';
-  const globalRole = user.role_global ? user.role_global.toUpperCase() : '';
-
-  // On accepte soit le rôle local d'admin (choisi à l'inscription), soit un superadmin global
-  const isAdmin = userRole === 'ADMIN' || globalRole === 'ADMIN' || globalRole === 'SUPERADMIN';
-
-  if (!isAdmin) {
-    // Si pas admin, on le renvoie au Dashboard
-    console.warn(`⛔ Accès refusé pour ${user.email} (Rôle détecté: ${userRole})`);
+  // Si pas d'utilisateur ou pas de cercle sélectionné -> Dehors
+  if (!user || !currentCircleId) {
+    console.warn("⛔ AdminGuard: Pas de user ou pas de circle_id");
     return <Navigate to="/dashboard" replace />;
   }
 
-  // 4. Si tout est bon, on affiche la page Admin
-  return children;
-};
+  // 2. On cherche le rôle DANS CE CERCLE PRÉCIS
+  // On force la conversion en String pour éviter les bugs (1 vs "1")
+  const currentCircle = user.circles?.find(c => String(c.id) === String(currentCircleId));
+  const userRoleInCircle = currentCircle?.role;
 
-export default AdminGuard;
+  // 3. On vérifie si SuperAdmin global
+  const isGlobalAdmin = user.role_global === 'ADMIN' || user.role_global === 'SUPERADMIN';
+
+  // 4. VERDICT
+  if (userRoleInCircle === 'ADMIN' || isGlobalAdmin) {
+    // ✅ C'est validé, on laisse entrer
+    return children;
+  }
+
+  // ❌ Accès refusé
+  console.error(`⛔ Accès refusé pour ${user.email}`);
+  console.error(`- Cercle actuel ID: ${currentCircleId}`);
+  console.error(`- Rôle trouvé: ${userRoleInCircle || 'AUCUN'}`);
+  console.error(`- Rôle Global: ${user.role_global}`);
+  
+  // On renvoie vers le dashboard
+  return <Navigate to="/dashboard" replace />;
+}

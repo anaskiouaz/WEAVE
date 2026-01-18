@@ -1,14 +1,15 @@
 import { useState, useEffect } from 'react';
-import { Plus, X, ShoppingCart, Stethoscope, Activity, User, Users, ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle } from 'lucide-react'; // J'ai ajouté quelques icônes pour la popup détails
-import { apiGet, apiPost, apiDelete } from '../api/client';
+import { Plus, X, ShoppingCart, Stethoscope, Activity, User, Users, ChevronLeft, ChevronRight, Calendar, Clock, CheckCircle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
+// 1. DÉFINITION DE L'URL DE BASE (Comme dans SelectCirclePage)
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
 export default function CalendarView() {
   const [showAddTask, setShowAddTask] = useState(false);
   const { circleId } = useAuth();
 
-  // 1. NOUVEAU : État pour la modale de détails
+  // État pour la modale de détails
   const [selectedTask, setSelectedTask] = useState(null);
 
   const [tasks, setTasks] = useState([]);
@@ -61,7 +62,34 @@ export default function CalendarView() {
   };
   // --- FIN UTILITAIRES ---
 
-  // Central helper to load tasks filtered by current circle
+  // --- FONCTION HELPER POUR LES APPELS API SÉCURISÉS ---
+  // C'est ici que la magie opère : on ajoute le TOKEN automatiquement
+  const authenticatedFetch = async (endpoint, options = {}) => {
+    const token = localStorage.getItem('weave_token'); // On récupère le bracelet VIP
+    
+    const defaultHeaders = {
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${token}` // On le montre au videur
+    };
+
+    const response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      ...options,
+      headers: {
+        ...defaultHeaders,
+        ...options.headers,
+      },
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      throw new Error(data.message || data.error || 'Erreur API');
+    }
+
+    return data;
+  };
+
+  // 2. CHARGEMENT DES TÂCHES (Remplacé apiGet par authenticatedFetch)
   const loadTasks = async () => {
     try {
       setLoading(true);
@@ -72,9 +100,13 @@ export default function CalendarView() {
         return;
       }
 
-      const data = await apiGet('/tasks');
+      // Appel sécurisé GET
+      const data = await authenticatedFetch('/tasks');
+      
       const allTasks = data.data || [];
+      // Filtrage côté client (idéalement le backend devrait filtrer, mais on garde ta logique)
       const filtered = allTasks.filter(t => String(t.circle_id) === String(circleId));
+      
       setTasks(filtered);
       setError(null);
     } catch (err) {
@@ -103,13 +135,13 @@ export default function CalendarView() {
     activity: { icon: Activity, color: 'bg-green-100 text-green-600 border-green-200' },
   };
 
+  // 3. AJOUT TÂCHE (Remplacé apiPost par authenticatedFetch)
   const handleAddTask = async () => {
     try {
       if (!newTask.date || !newTask.title) {
         alert("La date et le titre sont requis");
         return;
       }
-
 
       const taskPayload = {
         title: newTask.title,
@@ -120,13 +152,14 @@ export default function CalendarView() {
         helper_name: 'À pourvoir',
       };
 
-      // Attach circle_id if present in auth context so the backend inserts
-      // the task in the correct care circle instead of using the default.
       if (circleId) taskPayload.circle_id = circleId;
 
-      await apiPost('/tasks', taskPayload);
+      // Appel sécurisé POST
+      await authenticatedFetch('/tasks', {
+        method: 'POST',
+        body: JSON.stringify(taskPayload)
+      });
 
-      // Refresh tasks for the current circle only
       await loadTasks();
 
       setShowAddTask(false);
@@ -144,13 +177,17 @@ export default function CalendarView() {
     }
   };
 
+  // 4. SUPPRESSION TÂCHE (Remplacé apiDelete par authenticatedFetch)
   const handleDeleteTask = async (taskId) => {
     if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette tâche ?")) return;
 
     try {
-      await apiDelete(`/tasks/${taskId}`);
+      // Appel sécurisé DELETE
+      await authenticatedFetch(`/tasks/${taskId}`, {
+        method: 'DELETE'
+      });
+
       await loadTasks();
-      // Si la modale détails était ouverte, on la ferme
       setSelectedTask(null);
     } catch (err) {
       console.error('Error deleting task:', err);
@@ -158,17 +195,11 @@ export default function CalendarView() {
     }
   };
 
-  // 2. NOUVEAU : Fonction pour se porter volontaire
   const handleVolunteer = async (taskId) => {
     try {
-      // Simulation d'appel API - À adapter selon votre backend réel
-      // ex: await apiPost(`/tasks/${taskId}/volunteer`, { user: 'Moi' });
-
-      alert("Vous êtes maintenant volontaire pour cette tâche !");
-
-      // On recharge les tâches pour voir la mise à jour
+      alert("Vous êtes maintenant volontaire pour cette tâche ! (Simulation)");
       await loadTasks();
-      setSelectedTask(null); // On ferme la modale
+      setSelectedTask(null);
     } catch (err) {
       console.error('Error volunteering:', err);
       setError("Erreur lors de l'inscription : " + err.message);
@@ -247,12 +278,12 @@ export default function CalendarView() {
                     return (
                       <div
                         key={task.id}
-                        onClick={() => setSelectedTask(task)} // 3. MODIFICATION : Ouverture de la modale au clic
+                        onClick={() => setSelectedTask(task)} 
                         className={`p-3 rounded-lg border ${typeInfo.color} relative group shadow-sm hover:shadow-md transition-shadow cursor-pointer`}
                       >
                         <button
                           onClick={(e) => {
-                            e.stopPropagation(); // Empêche d'ouvrir la modale si on clique sur la croix
+                            e.stopPropagation();
                             handleDeleteTask(task.id);
                           }}
                           className="absolute top-1 right-1 opacity-0 group-hover:opacity-100 text-red-600 hover:text-red-800 bg-white rounded-full p-0.5 z-10"
@@ -292,7 +323,7 @@ export default function CalendarView() {
           })}
         </div>
 
-        {/* Modal Ajouter Tâche (Inchangée) */}
+        {/* Modal Ajouter Tâche */}
         {showAddTask && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
             <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6">
@@ -390,11 +421,10 @@ export default function CalendarView() {
           </div>
         )}
 
-        {/* 4. NOUVEAU : Modal Détails de la Tâche */}
+        {/* Modal Détails de la Tâche */}
         {selectedTask && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 backdrop-blur-sm">
             <div className="bg-white rounded-xl shadow-2xl max-w-md w-full p-6 relative overflow-hidden">
-              {/* Header coloré selon le type */}
               <div className={`absolute top-0 left-0 right-0 h-2 ${taskTypeIcons[selectedTask.task_type]?.color.split(' ')[0] || 'bg-gray-200'}`}></div>
 
               <div className="flex justify-between items-start mb-6 mt-2">

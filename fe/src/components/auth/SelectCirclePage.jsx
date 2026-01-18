@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext'; // On garde ça, c'est important pour le contexte
+import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
@@ -9,7 +9,6 @@ import { Users, UserPlus, ArrowRight, Loader2, ArrowLeft, Calendar, Phone, Steth
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
 
-// On garde ta liste d'options médicales qui est très bien
 const MEDICAL_OPTIONS = [
     "Risque d'Escarres", "Phlébite / Thrombose", "Fonte musculaire",
     "Ankyloses / Raideurs", "Constipation", "Incontinence",
@@ -18,7 +17,6 @@ const MEDICAL_OPTIONS = [
 
 export default function SelectCirclePage() {
     const navigate = useNavigate();
-    // On utilise le contexte pour sauvegarder le choix de l'utilisateur
     const { setCircleId, setCircleNom, token } = useAuth(); 
 
     const [view, setView] = useState('selection'); 
@@ -45,7 +43,6 @@ export default function SelectCirclePage() {
         });
     };
 
-    // La version améliorée de apiCall (gère les méthodes et le token)
     const apiCall = async (endpoint, method = 'POST', body = null) => {
         setLoading(true);
         setError('');
@@ -74,9 +71,14 @@ export default function SelectCirclePage() {
         }
     };
 
-    // --- ACTIONS ---
+    const forceReloadToDashboard = (id, name) => {
+        localStorage.setItem('circle_id', id);
+        localStorage.setItem('circle_nom', name);
+        setCircleId(id);
+        setCircleNom(name);
+        window.location.href = '/dashboard';
+    };
 
-    // 1. Charger la liste des cercles existants (Nouvelle feature !)
     const handleViewList = async () => {
         try {
             const data = await apiCall('/', 'GET'); 
@@ -88,16 +90,10 @@ export default function SelectCirclePage() {
         }
     };
 
-    // 2. Sélectionner un cercle existant
     const selectExistingCircle = (circle) => {
-        localStorage.setItem('circle_id', circle.id);
-        localStorage.setItem('circle_nom', circle.name);
-        setCircleId(circle.id);
-        setCircleNom(circle.name); 
-        navigate('/dashboard');
+        forceReloadToDashboard(circle.id, circle.name || circle.senior_name);
     };
 
-    // 3. Créer un nouveau cercle
     const handleCreate = async (e) => {
         e.preventDefault();
         if (!seniorData.name.trim()) return setError("Le nom est requis.");
@@ -115,21 +111,14 @@ export default function SelectCirclePage() {
             
             if (data.circle_id || data.circle?.id) {
                 const finalId = data.circle_id || data.circle.id;
-                const finalName = data.circle_name || data.circle.senior_id || seniorData.name; // Fallback nom
-
-                localStorage.setItem('circle_id', finalId);
-                localStorage.setItem('circle_nom', finalName);
-                setCircleId(finalId);
-                setCircleNom(finalName); 
-                
-                navigate('/dashboard');
+                const finalName = data.circle_name || data.circle.senior_id || seniorData.name;
+                forceReloadToDashboard(finalId, finalName);
             }
         } catch (err) {
-            // Erreur gérée dans apiCall
+            // Erreur gérée par le catch du apiCall
         }
     };
 
-    // 4. Rejoindre un cercle via code
     const handleJoin = async (e) => {
         e.preventDefault();
         if (!inviteCode.trim()) return setError("Le code est requis.");
@@ -139,15 +128,8 @@ export default function SelectCirclePage() {
             
             if (data.circle_id || data.circle?.id) {
                 const finalId = data.circle_id || data.circle.id;
-                // On essaie de récupérer le nom, sinon "Nouveau Cercle"
                 const finalName = data.circle_name || data.circle?.senior_name || "Mon Cercle";
-
-                localStorage.setItem('circle_id', finalId);
-                localStorage.setItem('circle_nom', finalName);
-                setCircleId(finalId);
-                setCircleNom(finalName);
-
-                navigate('/dashboard');
+                forceReloadToDashboard(finalId, finalName);
             }
         } catch (err) {
             // Erreur gérée
@@ -157,7 +139,6 @@ export default function SelectCirclePage() {
     return (
         <div className="min-h-screen bg-blue-50/50 flex items-center justify-center p-4">
             <Card className="w-full max-w-2xl shadow-xl border-t-6 border-blue-600 animate-in fade-in zoom-in duration-500">
-
                 <CardHeader className="text-center pb-6 space-y-2">
                     {view !== 'selection' && (
                         <Button variant="ghost" onClick={() => setView('selection')} className="mb-2">
@@ -165,14 +146,14 @@ export default function SelectCirclePage() {
                         </Button>
                     )}
                     <CardTitle className="text-3xl font-bold text-blue-900">
-                        {view === 'selection' && "Bienvenue sur Weave"}
-                        {view === 'create' && "Créer un Cercle de Soins"}
-                        {view === 'join' && "Rejoindre un Cercle"}
-                        {view === 'list' && "Vos Cercles"}
+                        {view === 'selection' ? "Bienvenue sur Weave" : 
+                         view === 'create' ? "Créer un Cercle" : 
+                         view === 'join' ? "Rejoindre un Cercle" : "Vos Cercles"}
                     </CardTitle>
                     <CardDescription className="text-lg text-gray-600">
                         {view === 'selection' && "Choisissez votre espace de travail."}
                         {view === 'list' && "Sélectionnez le senior dont vous voulez voir le suivi."}
+                        {view === 'create' && "Renseignez les informations du bénéficiaire."}
                     </CardDescription>
                 </CardHeader>
                 
@@ -185,7 +166,6 @@ export default function SelectCirclePage() {
 
                     {view === 'selection' && (
                         <div className="grid md:grid-cols-3 gap-4">
-                            {/* Option 1 : Voir mes cercles existants */}
                             <button onClick={handleViewList} className="flex flex-col items-center justify-center p-6 border-2 border-blue-100 rounded-xl bg-white hover:border-blue-500 hover:shadow-lg hover:-translate-y-1 transition-all group">
                                 <div className="p-3 bg-blue-50 rounded-full text-blue-600 mb-3 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                                     <LogIn className="w-8 h-8" />
@@ -194,7 +174,6 @@ export default function SelectCirclePage() {
                                 <p className="text-center text-xs text-gray-500">Accéder à mes cercles existants.</p>
                             </button>
 
-                            {/* Option 2 : Créer */}
                             <button onClick={() => setView('create')} className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:border-green-500 hover:bg-green-50 hover:shadow-lg hover:-translate-y-1 transition-all group">
                                 <div className="p-3 bg-white rounded-full text-gray-500 mb-3 border border-gray-200 group-hover:border-green-500 group-hover:bg-green-500 group-hover:text-white transition-colors">
                                     <UserPlus className="w-8 h-8" />
@@ -203,7 +182,6 @@ export default function SelectCirclePage() {
                                 <p className="text-center text-xs text-gray-500">Je crée un dossier pour un proche.</p>
                             </button>
 
-                            {/* Option 3 : Rejoindre */}
                             <button onClick={() => setView('join')} className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:border-purple-500 hover:bg-purple-50 hover:shadow-lg hover:-translate-y-1 transition-all group">
                                 <div className="p-3 bg-white rounded-full text-gray-500 mb-3 border border-gray-200 group-hover:border-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-colors">
                                     <Users className="w-8 h-8" />
@@ -243,6 +221,7 @@ export default function SelectCirclePage() {
 
                     {view === 'create' && (
                         <form onSubmit={handleCreate} className="space-y-4 max-w-lg mx-auto">
+                            {/* ✅ J'ai remis tous les champs ici */}
                             <div className="space-y-2">
                                 <Label htmlFor="name">Nom complet du Bénéficiaire *</Label>
                                 <div className="relative">
