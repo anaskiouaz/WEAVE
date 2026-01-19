@@ -148,4 +148,68 @@ router.put('/availability', async (req, res) => {
     }
 });
 
+// ============================================================
+// 5. RÉCUPÉRER LES STATISTIQUES (Interventions + Souvenirs)
+// ============================================================
+router.get('/stats', async (req, res) => {
+    const userId = getUserId(req);
+    if (!userId) return res.status(400).json({ success: false, error: 'ID manquant' });
+
+    try {
+        // Compter les interventions (tasks assignées à l'utilisateur)
+        const tasksResult = await db.query(
+            'SELECT COUNT(*) as count FROM tasks WHERE assigned_to = $1 AND completed = true',
+            [userId]
+        );
+        const interventions = parseInt(tasksResult.rows[0].count) || 0;
+
+        // Compter les souvenirs/moments (journal entries créés par l'utilisateur)
+        const journalResult = await db.query(
+            'SELECT COUNT(*) as count FROM journal_entries WHERE author_id = $1',
+            [userId]
+        );
+        const moments = parseInt(journalResult.rows[0].count) || 0;
+
+        // Calculer les années/mois/jours depuis la création du compte
+        const userResult = await db.query(
+            'SELECT created_at FROM users WHERE id = $1',
+            [userId]
+        );
+        
+        let yearsActiveText = '0 jour';
+        if (userResult.rows[0]) {
+            const createdDate = new Date(userResult.rows[0].created_at);
+            const now = new Date();
+            
+            // Calculer la différence en millisecondes
+            const diffMs = now - createdDate;
+            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+            const diffMonths = Math.floor(diffDays / 30);
+            const diffYears = Math.floor(diffMonths / 12);
+            
+            // Formater selon la durée
+            if (diffYears >= 1) {
+                yearsActiveText = `${diffYears} an${diffYears > 1 ? 's' : ''}`;
+            } else if (diffMonths >= 1) {
+                yearsActiveText = `${diffMonths} mois`;
+            } else {
+                yearsActiveText = `${Math.max(1, diffDays)} jour${diffDays > 1 ? 's' : ''}`;
+            }
+        }
+
+        res.json({
+            success: true,
+            stats: {
+                interventions,
+                moments,
+                yearsActiveText,
+                rating: 4.8  // À faire dynamique plus tard
+            }
+        });
+    } catch (error) {
+        console.error('Erreur stats:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 export default router;

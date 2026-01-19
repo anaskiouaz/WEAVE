@@ -51,8 +51,6 @@ export default function Profile() {
       if (data.success) {
         const userData = data.user;
         const createdDate = new Date(userData.created_at);
-        const now = new Date();
-        const yearsActive = now.getFullYear() - createdDate.getFullYear();
 
         setUserInfo({
           name: userData.name,
@@ -60,13 +58,25 @@ export default function Profile() {
           phone: userData.phone || '',
           address: userData.address || '',
           joinDate: createdDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
-          yearsActive: yearsActive > 0 ? yearsActive : 1,
+          yearsActive: 0,  // Sera mis à jour par les stats
           photoUrl: null
         });
 
         setSkills(Array.isArray(userData.skills) ? userData.skills : []);
         setAvailability(data.availability || []);
-        setStats({ interventions: 24, moments: 18, rating: 4.8 });
+        
+        // Charger les statistiques (interventions, moments et yearsActive)
+        try {
+          const statsData = await apiGet('/module/profile/stats', options);
+          if (statsData.success) {
+            setStats(statsData.stats);
+            // Mettre à jour yearsActive avec le texte formaté
+            setUserInfo(prev => ({ ...prev, yearsActive: statsData.stats.yearsActiveText || '0 jour' }));
+          }
+        } catch (err) {
+          console.log('Stats non disponibles, valeurs par défaut');
+          setStats({ interventions: 0, moments: 0, rating: 0 });
+        }
         
         // 👇 CHARGEMENT DEPUIS LA DB (booléen)
         setNotificationsEnabled(userData.notifications_enabled === true);
@@ -245,7 +255,7 @@ export default function Profile() {
             </div>
             <div className="text-white drop-shadow-md">
               <h1 className="text-3xl font-bold tracking-tight">{userInfo.name}</h1>
-              <p className="opacity-95 flex items-center gap-2 font-medium mt-1"><Award size={18} className="text-orange-200" /> Aidant depuis {userInfo.yearsActive} ans</p>
+              <p className="opacity-95 flex items-center gap-2 font-medium mt-1"><Award size={18} className="text-orange-200" /> Aidant depuis {userInfo.yearsActive}</p>
             </div>
           </div>
         </div>
