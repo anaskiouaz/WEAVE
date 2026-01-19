@@ -238,6 +238,9 @@ export default function CalendarView() {
                     const typeInfo = taskTypeIcons[task.task_type] || taskTypeIcons.activity;
                     const Icon = typeInfo.icon;
                     const amIVolunteer = isUserVolunteer(task);
+                    const volunteersCount = task.assigned_to ? task.assigned_to.length : 0;
+                    const needed = task.required_helpers || 1;
+                    const isFull = volunteersCount >= needed;
 
                     return (
                       <div
@@ -257,16 +260,23 @@ export default function CalendarView() {
 
                         {/* Indicateurs bas de carte */}
                         <div className="flex items-center justify-between mt-2 pt-2 border-t border-gray-200/50">
-                          <div className="flex items-center gap-1 overflow-hidden">
+                          <div className="flex items-center gap-2 overflow-hidden">
                             <User className="w-3 h-3 text-gray-500 shrink-0" />
                             <p className="text-gray-600 text-xs truncate">{task.helper_name}</p>
                           </div>
-                          {task.required_helpers > 1 && (
+
+                          <div className="flex items-center gap-2">
                             <div className="flex items-center gap-1 bg-white px-1.5 py-0.5 rounded border border-gray-200 shrink-0">
                               <Users className="w-3 h-3 text-gray-500" />
-                              <span className="text-xs font-semibold text-gray-600">{task.required_helpers}</span>
+                              <span className="text-xs font-semibold text-gray-600">{needed}</span>
                             </div>
-                          )}
+
+                            {isFull ? (
+                              <div className="text-xs font-semibold px-2 py-0.5 bg-red-50 text-red-700 border border-red-100 rounded">Plein</div>
+                            ) : (
+                              <div className="text-xs font-semibold px-2 py-0.5 bg-green-50 text-green-700 border border-green-100 rounded">{volunteersCount}/{needed}</div>
+                            )}
+                          </div>
                         </div>
                       </div>
                     );
@@ -345,11 +355,21 @@ export default function CalendarView() {
 
               <div className="grid grid-cols-2 gap-3 pt-4 border-t">
                 <button onClick={() => handleDeleteTask(selectedTask.id)} className="flex items-center justify-center gap-2 px-4 py-2 bg-white border border-red-200 text-red-600 rounded-lg hover:bg-red-50">Supprimer</button>
-                {!isUserVolunteer(selectedTask) ? (
-                  <button onClick={() => handleVolunteer(selectedTask.id)} className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Volontaire</button>
-                ) : (
-                  <button disabled className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 border border-blue-200 rounded-lg cursor-not-allowed">Inscrit</button>
-                )}
+                {(() => {
+                  const selVolunteersCount = selectedTask.assigned_to ? selectedTask.assigned_to.length : 0;
+                  const selNeeded = selectedTask.required_helpers || 1;
+                  const selIsFull = selVolunteersCount >= selNeeded;
+
+                  if (isUserVolunteer(selectedTask)) {
+                    return <button disabled className="flex items-center justify-center gap-2 px-4 py-2 bg-blue-100 text-blue-700 border border-blue-200 rounded-lg cursor-not-allowed">Inscrit</button>;
+                  }
+
+                  if (selIsFull) {
+                    return <button disabled className="flex items-center justify-center gap-2 px-4 py-2 bg-red-50 text-red-700 border border-red-100 rounded-lg cursor-not-allowed">Quota atteint</button>;
+                  }
+
+                  return <button onClick={() => handleVolunteer(selectedTask.id)} className="flex items-center justify-center gap-2 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700">Volontaire</button>;
+                })()}
               </div>
             </div>
           </div>
