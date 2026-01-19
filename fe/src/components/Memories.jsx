@@ -35,7 +35,7 @@ export default function Memories() {
     try {
       setLoading(true);
       setError(null); // Reset error state
-      
+
       const response = await apiGet(`/souvenirs?circle_id=${CIRCLE_ID}`);
 
       if (response && response.data) {
@@ -94,14 +94,14 @@ export default function Memories() {
           throw new Error(errorData.message || 'Erreur lors de l\'upload de l\'image');
         }
 
-  const uploadData = await uploadResponse.json();
-  if (uploadData.status !== 'ok') {
-    throw new Error(uploadData.message || 'Erreur upload');
-  }
+        const uploadData = await uploadResponse.json();
+        if (uploadData.status !== 'ok') {
+          throw new Error(uploadData.message || 'Erreur upload');
+        }
 
-  // 3. On récupère le nom du blob renvoyé par le backend
-  photoBlobName = uploadData.data.blobName;
-}
+        // 3. On récupère le nom du blob renvoyé par le backend
+        photoBlobName = uploadData.data.blobName;
+      }
 
       await apiPost('/souvenirs', {
         circle_id: CIRCLE_ID,
@@ -132,7 +132,7 @@ export default function Memories() {
     }
   };
 
-// --- NOUVELLE FONCTION CAPACITOR ---
+  // --- NOUVELLE FONCTION CAPACITOR ---
   const prendrePhoto = async () => {
     try {
       const image = await Camera.getPhoto({
@@ -151,11 +151,11 @@ export default function Memories() {
   const clearPhoto = () => {
     setTempPhoto(null);
   };
-  
+
   // --- FONCTION AJOUTÉE POUR ENVOYER UN COMMENTAIRE ---
   const handleSendComment = async (entryId) => {
     if (!commentText.trim()) return;
-    
+
     setIsSending(true);
     try {
       await apiPost(`/souvenirs/${entryId}/comments`, {
@@ -226,121 +226,121 @@ export default function Memories() {
   // Si la variable inclut /api, on le retire pour servir les fichiers statiques
   const FILES_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, '');
 
-const getPhotoUrl = (photo) => {
-  if (!photo) return null;
-  if (photo.startsWith('http')) return photo;
-  return `${FILES_BASE_URL}/uploads/${photo}`;
-};
+  const getPhotoUrl = (photo) => {
+    if (!photo) return null;
+    if (photo.startsWith('http')) return photo;
+    return `${FILES_BASE_URL}/uploads/${photo}`;
+  };
 
-// 🔹 Charger une image en base64 pour jsPDF
-// Fallback proxy pour les images Azure afin d'éviter les erreurs CORS/canvas
-const loadImageAsBase64 = async (url) => {
-  try {
-    // Si c'est une URL Azure, passer par le proxy backend
-    if (url.includes('.blob.core.windows.net')) {
-      let blobName = null;
-      try {
-        const u = new URL(url);
-        const parts = u.pathname.split('/');
-        blobName = parts[parts.length - 1];
-      } catch {}
+  // 🔹 Charger une image en base64 pour jsPDF
+  // Fallback proxy pour les images Azure afin d'éviter les erreurs CORS/canvas
+  const loadImageAsBase64 = async (url) => {
+    try {
+      // Si c'est une URL Azure, passer par le proxy backend
+      if (url.includes('.blob.core.windows.net')) {
+        let blobName = null;
+        try {
+          const u = new URL(url);
+          const parts = u.pathname.split('/');
+          blobName = parts[parts.length - 1];
+        } catch { }
 
-      if (blobName) {
-        const API_BASE_URL_FULL = import.meta.env.VITE_API_BASE_URL || '';
-        const proxyUrl = `${API_BASE_URL_FULL}/upload/blob/${blobName}`;
-        const resp = await fetch(proxyUrl);
-        if (!resp.ok) throw new Error('Proxy image fetch failed');
-        const blob = await resp.blob();
-        const reader = new FileReader();
-        const base64 = await new Promise((resolve, reject) => {
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-        return base64;
+        if (blobName) {
+          const API_BASE_URL_FULL = import.meta.env.VITE_API_BASE_URL || '';
+          const proxyUrl = `${API_BASE_URL_FULL}/upload/blob/${blobName}`;
+          const resp = await fetch(proxyUrl);
+          if (!resp.ok) throw new Error('Proxy image fetch failed');
+          const blob = await resp.blob();
+          const reader = new FileReader();
+          const base64 = await new Promise((resolve, reject) => {
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          return base64;
+        }
       }
-    }
 
-    // Par défaut: charger via Image + canvas (pour fichiers locaux)
-    const img = new window.Image();
-    img.crossOrigin = 'anonymous';
-    await new Promise((resolve, reject) => {
-      img.onload = resolve;
-      img.onerror = reject;
-      img.src = url;
-    });
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0);
-    return canvas.toDataURL('image/jpeg', 0.9);
-  } catch (e) {
-    console.error('loadImageAsBase64 failed:', e);
-    throw e;
-  }
-};
+      // Par défaut: charger via Image + canvas (pour fichiers locaux)
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = url;
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      return canvas.toDataURL('image/jpeg', 0.9);
+    } catch (e) {
+      console.error('loadImageAsBase64 failed:', e);
+      throw e;
+    }
+  };
 
   // Fonction d'export PDF avec les données réelles
   const handleDownloadPDF = async () => {
-  const doc = new jsPDF();
-  doc.setFontSize(20);
-  doc.text('Journal de bord - Souvenirs Partagés', 20, 20);
+    const doc = new jsPDF();
+    doc.setFontSize(20);
+    doc.text('Journal de bord - Souvenirs Partagés', 20, 20);
 
-  let yPosition = 40;
+    let yPosition = 40;
 
-  for (let index = 0; index < memories.length; index++) {
-    const memory = memories[index];
+    for (let index = 0; index < memories.length; index++) {
+      const memory = memories[index];
 
-    if (yPosition > 260) {
-      doc.addPage();
-      yPosition = 20;
-    }
+      if (yPosition > 260) {
+        doc.addPage();
+        yPosition = 20;
+      }
 
-    const dateStr = new Date(memory.created_at).toLocaleDateString('fr-FR');
-    const authorStr = memory.author_name || "Auteur inconnu";
+      const dateStr = new Date(memory.created_at).toLocaleDateString('fr-FR');
+      const authorStr = memory.author_name || "Auteur inconnu";
 
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`${dateStr} - Par ${authorStr}`, 20, yPosition);
-    yPosition += 7;
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`${dateStr} - Par ${authorStr}`, 20, yPosition);
+      yPosition += 7;
 
-    doc.setFontSize(11);
-    doc.setTextColor(0);
-    const lines = doc.splitTextToSize(memory.text_content || '', 170);
-    doc.text(lines, 20, yPosition);
-    yPosition += lines.length * 7 + 5;
+      doc.setFontSize(11);
+      doc.setTextColor(0);
+      const lines = doc.splitTextToSize(memory.text_content || '', 170);
+      doc.text(lines, 20, yPosition);
+      yPosition += lines.length * 7 + 5;
 
-    // ✅ AJOUT DE LA PHOTO DANS LE PDF
-    if (memory.photo_data) {
-      try {
-        const imageUrl = getPhotoUrl(memory.photo_data);
-        const imageBase64 = await loadImageAsBase64(imageUrl);
+      // ✅ AJOUT DE LA PHOTO DANS LE PDF
+      if (memory.photo_data) {
+        try {
+          const imageUrl = getPhotoUrl(memory.photo_data);
+          const imageBase64 = await loadImageAsBase64(imageUrl);
 
-        const imgWidth = 170;
-        const imgHeight = 100;
+          const imgWidth = 170;
+          const imgHeight = 100;
 
-        if (yPosition + imgHeight > 280) {
-          doc.addPage();
-          yPosition = 20;
+          if (yPosition + imgHeight > 280) {
+            doc.addPage();
+            yPosition = 20;
+          }
+
+          doc.addImage(imageBase64, 'JPEG', 20, yPosition, imgWidth, imgHeight);
+          yPosition += imgHeight + 10;
+        } catch (err) {
+          console.error("Erreur image PDF :", err);
         }
+      }
 
-        doc.addImage(imageBase64, 'JPEG', 20, yPosition, imgWidth, imgHeight);
-        yPosition += imgHeight + 10;
-      } catch (err) {
-        console.error("Erreur image PDF :", err);
+      if (index < memories.length - 1) {
+        doc.setDrawColor(200);
+        doc.line(20, yPosition, 190, yPosition);
+        yPosition += 10;
       }
     }
 
-    if (index < memories.length - 1) {
-      doc.setDrawColor(200);
-      doc.line(20, yPosition, 190, yPosition);
-      yPosition += 10;
-    }
-  }
-
-  doc.save(`journal-souvenirs-${new Date().toISOString().split('T')[0]}.pdf`);
-};
+    doc.save(`journal-souvenirs-${new Date().toISOString().split('T')[0]}.pdf`);
+  };
 
 
   if (loading) {
@@ -372,9 +372,9 @@ const loadImageAsBase64 = async (url) => {
         {error && (
           <div className="p-4 mb-6 bg-red-50 text-red-600 rounded-lg border border-red-100">
             {error}
-                </div>
-              )}
-              
+          </div>
+        )}
+
         {/* --- FORMULAIRE D'AJOUT DYNAMISÉ --- */}
         <div className="mb-8 bg-white rounded-lg shadow-sm border p-6">
           <div className="flex gap-4">
@@ -389,13 +389,13 @@ const loadImageAsBase64 = async (url) => {
                 className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
                 rows={3}
               />
-              
+
               {/* Aperçu de l'image sélectionnée */}
               {newPhotoUrl && (
                 <div className="mt-3">
-                  <img 
-                    src={newPhotoUrl} 
-                    alt="Aperçu" 
+                  <img
+                    src={newPhotoUrl}
+                    alt="Aperçu"
                     className="w-full max-h-48 object-cover rounded-lg border"
                   />
                 </div>
@@ -415,31 +415,31 @@ const loadImageAsBase64 = async (url) => {
                 }}
                 className="hidden"
                 id="photo-input"
-                  />
+              />
 
               <div className="flex justify-between items-center mt-3">
                 <div className="flex gap-4">
-                  <button 
+                  <button
                     onClick={() => document.getElementById('photo-input').click()}
                     className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors text-sm"
                   >
                     <ImageIcon className="w-5 h-5" />
                     <span>{newPhotoFile ? "Photo sélectionnée" : "Ajouter une photo"}</span>
                   </button>
-                  
+
                   <div className="flex items-center gap-2 text-gray-600 text-sm">
                     <Smile className="w-4 h-4" />
-                    <select 
-                      value={newMood} 
+                    <select
+                      value={newMood}
                       onChange={(e) => setNewMood(parseInt(e.target.value))}
                       className="bg-transparent outline-none cursor-pointer border-b border-gray-300"
                     >
-                      {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>Humeur: {n}/10</option>)}
+                      {[1, 2, 3, 4, 5, 6, 7, 8, 9, 10].map(n => <option key={n} value={n}>Humeur: {n}/10</option>)}
                     </select>
                   </div>
                 </div>
 
-                <button 
+                <button
                   onClick={handleAddMemory}
                   disabled={isPublishing || !newText.trim() || !user}
                   className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
@@ -479,7 +479,7 @@ const loadImageAsBase64 = async (url) => {
 
                 {memory.photo_data && (
                   <div className="mb-4 rounded-lg overflow-hidden border">
-                    <img src={getPhotoUrl(memory.photo_data)} alt="Souvenir" className="w-full h-auto max-h-96 object-cover"/>
+                    <img src={getPhotoUrl(memory.photo_data)} alt="Souvenir" className="w-full h-auto max-h-96 object-cover" />
                   </div>
                 )}
 
@@ -489,7 +489,7 @@ const loadImageAsBase64 = async (url) => {
                     <span>{memory.mood ? `Humeur: ${memory.mood}/10` : 'Aimer'}</span>
                   </button>
                   {/* BOUTON MODIFIÉ POUR ACTIVER LA SECTION COMMENTAIRE */}
-                  <button 
+                  <button
                     onClick={() => setActiveCommentId(activeCommentId === memory.id ? null : memory.id)}
                     className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors"
                   >
@@ -498,7 +498,7 @@ const loadImageAsBase64 = async (url) => {
                   </button>
                   {/* BOUTON DE SUPPRESSION - UNIQUEMENT POUR L'AUTEUR */}
                   {user && memory.author_id === user.id && (
-                    <button 
+                    <button
                       onClick={() => handleDeleteMemory(memory.id)}
                       className="flex items-center gap-2 text-gray-600 hover:text-red-600 transition-colors"
                       title="Supprimer ce souvenir"
@@ -520,7 +520,7 @@ const loadImageAsBase64 = async (url) => {
                               <p className="font-semibold text-blue-700">{comment.author}</p>
                               {/* Bouton de suppression - seulement si l'utilisateur est l'auteur du commentaire */}
                               {user && (comment.author === user.name || memory.author_name === user.name) && (
-                                <button 
+                                <button
                                   onClick={() => handleDeleteComment(memory.id, comment.id, comment.author, memory.author_name)}
                                   className="text-gray-400 hover:text-red-600 transition-colors p-1"
                                   title="Supprimer ce commentaire"
@@ -536,7 +536,7 @@ const loadImageAsBase64 = async (url) => {
                         <p className="text-center text-gray-400 text-sm py-2">Soyez le premier à commenter ce souvenir.</p>
                       )}
                     </div>
-                    
+
                     <div className="flex gap-2">
                       <input
                         type="text"
@@ -546,7 +546,7 @@ const loadImageAsBase64 = async (url) => {
                         className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
                         onKeyDown={(e) => e.key === 'Enter' && handleSendComment(memory.id)}
                       />
-                      <button 
+                      <button
                         onClick={() => handleSendComment(memory.id)}
                         disabled={isSending || !commentText.trim()}
                         className="p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"

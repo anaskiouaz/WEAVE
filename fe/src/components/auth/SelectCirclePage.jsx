@@ -25,9 +25,9 @@ const MEDICAL_OPTIONS = [
 
 export default function SelectCirclePage() {
     const navigate = useNavigate();
-    const { setCircleId, setCircleNom, token } = useAuth(); 
+    const { setCircleId, setCircleNom, token } = useAuth();
 
-    const [view, setView] = useState('selection'); 
+    const [view, setView] = useState('selection');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [myCircles, setMyCircles] = useState([]);
@@ -37,7 +37,7 @@ export default function SelectCirclePage() {
         birth_date: '',
         phone: '',
         email: '',
-        medical_select: [] 
+        medical_select: []
     });
 
     const [inviteCode, setInviteCode] = useState('');
@@ -63,27 +63,27 @@ export default function SelectCirclePage() {
     const apiCall = async (endpoint, method = 'POST', body = null) => {
         setLoading(true);
         setError('');
-        
+
         try {
-            const config = { 
-                method, 
+            const config = {
+                method,
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
-                } 
+                }
             };
             if (body) config.body = JSON.stringify(body);
 
-            const res = await fetch(`${API_BASE_URL}/api/circles${endpoint}`, config);
+            const res = await fetch(`${API_BASE_URL}/circles${endpoint}`, config);
             const data = await res.json();
 
-            if (!res.ok) throw new Error(data.error || "Une erreur est survenue");
+            if (!res.ok) throw new Error(data.error || "Une erreu   r est survenue");
 
-            return data; 
+            return data;
 
         } catch (err) {
             setError(err.message);
-            throw err; 
+            throw err;
         } finally {
             setLoading(false);
         }
@@ -94,7 +94,7 @@ export default function SelectCirclePage() {
     // 1. Charger la liste
     const handleViewList = async () => {
         try {
-            const data = await apiCall('/', 'GET'); 
+            const data = await apiCall('/', 'GET');
             const circles = Array.isArray(data) ? data : (data.circles || []);
             setMyCircles(circles);
             setView('list');
@@ -108,11 +108,11 @@ export default function SelectCirclePage() {
         // --- MISE A JOUR LOCALSTORAGE ---
         localStorage.setItem('circle_id', circle.id);
         localStorage.setItem('circle_nom', circle.name);
-        
+
         // Mise à jour du Contexte
         setCircleId(circle.id);
-        setCircleNom(circle.name); 
-        
+        setCircleNom(circle.name);
+
         navigate('/dashboard');
     };
 
@@ -123,15 +123,15 @@ export default function SelectCirclePage() {
 
         const payloadInfo = {
             ...seniorData,
-            medical_info: seniorData.medical_select.length > 0 
-                ? seniorData.medical_select.join(', ') 
+            medical_info: seniorData.medical_select.length > 0
+                ? seniorData.medical_select.join(', ')
                 : null
         };
         delete payloadInfo.medical_select;
 
         try {
             const data = await apiCall('/', 'POST', { senior_info: payloadInfo });
-            
+
             if (data.circle_id) {
                 // --- MISE A JOUR LOCALSTORAGE ---
                 const nomCercle = data.circle_name || seniorData.name;
@@ -140,8 +140,8 @@ export default function SelectCirclePage() {
 
                 // Mise à jour Contexte
                 setCircleId(data.circle_id);
-                setCircleNom(nomCercle); 
-                
+                setCircleNom(nomCercle);
+
                 navigate('/dashboard');
             }
         } catch (err) {
@@ -153,10 +153,10 @@ export default function SelectCirclePage() {
     const handleJoin = async (e) => {
         e.preventDefault();
         if (!inviteCode.trim()) return setError("Le code est requis.");
-        
+
         try {
             const data = await apiCall('/join', 'POST', { invite_code: inviteCode });
-            
+
             if (data.circle_id) {
                 // --- MISE A JOUR LOCALSTORAGE ---
                 const nomCercle = data.circle_name || "Nouveau Cercle";

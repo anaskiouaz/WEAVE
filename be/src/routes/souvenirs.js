@@ -17,28 +17,30 @@ if (connectionString) {
 // Fonction utilitaire pour supprimer un blob d'Azure
 async function deleteBlobFromAzure(blobName) {
   if (!blobServiceClient || !blobName) {
-    return; // Ne pas échouer si Azure n'est pas configuré ou pas de blob
+    return;
   }
 
+  // --- CORRECTION 1 : Sécurisation du type de blobName ---
+  const blobNameStr = String(blobName); 
+
   // Ne supprimer que les blobs (pas les URLs externes)
-  if (blobName.startsWith('http://') || blobName.startsWith('https://')) {
-    console.log('Skipping deletion of external URL:', blobName);
+  if (blobNameStr.startsWith('http://') || blobNameStr.startsWith('https://')) {
+    console.log('Skipping deletion of external URL:', blobNameStr);
     return;
   }
 
   try {
     const containerClient = blobServiceClient.getContainerClient(containerName);
-    const blockBlobClient = containerClient.getBlockBlobClient(blobName);
+    const blockBlobClient = containerClient.getBlockBlobClient(blobNameStr);
     
     const deleteResponse = await blockBlobClient.deleteIfExists();
     if (deleteResponse.succeeded) {
-      console.log('✅ Blob supprimé d\'Azure:', blobName);
+      console.log('✅ Blob supprimé d\'Azure:', blobNameStr);
     } else {
-      console.log('⚠️ Blob n\'existait pas ou déjà supprimé:', blobName);
+      console.log('⚠️ Blob n\'existait pas ou déjà supprimé:', blobNameStr);
     }
   } catch (error) {
-    console.error('❌ Erreur lors de la suppression du blob Azure:', blobName, error);
-    // Ne pas échouer la suppression du souvenir si la suppression du blob échoue
+    console.error('❌ Erreur lors de la suppression du blob Azure:', blobNameStr, error);
   }
 }
 
@@ -62,16 +64,20 @@ export async function getJournalEntries(req, res) {
     // Generate SAS URLs for photos
     const entriesWithSAS = result.rows.map(entry => {
       if (entry.photo_data) {
+        // --- CORRECTION 2 : Conversion explicite en String pour éviter le crash ---
+        // Si entry.photo_data est un objet, un buffer ou autre, startsWith plante.
+        const photoStr = String(entry.photo_data);
+
         // Check if it's already a full URL (from existing data or external URLs)
-        if (entry.photo_data.startsWith('http://') || entry.photo_data.startsWith('https://')) {
-          // Keep the URL as is
-          return entry;
+        if (photoStr.startsWith('http://') || photoStr.startsWith('https://')) {
+          // Keep the URL as is (mais on s'assure de renvoyer la string)
+          return { ...entry, photo_data: photoStr };
         } else {
           // Generate SAS URL for blob name
-          const sasUrl = generateBlobSASUrl(entry.photo_data);
+          const sasUrl = generateBlobSASUrl(photoStr);
           return {
             ...entry,
-            photo_data: sasUrl || entry.photo_data // Fallback to blob name if SAS fails
+            photo_data: sasUrl || photoStr // Fallback to blob name if SAS fails
           };
         }
       }
@@ -80,18 +86,16 @@ export async function getJournalEntries(req, res) {
 
     res.json({ status: 'ok', data: entriesWithSAS, count: entriesWithSAS.length });
   } catch (err) {
+    console.error("Erreur getJournalEntries:", err); // Log serveur pour aider au debug
     res.status(500).json({ status: 'error', message: err.message });
   }
 }
 
 // Créer un souvenir
-// Créer un souvenir
 export async function createJournalEntry(req, res) {
   try {
-    // 1. On récupère les champs nécessaires
     const { circle_id, author_id, text_content, mood, photo_data } = req.body;
 
-    // Validation basique
     if (!author_id || !text_content) {
       return res.status(400).json({
         status: 'error',
@@ -101,7 +105,6 @@ export async function createJournalEntry(req, res) {
 
     let resolvedCircleId = circle_id;
 
-    // 2. Logique de résolution du Cercle
     if (circle_id) {
       const specificCircle = await db.query(
         `SELECT id FROM care_circles WHERE id = $1`,
@@ -128,7 +131,7 @@ export async function createJournalEntry(req, res) {
       resolvedCircleId = defaultCircle.rows[0].id;
     }
 
-    // 3. Insertion en base de données
+    // Insertion
     const result = await db.query(
       `INSERT INTO journal_entries (circle_id, author_id, mood, text_content, photo_data, comments)
        VALUES ($1, $2, $3, $4, $5, $6)
@@ -143,11 +146,9 @@ export async function createJournalEntry(req, res) {
       ]
     );
 
-    // Récupérer le nom de l'auteur
     const authorResult = await db.query(`SELECT name FROM users WHERE id = $1`, [author_id]);
     const authorName = authorResult.rows.length ? authorResult.rows[0].name : 'Inconnu';
 
-    // ✅ Réponse envoyée au client (Succès)
     res.status(201).json({
       status: 'ok',
       message: 'Journal entry created',
@@ -157,38 +158,31 @@ export async function createJournalEntry(req, res) {
       },
     });
 
-    // --- 🔔 NOTIFICATIONS (Maintenant à l'intérieur du try) ---
-    // On met ça dans un try/catch séparé pour ne pas crasher si la notif échoue
+    // Notifications
     try {
         const userTokens = await db.query("SELECT fcm_token FROM users WHERE fcm_token IS NOT NULL AND fcm_token != ''");
         const tokens = [...new Set(userTokens.rows.map(r => r.fcm_token))];
-        console.log(`Préparation notif. Tokens trouvés en DB : ${tokens.length}`);
-
+        
         if (tokens.length > 0) {
             const message = {
                 notification: {
-                    title: `Nouveau souvenir ajouté par : ${authorName}`, // On utilise authorName qu'on a déjà récupéré plus haut
+                    title: `Nouveau souvenir ajouté par : ${authorName}`,
                     body: `Souvenir ajouté : ${text_content.substring(0, 100)}...`,
                 },
                 data: { 
-                    taskId: result.rows[0].id.toString(), // "result" est accessible ici !
-                    type: 'souvenir_created' // J'ai changé "task_created" en "souvenir_created" pour la cohérence
+                    taskId: result.rows[0].id.toString(),
+                    type: 'souvenir_created'
                 },
                 tokens: tokens
             };
-    
-            console.log("Envoi à Firebase en cours...");
-            const response = await admin.messaging().sendEachForMulticast(message);
-            console.log(`Bilan Firebase : ${response.successCount} succès, ${response.failureCount} échecs.`);
+            await admin.messaging().sendEachForMulticast(message);
         }
     } catch (notifError) {
         console.error("Erreur lors de l'envoi de la notification (non bloquant) :", notifError);
     }
-    // ---------------------------------------------------------
 
   } catch (err) {
     console.error('Error creating journal entry:', err);
-    // On vérifie que la réponse n'a pas déjà été envoyée avant d'envoyer l'erreur
     if (!res.headersSent) {
         res.status(500).json({
             status: 'error',
@@ -198,9 +192,10 @@ export async function createJournalEntry(req, res) {
   }
 }
 
+// Ajouter un commentaire
 export async function addCommentToEntry(req, res) {
   try {
-    const { id } = req.params; // ID du souvenir
+    const { id } = req.params;
     const { author_name, content } = req.body;
 
     if (!content || !author_name) {
@@ -214,7 +209,6 @@ export async function addCommentToEntry(req, res) {
       created_at: new Date().toISOString()
     };
 
-    // On utilise l'opérateur || pour ajouter l'objet au tableau JSONB existant
     const result = await db.query(
       `UPDATE journal_entries 
        SET comments = comments || $1::jsonb 
@@ -229,18 +223,18 @@ export async function addCommentToEntry(req, res) {
   }
 }
 
+// Supprimer un commentaire
 export async function deleteCommentFromEntry(req, res) {
   try {
-    const { id, commentId } = req.params; // ID du souvenir et ID du commentaire
-    const { author_name } = req.body; // Nom de l'auteur qui fait la demande de suppression
+    const { id, commentId } = req.params;
+    const { author_name } = req.body;
 
     if (!id || !commentId || !author_name) {
-      return res.status(400).json({ status: 'error', message: 'Souvenir ID, comment ID, and author_name required' });
+      return res.status(400).json({ status: 'error', message: 'Missing parameters' });
     }
 
-    // Récupérer les commentaires actuels
     const result = await db.query(
-      'SELECT comments FROM journal_entries WHERE id = $1',
+      'SELECT comments, author_id FROM journal_entries WHERE id = $1',
       [id]
     );
 
@@ -249,8 +243,10 @@ export async function deleteCommentFromEntry(req, res) {
     }
 
     let comments = result.rows[0].comments || [];
+    // Récupérer l'auteur du post pour permission de suppression
+    // (Non utilisé dans la logique actuelle mais bon à avoir si besoin)
+    // const memoryAuthorId = result.rows[0].author_id; 
 
-    // Trouver le commentaire à supprimer
     const commentIndex = comments.findIndex(comment => comment.id === commentId);
 
     if (commentIndex === -1) {
@@ -259,15 +255,16 @@ export async function deleteCommentFromEntry(req, res) {
 
     const comment = comments[commentIndex];
 
-    // Vérifier que l'auteur de la demande est bien l'auteur du commentaire
-    if (comment.author !== author_name && memoryAuthor !== author_name) {
+    // Vérification simplifiée : on suppose que le frontend envoie le bon author_name
+    // Idéalement, il faudrait comparer des IDs, mais cela respecte votre logique existante.
+    if (comment.author !== author_name) {
+        // Optionnel : permettre au propriétaire du post de supprimer n'importe quel com
+        // if (user.id !== memoryAuthorId) ...
       return res.status(403).json({ status: 'error', message: 'You can only delete your own comments' });
     }
 
-    // Supprimer le commentaire du tableau
     comments.splice(commentIndex, 1);
 
-    // Mettre à jour la base de données
     await db.query(
       'UPDATE journal_entries SET comments = $1::jsonb WHERE id = $2',
       [JSON.stringify(comments), id]
@@ -283,7 +280,7 @@ export async function deleteCommentFromEntry(req, res) {
 export async function deleteJournalEntry(req, res) {
   try {
     const { id } = req.params;
-    const { author_id } = req.body; // Pour vérifier que c'est bien l'auteur qui supprime
+    const { author_id } = req.body;
 
     if (!id || !author_id) {
       return res.status(400).json({
@@ -292,7 +289,6 @@ export async function deleteJournalEntry(req, res) {
       });
     }
 
-    // Récupérer les informations du souvenir avant suppression (pour l'image)
     const souvenirResult = await db.query(
       'SELECT id, author_id, photo_data FROM journal_entries WHERE id = $1',
       [id]
@@ -307,20 +303,19 @@ export async function deleteJournalEntry(req, res) {
 
     const souvenir = souvenirResult.rows[0];
 
-    if (souvenir.author_id !== author_id) {
+    // Note : comparer des UUIDs sous forme de string est préférable
+    if (String(souvenir.author_id) !== String(author_id)) {
       return res.status(403).json({
         status: 'error',
         message: 'Vous ne pouvez supprimer que vos propres souvenirs'
       });
     }
 
-    // Supprimer l'image d'Azure si elle existe
     if (souvenir.photo_data) {
       console.log('🗑️ Suppression de l\'image associée au souvenir:', id);
       await deleteBlobFromAzure(souvenir.photo_data);
     }
 
-    // Supprimer le souvenir de la base de données
     await db.query('DELETE FROM journal_entries WHERE id = $1', [id]);
 
     console.log('✅ Souvenir supprimé avec succès:', id);
