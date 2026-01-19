@@ -24,6 +24,7 @@ export default function Profile() {
   const [availability, setAvailability] = useState([]);
   const [stats, setStats] = useState({ interventions: 0, moments: 0, rating: 0 });
   const [skills, setSkills] = useState([]);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
@@ -59,7 +60,7 @@ export default function Profile() {
           address: userData.address || '',
           joinDate: createdDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
           yearsActive: 0,  // Sera mis à jour par les stats
-          photoUrl: null
+          photoUrl: userData.profile_photo ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'}/uploads/${userData.profile_photo}` : null
         });
 
         setSkills(Array.isArray(userData.skills) ? userData.skills : []);
@@ -196,9 +197,57 @@ export default function Profile() {
   };
 
   const handlePhotoClick = () => fileInputRef.current.click();
-  const handlePhotoUpload = (e) => {
+  
+  const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
-    if (file) setUserInfo({ ...userInfo, photoUrl: URL.createObjectURL(file) });
+    if (!file) return;
+
+    setIsUploadingPhoto(true);
+    try {
+      // 1. Afficher l'aperçu temporaire
+      const tempUrl = URL.createObjectURL(file);
+      setUserInfo({ ...userInfo, photoUrl: tempUrl });
+
+      // 2. Préparer le FormData pour l'upload
+      const formData = new FormData();
+      formData.append('image', file);
+
+      // 3. Uploader vers le backend qui uploadera à Azure
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+      const uploadResponse = await fetch(`${API_BASE_URL}/api/upload/image`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Erreur lors de l\'upload de l\'image');
+      }
+
+      const uploadData = await uploadResponse.json();
+      if (uploadData.status !== 'ok' || !uploadData.data.blobName) {
+        throw new Error('Erreur lors de la sauvegarde de l\'image');
+      }
+
+      // 4. Sauvegarder le nom du blob en base de données
+      const options = { headers: { 'x-user-id': USER_ID } };
+      const saveResponse = await apiPost('/module/profile/upload-photo', {
+        photoBlobName: uploadData.data.blobName
+      }, options);
+
+      if (saveResponse.success) {
+        // 5. Mettre à jour l'URL avec le blob Azure
+        const photoUrl = `${API_BASE_URL}/uploads/${uploadData.data.blobName}`;
+        setUserInfo({ ...userInfo, photoUrl });
+        alert('Photo de profil mise à jour avec succès!');
+      }
+    } catch (err) {
+      console.error('Erreur upload photo:', err);
+      alert(`Erreur lors de l'upload: ${err.message}`);
+      // Réinitialiser la photo en cas d'erreur
+      setUserInfo({ ...userInfo, photoUrl: userInfo.photoUrl });
+    } finally {
+      setIsUploadingPhoto(false);
+    }
   };
 
   const startEditProfile = () => { setProfileForm({ ...userInfo }); setIsEditingProfile(true); };
@@ -247,11 +296,18 @@ export default function Profile() {
       <div className="bg-gradient-to-r from-blue-700 via-blue-500 to-orange-400 pb-32 shadow-md">
         <div className="max-w-4xl mx-auto p-8 pt-12">
           <div className="flex items-center gap-6">
-            <div className="relative group cursor-pointer" onClick={handlePhotoClick}>
-              <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-blue-600 text-3xl font-bold border-4 border-white/40 shadow-xl overflow-hidden">
+            <div className="relative group cursor-pointer" onClick={!isUploadingPhoto ? handlePhotoClick : null}>
+              <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-blue-600 text-3xl font-bold border-4 border-white/40 shadow-xl overflow-hidden relative">
+                {isUploadingPhoto && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 z-10">
+                    <Loader2 className="animate-spin text-white w-6 h-6" />
+                  </div>
+                )}
                 {userInfo.photoUrl ? <img src={userInfo.photoUrl} className="w-full h-full object-cover" /> : userInfo.name?.charAt(0).toUpperCase()}
               </div>
-              <div className="absolute bottom-0 right-0 bg-white p-2 rounded-full text-gray-600 hover:text-blue-600 shadow-lg transition-transform transform group-hover:scale-110"><Camera size={16} /></div>
+              {!isUploadingPhoto && (
+                <div className="absolute bottom-0 right-0 bg-white p-2 rounded-full text-gray-600 hover:text-blue-600 shadow-lg transition-transform transform group-hover:scale-110"><Camera size={16} /></div>
+              )}
             </div>
             <div className="text-white drop-shadow-md">
               <h1 className="text-3xl font-bold tracking-tight">{userInfo.name}</h1>
