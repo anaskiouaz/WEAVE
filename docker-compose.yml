@@ -26,7 +26,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./be:/app
-    command: sh -c "npm install && npm start"
+    command: sh -c "npm install && npm start && npm install nodemailer"
     env_file:
       - .env
     environment:
