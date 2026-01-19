@@ -1,75 +1,51 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, Heart, LogOut, Camera, ChevronDown, ChevronUp } from 'lucide-react';
-import { apiGet, apiPut, apiPost } from '../api/client'; // 👇 J'ai ajouté apiPost
+import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, LogOut, Camera } from 'lucide-react';
+import { apiGet, apiPut, apiPost } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { PushNotifications } from '@capacitor/push-notifications'; // 👇 Import Notifications
-import { Capacitor } from '@capacitor/core'; // 👇 Import Core
+import { PushNotifications } from '@capacitor/push-notifications';
+import { Capacitor } from '@capacitor/core';
 
 export default function Profile() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   
-  // Utilisation de l'ID du contexte s'il existe
-  const USER_ID = user?.id || "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380c33"; 
+  const USER_ID = user?.id || "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380c33";
+  const token = localStorage.getItem('token') || user?.token; 
 
   const [isLoading, setIsLoading] = useState(true);
   const fileInputRef = useRef(null);
 
-  // ÉTATS UI
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isEditingAvailability, setIsEditingAvailability] = useState(false);
   const [isEditingSkills, setIsEditingSkills] = useState(false);
   
-  // ÉTATS DONNÉES
   const [userInfo, setUserInfo] = useState({ name: '', email: '', phone: '', address: '', joinDate: '', yearsActive: 0, photoUrl: null });
   const [availability, setAvailability] = useState([]);
   const [stats, setStats] = useState({ interventions: 0, moments: 0, rating: 0 });
   const [skills, setSkills] = useState([]);
   
-  // NOUVEAUX ÉTATS
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false); // Par défaut false en attendant le check
-  const [showAssistedPeople, setShowAssistedPeople] = useState(false);
-  const [assistedPeopleList] = useState(['Grand-Père Michel']); 
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
-  // --- FORMULAIRES ---
   const [profileForm, setProfileForm] = useState({});
   const [availForm, setAvailForm] = useState([]);
   const [skillsForm, setSkillsForm] = useState([]);
 
-  // CONSTANTES & AUTRES ÉTATS
-  const [notificationsEnabled, setNotificationsEnabled] = useState(true);
-  const [showAssistedPeople, setShowAssistedPeople] = useState(false);
-  const [assistedPeopleList] = useState(['Grand-Père Michel']); 
   const weekDays = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
   const hours = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
   const availableSkillsList = ['Courses', 'Cuisine', 'Accompagnement médical', 'Promenade', 'Lecture', 'Jardinage', 'Bricolage'];
 
-  // --- CHARGEMENT ---
   useEffect(() => {
     if (USER_ID) {
         fetchData();
-        checkNotificationStatus(); // 👇 Vérifier l'état réel au chargement
+        // On ne vérifie plus les permissions ici pour l'état initial, on fait confiance à la DB
+        // Mais on peut vérifier la cohérence si besoin plus tard
     }
   }, [USER_ID]);
-
-  // Vérifier si les notifs sont déjà activées sur le téléphone
-  const checkNotificationStatus = async () => {
-    if (Capacitor.getPlatform() === 'web') return;
-    try {
-      const perm = await PushNotifications.checkPermissions();
-      if (perm.receive === 'granted') {
-        setNotificationsEnabled(true);
-      }
-    } catch (e) {
-      console.error("Erreur check notifs", e);
-    }
-  };
 
   const fetchData = async () => {
     try {
       const options = { headers: { 'x-user-id': USER_ID } };
-      // Appel au nouveau module
       const data = await apiGet('/module/profile', options);
       
       if (data.success) {
@@ -88,9 +64,12 @@ export default function Profile() {
           photoUrl: null
         });
 
-        setSkills(Array.isArray(user.skills) ? user.skills : []);
+        setSkills(Array.isArray(userData.skills) ? userData.skills : []);
         setAvailability(data.availability || []);
         setStats({ interventions: 24, moments: 18, rating: 4.8 });
+        
+        // 👇 CHARGEMENT DEPUIS LA DB (booléen)
+        setNotificationsEnabled(userData.notifications_enabled === true);
       }
     } catch (error) {
       console.error("Erreur chargement:", error);
@@ -99,7 +78,6 @@ export default function Profile() {
     }
   };
 
-  // --- SAUVEGARDES ---
   const saveProfile = async () => {
     try {
       const options = { headers: { 'x-user-id': USER_ID } };
@@ -116,77 +94,97 @@ export default function Profile() {
     } catch (err) { console.error(err); }
   };
 
-  // --- GESTION NOTIFICATIONS (Toggle) ---
-  const handleNotificationToggle = async () => {
-    // Si on est sur le web, on ne fait rien (ou juste visuel)
-    if (Capacitor.getPlatform() === 'web') {
-        setNotificationsEnabled(!notificationsEnabled);
-        return;
-    }
-
-    const newStatus = !notificationsEnabled;
-    setNotificationsEnabled(newStatus); // On change visuellement tout de suite
-
-    try {
-        if (newStatus === true) {
-            // --- ACTIVATION ---
-            let perm = await PushNotifications.checkPermissions();
-            if (perm.receive === 'prompt') {
-                perm = await PushNotifications.requestPermissions();
-            }
-
-            if (perm.receive === 'granted') {
-                await PushNotifications.register();
-                // On ajoute un listener temporaire pour capturer le token et l'envoyer
-                PushNotifications.addListener('registration', async (token) => {
-                    console.log('Token réactivé:', token.value);
-                    await apiPost('/users/device-token', { userId: USER_ID, token: token.value });
-                    // On nettoie le listener pour éviter les doublons
-                    PushNotifications.removeAllListeners(); 
-                });
-            } else {
-                // Si refusé, on remet le switch à OFF
-                setNotificationsEnabled(false);
-                alert("Les notifications sont bloquées dans les paramètres de votre téléphone.");
-            }
-
-        } else {
-            // --- DÉSACTIVATION ---
-            // 1. On dit au backend d'oublier ce token (en envoyant une chaine vide)
-            await apiPost('/users/device-token', { userId: USER_ID, token: "" });
-            
-            // 2. On désinscrit le téléphone
-            await PushNotifications.removeAllListeners();
-            await PushNotifications.unregister();
-            console.log("Notifications désactivées et token supprimé.");
-        }
-    } catch (error) {
-        console.error("Erreur toggle notifs:", error);
-        // En cas d'erreur, on annule le changement visuel
-        setNotificationsEnabled(!newStatus); 
-    }
-  };
-
-   const handleLogout = () => {
-    logout();           // Vide le localStorage et le state user
-    navigate('/login'); // Redirige vers la page de connexion
-  };
-
-  // --- SAUVEGARDES ---
-  const startEditProfile = () => { setProfileForm({ ...userInfo }); setIsEditingProfile(true); };
-  
-  const saveProfile = async () => {
+  const saveAvailability = async () => {
     try {
       const options = { headers: { 'x-user-id': USER_ID } };
+      const circleId = localStorage.getItem('circle_id');
       if (!circleId) { alert('Aucun cercle sélectionné'); return; }
-      // Conversion pour l'API backend : day -> day_of_week, ajout du circle_id
-      const dataToSend = availForm.map(item => ({ day_of_week: item.day, slots: item.slots }));
-      const data = await apiPut('/module/profile/availability', { circle_id: circleId, availability: dataToSend }, options);
-      if (data.success) { setAvailability(dataToSend); setIsEditingAvailability(false); }
-    } catch (err) { console.error(err); }
+      
+      const dataToSend = availForm.map(item => ({ 
+        day_of_week: item.day || item.day_of_week, 
+        slots: item.slots 
+      }));
+      
+      const data = await apiPut('/module/profile/availability', { 
+        circle_id: circleId, 
+        availability: dataToSend 
+      }, options);
+      
+      if (data.success) { 
+        setAvailability(dataToSend); 
+        setIsEditingAvailability(false); 
+      }
+    } catch (err) { 
+      console.error(err); 
+      alert('Erreur lors de la sauvegarde des disponibilités');
+    }
   };
 
-  // --- HANDLERS UI ---
+  // --- GESTION NOTIFICATIONS (DB + Mobile) ---
+  const handleNotificationToggle = async () => {
+    const newStatus = !notificationsEnabled;
+    const options = { headers: { 'x-user-id': USER_ID } };
+
+    // 1. Optimistic UI Update
+    setNotificationsEnabled(newStatus);
+
+    try {
+        // 2. Sauvegarder la préférence en BDD
+        const saveResult = await apiPut('/module/profile/notifications', { notifications_enabled: newStatus }, options);
+        console.log('✅ Notification pref sauvegardée:', newStatus, saveResult);
+
+        // 3. Gérer la partie technique (Token FCM) si sur mobile
+        if (Capacitor.getPlatform() !== 'web') {
+            if (newStatus === true) {
+                // --- ACTIVATION ---
+                let perm = await PushNotifications.checkPermissions();
+                if (perm.receive === 'prompt') {
+                    perm = await PushNotifications.requestPermissions();
+                }
+
+                if (perm.receive === 'granted') {
+                    await PushNotifications.register();
+                    // On attend l'event 'registration'
+                    PushNotifications.addListener('registration', async (token) => {
+                        console.log('Token réactivé:', token.value);
+                        // On envoie le token au backend
+                        await apiPost('/users/device-token', { userId: USER_ID, token: token.value }, options);
+                        PushNotifications.removeAllListeners(); 
+                    });
+                } else {
+                    // Si refusé par l'OS, on remet à false et on prévient
+                    setNotificationsEnabled(false);
+                    await apiPut('/module/profile/notifications', { enabled: false }, options); // Rollback DB
+                    alert("Les notifications sont bloquées dans les paramètres de votre téléphone.");
+                }
+
+            } else {
+                // --- DÉSACTIVATION ---
+                // On efface le token côté backend
+                await apiPost('/users/device-token', { userId: USER_ID, token: "" }, options);
+                
+                // On désinscrit le téléphone
+                await PushNotifications.removeAllListeners();
+                await PushNotifications.unregister();
+            }
+        } 
+        
+        // Sur le web, on a déjà sauvegardé en DB, rien de plus à faire pour l'instant
+        // (Sauf si vous implémentez les notifs Web Push plus tard)
+
+    } catch (error) {
+        console.error("Erreur toggle notifs:", error);
+        // Rollback UI en cas d'erreur API
+        setNotificationsEnabled(!newStatus);
+        alert("Impossible de modifier les paramètres de notification.");
+    }
+  };
+
+  const handleLogout = () => {
+    logout();
+    navigate('/login');
+  };
+
   const handlePhotoClick = () => fileInputRef.current.click();
   const handlePhotoUpload = (e) => {
     const file = e.target.files[0];
@@ -194,7 +192,6 @@ export default function Profile() {
   };
 
   const startEditProfile = () => { setProfileForm({ ...userInfo }); setIsEditingProfile(true); };
-  
   const startEditSkills = () => { setSkillsForm([...skills]); setIsEditingSkills(true); };
   const toggleSkill = (skill) => {
     if (skillsForm.includes(skill)) setSkillsForm(skillsForm.filter(s => s !== skill));
@@ -203,7 +200,10 @@ export default function Profile() {
 
   const startEditAvail = () => { 
     const initialForm = availability.length > 0 
-      ? availability.map(a => ({...a})) 
+      ? availability.map(a => ({
+          day: a.day_of_week || a.day,
+          slots: a.slots
+        })) 
       : [{ day: 'Lundi', slots: '08:00 - 18:00' }];
     setAvailForm(initialForm); 
     setIsEditingAvailability(true); 
@@ -336,7 +336,10 @@ export default function Profile() {
                   availability.length > 0 ? (
                       <div className="grid grid-cols-1 gap-2">
                         {availability.map((item, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100"><span className="font-medium text-gray-900 w-32">{item.day}</span><span className="text-gray-600 bg-white px-3 py-1 rounded border border-gray-200 text-sm">{item.slots}</span></div>
+                            <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
+                              <span className="font-medium text-gray-900 w-32">{item.day_of_week || item.day}</span>
+                              <span className="text-gray-600 bg-white px-3 py-1 rounded border border-gray-200 text-sm">{item.slots}</span>
+                            </div>
                         ))}
                       </div>
                   ) : (<div className="text-center py-6 bg-gray-50 rounded-lg border border-dashed border-gray-300"><p className="text-gray-500 italic text-sm">Aucune disponibilité.</p></div>)
@@ -361,11 +364,13 @@ export default function Profile() {
                {isEditingProfile ? (
                  <>
                     <div className="md:col-span-2"><label className="text-xs font-semibold text-gray-500 uppercase">Nom</label><input value={profileForm.name || ''} onChange={(e) => setProfileForm({...profileForm, name: e.target.value})} className="mt-1 w-full p-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"/></div>
+                    <div><label className="text-xs font-semibold text-gray-500 uppercase">Email</label><div className="flex items-center gap-3 mt-1 p-2 bg-gray-50 rounded border border-gray-100"><Mail className="w-4 h-4 text-gray-400"/><span className="text-gray-700">{userInfo.email}</span></div></div>
                     <div><label className="text-xs font-semibold text-gray-500 uppercase">Tel</label><input value={profileForm.phone || ''} onChange={(e) => setProfileForm({...profileForm, phone: e.target.value})} className="mt-1 w-full p-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"/></div>
                     <div className="md:col-span-2"><label className="text-xs font-semibold text-gray-500 uppercase">Adresse</label><input value={profileForm.address || ''} onChange={(e) => setProfileForm({...profileForm, address: e.target.value})} className="mt-1 w-full p-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"/></div>
                  </>
                ) : (
                  <>
+                    <div><label className="text-xs font-semibold text-gray-500 uppercase">Nom</label><div className="flex items-center gap-3 mt-1 p-2 bg-gray-50 rounded border border-gray-100"><PenSquare className="w-4 h-4 text-gray-400"/><span className="text-gray-700">{userInfo.name}</span></div></div>
                     <div><label className="text-xs font-semibold text-gray-500 uppercase">Email</label><div className="flex items-center gap-3 mt-1 p-2 bg-gray-50 rounded border border-gray-100"><Mail className="w-4 h-4 text-gray-400"/><span className="text-gray-700">{userInfo.email}</span></div></div>
                     <div><label className="text-xs font-semibold text-gray-500 uppercase">Tel</label><div className="flex items-center gap-3 mt-1 p-2 bg-gray-50 rounded border border-gray-100"><Phone className="w-4 h-4 text-gray-400"/><span className="text-gray-700">{userInfo.phone || '-'}</span></div></div>
                     <div className="md:col-span-2"><label className="text-xs font-semibold text-gray-500 uppercase">Adresse</label><div className="flex items-center gap-3 mt-1 p-2 bg-gray-50 rounded border border-gray-100"><MapPin className="w-4 h-4 text-gray-400"/><span className="text-gray-700">{userInfo.address || '-'}</span></div></div>
@@ -386,48 +391,18 @@ export default function Profile() {
                 <span className="text-gray-700 font-medium">Notifications</span>
               </div>
               <button 
-                onClick={handleNotificationToggle} // 👇 Utilisation de la nouvelle fonction
+                onClick={handleNotificationToggle}
                 className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-300 focus:outline-none ${notificationsEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
               >
                 <div 
                   className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${notificationsEnabled ? 'translate-x-5' : 'translate-x-0'}`}
                 ></div>
-          </button>
-        </div>
-
-            {/* PERSONNES AIDÉES */}
-            <div className="border-t border-gray-100 pt-4">
-              <button 
-                onClick={() => setShowAssistedPeople(!showAssistedPeople)}
-                className="w-full flex items-center justify-between group"
-              >
-                <div className="flex items-center gap-3">
-                  <Heart className="text-gray-500 group-hover:text-red-500 transition-colors" size={20} />
-                  <span className="text-gray-700 font-medium group-hover:text-gray-900">Personnes aidées</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded text-sm">{assistedPeopleList.length}</span>
-                  {showAssistedPeople ? <ChevronUp size={16} className="text-gray-400"/> : <ChevronDown size={16} className="text-gray-400"/>}
-                </div>
               </button>
-
-              {/* Liste déroulante */}
-              {showAssistedPeople && (
-                <div className="mt-3 ml-8 p-3 bg-gray-50 rounded-lg animate-in fade-in slide-in-from-top-2">
-                  <p className="text-xs text-gray-500 uppercase font-semibold mb-2">Liste des bénéficiaires</p>
-                  {assistedPeopleList.map((person, idx) => (
-                    <div key={idx} className="flex items-center gap-2 py-1 text-gray-700">
-                      <div className="w-2 h-2 rounded-full bg-green-500"></div>
-                      {person}
-                    </div>
-                  ))}
-                </div>
-              )}
             </div>
 
             {/* DÉCONNEXION */}
             <button 
-              onClick={handleLogout} // <--- 4. Remplacez l'alert par handleLogout
+              onClick={handleLogout}
               className="flex items-center gap-3 text-orange-600 hover:text-orange-700 hover:bg-orange-50 p-2 rounded-lg transition-colors w-full text-left pt-4 border-t border-gray-100 mt-2"
             >
               <LogOut size={20} />

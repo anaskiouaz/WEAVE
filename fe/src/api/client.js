@@ -34,8 +34,6 @@ export async function apiGet(path, options = {}) {
     method: 'GET',
     headers: getHeaders(options),
   });
-  if (!res.ok) throw new Error(`API GET error: ${res.status}`);
-  return res.json();
   return handleResponse(res);
 }
 
@@ -45,8 +43,7 @@ export async function apiPost(path, body, options = {}) {
     headers: getHeaders(options),
     body: JSON.stringify(body),
   });
-  if (!res.ok) throw new Error(`API POST error: ${res.status}`);
-  return res.json();
+  return handleResponse(res);
 }
 
 export async function apiPut(path, body, options = {}) {
@@ -54,28 +51,6 @@ export async function apiPut(path, body, options = {}) {
     method: 'PUT',
     headers: getHeaders(options),
     body: JSON.stringify(body),
-  });
-  if (!res.ok) throw new Error(`API PUT error: ${res.status}`);
-  return res.json();
-}
-
-export async function apiDelete(path, options = {}) {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'DELETE',
-    headers: getHeaders(options),
-  });
-  if (!res.ok) throw new Error(`API DELETE error: ${res.status}`);
-  return res.json();
-  return handleResponse(res);
-}
-
-export async function apiPut(path, data) {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
   });
   return handleResponse(res);
 }

@@ -15,7 +15,7 @@ router.get('/', async (req, res) => {
 
     try {
         const userResult = await db.query(
-            'SELECT id, name, email, phone, address, skills, created_at FROM users WHERE id = $1',
+            'SELECT id, name, email, phone, address, skills, notifications_enabled, fcm_token, created_at FROM users WHERE id = $1',
             [userId]
         );
         if (userResult.rows.length === 0) return res.status(404).json({ success: false, error: 'User not found' });
@@ -61,18 +61,61 @@ router.put('/info', async (req, res) => {
 });
 
 // ============================================================
+// 2b. SAUVEGARDER PRÉFÉRENCE NOTIFICATIONS
+// ============================================================
+router.put('/notifications', async (req, res) => {
+    const userId = getUserId(req);
+    const { notifications_enabled } = req.body;
+    console.log(`🔔 Sauvegarde notification pour user ${userId}: ${notifications_enabled}`);
+    try {
+        await db.query(
+            'UPDATE users SET notifications_enabled = $1 WHERE id = $2',
+            [notifications_enabled, userId]
+        );
+        res.json({ success: true });
+    } catch (e) { 
+        console.error('Erreur sauvegarde notification:', e);
+        res.status(500).json({ success: false, error: e.message }); 
+    }
+});
+
+// ============================================================
 // 3. SAUVEGARDER COMPÉTENCES
 // ============================================================
 router.put('/skills', async (req, res) => {
     const userId = getUserId(req);
     const { skills } = req.body;
+    console.log('💡 Sauvegarde skills pour user:', userId, 'Skills:', skills);
+    try {
+        const result = await db.query(
+            'UPDATE users SET skills = $1 WHERE id = $2 RETURNING skills',
+            [skills || [], userId]
+        );
+        console.log('✅ Skills sauvegardées:', result.rows[0]);
+        res.json({ success: true });
+    } catch (e) { 
+        console.error('❌ Erreur sauvegarde skills:', e);
+        res.status(500).json({ success: false, error: e.message }); 
+    }
+});
+
+// ============================================================
+// 4. SAUVEGARDER NOTIFICATIONS
+// ============================================================
+router.put('/notifications', async (req, res) => {
+    const userId = getUserId(req);
+    const { enabled } = req.body; // Boolean attendu
+    
     try {
         await db.query(
-            'UPDATE users SET skills = $1 WHERE id = $2',
-            [JSON.stringify(skills || []), userId]
+            'UPDATE users SET notifications_enabled = $1 WHERE id = $2',
+            [enabled, userId]
         );
         res.json({ success: true });
-    } catch (e) { res.status(500).json({ success: false, error: e.message }); }
+    } catch (e) { 
+        console.error(e);
+        res.status(500).json({ success: false, error: e.message }); 
+    }
 });
 
 // ============================================================

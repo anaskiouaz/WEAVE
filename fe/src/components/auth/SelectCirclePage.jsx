@@ -7,8 +7,7 @@ import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Users, UserPlus, ArrowRight, Loader2, ArrowLeft, Calendar, Phone, Stethoscope, Check, LogIn } from 'lucide-react';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
-
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 // On garde ta liste d'options médicales qui est très bien
 const MEDICAL_OPTIONS = [
     "Risque d'Escarres", "Phlébite / Thrombose", "Fonte musculaire",
@@ -61,13 +60,30 @@ export default function SelectCirclePage() {
             if (body) config.body = JSON.stringify(body);
 
             const res = await fetch(`${API_BASE_URL}/circles${endpoint}`, config);
-            const data = await res.json();
+            
+            // Lire le texte d'abord
+            const text = await res.text();
+            
+            // Essayer de parser le JSON
+            let data;
+            try {
+                data = JSON.parse(text);
+            } catch (parseError) {
+                console.error('Réponse non-JSON reçue:', text.substring(0, 200));
+                throw new Error(`Le serveur n'a pas retourné de JSON valide (${res.status})`);
+            }
+            
+            // Vérifier si la réponse est OK
+            if (!res.ok) {
+                const errorMessage = data.error || data.message || "Une erreur est survenue";
+                throw new Error(errorMessage);
+            }
 
-            if (!res.ok) throw new Error(data.error || "Une erreur est survenue");
             return data; 
 
         } catch (err) {
-            setError(err.message);
+            const message = err.message || "Erreur de connexion au serveur";
+            setError(message);
             throw err; 
         } finally {
             setLoading(false);

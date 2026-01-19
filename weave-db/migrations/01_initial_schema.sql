@@ -41,9 +41,12 @@
                         email VARCHAR(255) UNIQUE NOT NULL,
                         onboarding_role VARCHAR(50),
                         phone VARCHAR(20),
+                        address TEXT,
                         birth_date DATE,
+                        skills TEXT[],
                         medical_info TEXT,                       -- Pour stocker les données chiffrées
                         privacy_consent BOOLEAN DEFAULT FALSE,   -- Pour le consentement RGPD
+                        notifications_enabled BOOLEAN DEFAULT FALSE,  -- Préférence notifications
                         password_hash VARCHAR(255) NOT NULL,
                         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                         role_global global_role_type,
@@ -80,7 +83,7 @@
         slots JSONB NOT NULL DEFAULT '[]'::jsonb, 
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
         CONSTRAINT fk_availability_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-        CONSTRAINT uq_user_day UNIQUE (user_id, day_of_week)
+        CONSTRAINT uq_user_day_circle UNIQUE (user_id, circle_id, day_of_week)
     );
 
     -- TACHES

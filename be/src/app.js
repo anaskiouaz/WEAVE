@@ -92,7 +92,7 @@ app.use('/health', healthRoutes); // Ou '/api/health' selon ta préférence
 app.use('/users', usersRoutes);
 app.use('/api/auth', authRoutes); // <--- CORRECTION ICI
 app.use('/api/upload', uploadRoutes);
-app.use('/profile_module', profile_module);
+app.use('/api/module/profile', profile_module);
 app.use('/api/users', usersRoutes);
 app.use('/api/tasks', tasksRoutes);
 
