@@ -51,6 +51,32 @@ export default function Admin() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  const handleRemoveMember = async (memberId, memberName) => {
+    // Demander confirmation
+    const confirmDelete = window.confirm(`Êtes-vous sûr de vouloir retirer "${memberName}" du cercle ?`);
+    if (!confirmDelete) return;
+
+    try {
+      const token = localStorage.getItem('weave_token');
+      const res = await fetch(`${API_BASE_URL}/circles/${adminCircle.id}/members/${memberId}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        // Rafraîchir la liste des membres
+        await fetchMembers(adminCircle.id);
+        alert(`${memberName} a été retiré du cercle.`);
+      } else {
+        const error = await res.json();
+        alert(`Erreur: ${error.error || "Impossible de retirer le membre"}`);
+      }
+    } catch (err) {
+      console.error("Erreur suppression membre", err);
+      alert("Erreur lors de la suppression du membre");
+    }
+  };
+
   // Si l'utilisateur n'est pas admin, on affiche un message simple
   if (!adminCircle) {
       return (
@@ -197,7 +223,11 @@ export default function Admin() {
 
                       {/* Actions (Supprimer) - Sauf pour l'admin lui-même et le senior */}
                       {member.role === 'HELPER' && (
-                        <button className="text-gray-300 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors" title="Retirer du cercle">
+                        <button 
+                          onClick={() => handleRemoveMember(member.id, member.name)}
+                          className="text-gray-300 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors" 
+                          title="Retirer du cercle"
+                        >
                             <Trash2 className="w-5 h-5" />
                         </button>
                       )}

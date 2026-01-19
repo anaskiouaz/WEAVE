@@ -15,6 +15,7 @@ import authRoutes from './routes/auth.js';
 import uploadRoutes from './routes/upload.js';
 import profile_module from   './routes/profile_module.js';  
 import circlesRoutes from './routes/circles.js';
+import dashboardRoutes from './routes/dashboard.js';
 
 const app = express();
 
@@ -60,7 +61,6 @@ app.use(cors({
     return callback(new Error('Not allowed by CORS'));
   },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
-  // 👇 AJOUTE 'x-user-id' ICI (C'est le plus important) 👇
   allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id'], 
   credentials: true,
 }));
@@ -70,10 +70,18 @@ app.use(helmet());
 app.use(morgan('dev'));
 app.use(express.json());
 
+// --- DEBUG LOGGING ---
+app.use((req, res, next) => {
+    if (req.method === 'POST' || req.method === 'PUT') {
+        console.log(`📦 REÇU [${req.method}] ${req.path} :`, req.body);
+    }
+    next();
+});
+
 // --- Servir les fichiers statiques (images uploadées) ---
 app.use('/uploads', express.static('uploads'));
 
-// --- 1. LANDING PAGE (Demandé en premier) ---
+// --- LANDING PAGE ---
 app.get('/', (req, res) => {
   res.send(`
     <div style="font-family: sans-serif; text-align: center; padding: 50px;">
@@ -84,55 +92,30 @@ app.get('/', (req, res) => {
   `);
 });
 
-app.use('/api', routes);
-// --- 2. Routes API Spécifiques ---
+// --- ROUTES API ---
+app.use('/api', routes); // Routeur principal contenant souvenirs, conversations, etc.
 app.use('/api/circles', circlesRoutes);
-app.use('/test-db', dbTestRouter);
-app.use('/health', healthRoutes); // Ou '/api/health' selon ta préférence
-app.use('/users', usersRoutes);
-app.use('/api/auth', authRoutes); // <--- CORRECTION ICI
+app.use('/api/auth', authRoutes);
 app.use('/api/upload', uploadRoutes);
 app.use('/api/module/profile', profile_module);
 app.use('/api/users', usersRoutes);
 app.use('/api/tasks', tasksRoutes);
+app.use('/api/dashboard', dashboardRoutes);
 
-// --- 3. Routeur Principal (si tu as un index global) ---
-// Toutes les routes définies dans routes/index.js seront préfixées par /api
-
-// --- Gestion des Erreurs (DOIT être à la fin) ---
-
-app.use((req, res, next) => {
-  res.status(404).json({ message: 'Ressource non trouvée', path: req.path });
-// IMPORTANT : Permet de lire le JSON envoyé par le React
-app.use(express.json()); 
-
-// --- DEBUG LOGGING ---
-// J'ajoute ceci pour que tu voies dans la console ce que le serveur reçoit
-app.use((req, res, next) => {
-    if (req.method === 'POST' || req.method === 'PUT') {
-        console.log(`📦 REÇU [${req.method}] ${req.path} :`, req.body);
-    }
-    next();
-});
-
-// --- ROUTES ---
+// Routes sans préfixe /api
 app.use('/test-db', dbTestRouter);
-
-// Toutes les routes API (dont conversations) sont montées ici
-app.use('/api', routes); 
+app.use('/health', healthRoutes);
 
 // --- GESTION DES ERREURS ---
 // 404 Not Found
 app.use((req, res, next) => {
-  res.status(404).json({ message: 'Route introuvable', path: req.path });
+  res.status(404).json({ message: 'Ressource non trouvée', path: req.path });
 });
 
 // Global Error Handler
 app.use((err, req, res, next) => {
   console.error('❌ Unhandled error:', err);
   res.status(500).json({ message: 'Erreur serveur interne', error: err.message });
-});
-
 });
 
 export default app;

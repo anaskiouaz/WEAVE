@@ -225,4 +225,50 @@ router.get('/me', authenticateToken, async (req, res) => {
   }
 });
 
+// ============================================================
+// 6. SUPPRIMER UN MEMBRE DU CERCLE
+// ============================================================
+router.delete('/:circleId/members/:memberId', authenticateToken, async (req, res) => {
+  const { circleId, memberId } = req.params;
+  const currentUserId = req.user.id;
+
+  try {
+    // 1. Vérifier que l'utilisateur courant est ADMIN du cercle
+    const adminCheck = await pool.query(
+      `SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2`,
+      [currentUserId, circleId]
+    );
+
+    if (adminCheck.rows.length === 0 || adminCheck.rows[0].role !== 'ADMIN') {
+      return res.status(403).json({ error: "Vous n'avez pas les permissions pour cette action." });
+    }
+
+    // 2. Vérifier que le membre à supprimer est un HELPER (pas le senior/PC)
+    const memberCheck = await pool.query(
+      `SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2`,
+      [memberId, circleId]
+    );
+
+    if (memberCheck.rows.length === 0) {
+      return res.status(404).json({ error: "Membre non trouvé dans ce cercle." });
+    }
+
+    if (memberCheck.rows[0].role !== 'HELPER') {
+      return res.status(400).json({ error: "Vous ne pouvez supprimer que les aidants." });
+    }
+
+    // 3. Supprimer le rôle du membre
+    await pool.query(
+      `DELETE FROM user_roles WHERE user_id = $1 AND circle_id = $2`,
+      [memberId, circleId]
+    );
+
+    res.json({ success: true, message: "Membre supprimé du cercle avec succès." });
+
+  } catch (error) {
+    console.error('Erreur suppression membre:', error);
+    res.status(500).json({ error: "Impossible de supprimer le membre." });
+  }
+});
+
 export default router;

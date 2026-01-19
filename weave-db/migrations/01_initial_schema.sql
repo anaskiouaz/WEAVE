@@ -41,6 +41,7 @@
                         email VARCHAR(255) UNIQUE NOT NULL,
                         onboarding_role VARCHAR(50),
                         phone VARCHAR(20),
+                        profile_photo VARCHAR(500),
                         address TEXT,
                         birth_date DATE,
                         skills TEXT[],
@@ -285,3 +286,77 @@ CREATE TABLE incidents (
 
     ALTER TABLE care_circles 
     ADD COLUMN invite_code VARCHAR(10) UNIQUE;
+
+-- ============================================================
+-- SYSTÈME DE NOTATION DES AIDANTS
+-- ============================================================
+
+-- Table pour stocker les notes entre aidants
+CREATE TABLE IF NOT EXISTS helper_ratings (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    rated_user_id UUID NOT NULL,           -- Aidant qui est noté
+    rater_user_id UUID NOT NULL,           -- Aidant qui donne la note
+    circle_id UUID NOT NULL,                -- Cercle dans lequel la note est donnée
+    rating INT NOT NULL CHECK (rating BETWEEN 1 AND 5),  -- Note de 1 à 5 étoiles
+    comment TEXT,                           -- Commentaire optionnel
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    
+    -- Contraintes
+    CONSTRAINT fk_rating_rated_user FOREIGN KEY (rated_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_rating_rater_user FOREIGN KEY (rater_user_id) REFERENCES users(id) ON DELETE CASCADE,
+    CONSTRAINT fk_rating_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE,
+    
+    -- Un utilisateur ne peut noter qu'une seule fois un autre utilisateur dans un cercle donné
+    CONSTRAINT uq_rating_per_circle UNIQUE (rated_user_id, rater_user_id, circle_id),
+    
+    -- Un utilisateur ne peut pas se noter lui-même
+    CONSTRAINT chk_no_self_rating CHECK (rated_user_id != rater_user_id)
+);
+
+-- Index pour optimiser les requêtes de calcul de moyenne
+CREATE INDEX IF NOT EXISTS idx_ratings_rated_user ON helper_ratings(rated_user_id);
+CREATE INDEX IF NOT EXISTS idx_ratings_circle ON helper_ratings(circle_id);
+CREATE INDEX IF NOT EXISTS idx_ratings_rater_user ON helper_ratings(rater_user_id);
+
+-- Vue pour calculer les moyennes de notation par utilisateur
+CREATE OR REPLACE VIEW helper_rating_averages AS
+SELECT 
+    rated_user_id,
+    ROUND(AVG(rating)::numeric, 2) as average_rating,
+    COUNT(*) as total_ratings
+FROM helper_ratings
+GROUP BY rated_user_id;
+
+-- Vue pour calculer les moyennes par utilisateur et par cercle
+CREATE OR REPLACE VIEW helper_rating_averages_by_circle AS
+SELECT 
+    rated_user_id,
+    circle_id,
+    ROUND(AVG(rating)::numeric, 2) as average_rating,
+    COUNT(*) as total_ratings
+FROM helper_ratings
+GROUP BY rated_user_id, circle_id;
+
+-- Fonction pour mettre à jour automatiquement updated_at
+CREATE OR REPLACE FUNCTION update_rating_timestamp()
+RETURNS TRIGGER AS $$
+BEGIN
+    NEW.updated_at = CURRENT_TIMESTAMP;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+-- Trigger pour mettre à jour updated_at lors d'une modification
+CREATE TRIGGER trigger_update_rating_timestamp
+BEFORE UPDATE ON helper_ratings
+FOR EACH ROW
+EXECUTE FUNCTION update_rating_timestamp();
+
+-- Commentaires pour la documentation
+COMMENT ON TABLE helper_ratings IS 'Stocke les notes données par les aidants aux autres aidants dans un cercle';
+COMMENT ON COLUMN helper_ratings.rated_user_id IS 'ID de l''aidant qui reçoit la note';
+COMMENT ON COLUMN helper_ratings.rater_user_id IS 'ID de l''aidant qui donne la note';
+COMMENT ON COLUMN helper_ratings.circle_id IS 'ID du cercle de soins concerné';
+COMMENT ON COLUMN helper_ratings.rating IS 'Note de 1 à 5 étoiles';
+COMMENT ON COLUMN helper_ratings.comment IS 'Commentaire optionnel accompagnant la note';
