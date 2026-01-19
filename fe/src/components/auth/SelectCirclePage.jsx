@@ -132,11 +132,26 @@ export default function SelectCirclePage() {
             if (data.circle_id || data.circle?.id) {
                 const finalId = data.circle_id || data.circle.id;
                 const finalName = data.circle_name || data.circle.senior_id || seniorData.name; // Fallback nom
+                const inviteCodeFromApi = data.invite_code || '';
 
                 localStorage.setItem('circle_id', finalId);
                 localStorage.setItem('circle_nom', finalName);
                 setCircleId(finalId);
                 setCircleNom(finalName); 
+                
+                // Ajouter le cercle créé à user.circles avec le rôle ADMIN
+                const newCircle = {
+                    id: finalId,
+                    senior_name: finalName,
+                    role: 'ADMIN',
+                    invite_code: inviteCodeFromApi
+                };
+                const updatedUser = { 
+                    ...user, 
+                    circles: [...(user?.circles || []), newCircle] 
+                };
+                setUser(updatedUser);
+                localStorage.setItem('weave_user', JSON.stringify(updatedUser));
                 
                 navigate('/dashboard');
             }
@@ -162,6 +177,20 @@ export default function SelectCirclePage() {
                 localStorage.setItem('circle_nom', finalName);
                 setCircleId(finalId);
                 setCircleNom(finalName);
+
+                // Ajouter le cercle rejoint à user.circles avec le rôle HELPER
+                const newCircle = {
+                    id: finalId,
+                    senior_name: finalName,
+                    role: 'HELPER',
+                    invite_code: ''
+                };
+                const updatedUser = { 
+                    ...user, 
+                    circles: [...(user?.circles || []), newCircle] 
+                };
+                setUser(updatedUser);
+                localStorage.setItem('weave_user', JSON.stringify(updatedUser));
 
                 navigate('/dashboard');
             }
