@@ -1,176 +1,189 @@
 import { useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../ui/card';
-import { ArrowLeft, Loader2, AlertCircle, User, Mail, Lock } from 'lucide-react';
-
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
+import { ArrowLeft, Loader2 } from 'lucide-react';
 
 export default function RegisterPage() {
-  // On récupère 'login' pour sauvegarder la session une fois l'inscription réussie
-  const { login } = useAuth();
+  const navigate = useNavigate();
+  const { register, login, loading } = useAuth();
+  const [error, setError] = useState('');
 
+  // Ajout du champ confirmPassword dans l'état
   const [formData, setFormData] = useState({
     name: '',
     email: '',
     password: '',
-    confirmPassword: ''
+    confirmPassword: '',
+    phone: '',
+    birth_date: '',
+    onboarding_role: ''
   });
-  
-  const [error, setError] = useState('');
-  const [loading, setLoading] = useState(false);
 
-  const handleChange = (e) => {
-    setFormData({ ...formData, [e.target.name]: e.target.value });
-    setError('');
+  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleSelectChange = (value) => setFormData({ ...formData, onboarding_role: value });
+
+  // Fonction de validation du mot de passe
+  const validatePassword = (password) => {
+    const minLength = 8;
+    const hasUpperCase = /[A-Z]/.test(password);
+    const hasNumber = /[0-9]/.test(password);
+    // Regex pour caractères spéciaux (ajustable selon vos besoins)
+    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>\-_]/.test(password);
+
+    if (password.length < minLength) return "Le mot de passe doit contenir au moins 8 caractères.";
+    if (!hasUpperCase) return "Le mot de passe doit contenir au moins une majuscule.";
+    if (!hasNumber) return "Le mot de passe doit contenir au moins un chiffre.";
+    if (!hasSpecialChar) return "Le mot de passe doit contenir au moins un caractère spécial.";
+    return null;
+  };
+
+
+  // Validation du numéro de téléphone (exemple France : 10 chiffres)
+  const validatePhone = (phone) => {
+    const onlyDigits = /^\d+$/;
+    if (!phone) return null; // Champ optionnel
+    if (!onlyDigits.test(phone)) return "Le numéro de téléphone doit contenir uniquement des chiffres.";
+    if (phone.length !== 10) return "Le numéro de téléphone doit contenir exactement 10 chiffres.";
+    return null;
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    // 1. Validation basique
+    // 1. Vérification : Les mots de passe correspondent
     if (formData.password !== formData.confirmPassword) {
-        return setError("Les mots de passe ne correspondent pas.");
-    }
-    if (formData.password.length < 6) {
-        return setError("Le mot de passe doit faire au moins 6 caractères.");
+      setError("Les mots de passe ne correspondent pas.");
+      return;
     }
 
-    setLoading(true);
+    // 2. Vérification : Complexité du mot de passe
+    const passwordError = validatePassword(formData.password);
+    if (passwordError) {
+      setError(passwordError);
+      return;
+    }
 
-    try {
-        // 2. Appel API direct (C'est ici qu'on remplace l'ancienne fonction 'register')
-        const res = await fetch(`${API_BASE_URL}/auth/register`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-                name: formData.name,
-                email: formData.email,
-                password: formData.password
-            })
-        });
+    // 3. Vérification : Numéro de téléphone
+    const phoneError = validatePhone(formData.phone);
+    if (phoneError) {
+      setError(phoneError);
+      return;
+    }
 
-        const result = await res.json();
+    // Préparation des données (on retire confirmPassword avant l'envoi)
+    const { confirmPassword, ...payload } = formData;
 
-        if (result.success) {
-            // 3. Succès : On connecte l'utilisateur immédiatement
-            login(result.token, result.user);
+    // 3. Inscription
+    const resRegister = await register(payload);
 
-            // 4. Redirection vers la sélection de cercle
-            window.location.href = '/select-circle';
-        } else {
-            // Erreur API (ex: Email déjà pris)
-            setError(result.error || "Erreur lors de l'inscription.");
-        }
-    } catch (err) {
-        console.error("Erreur Register:", err);
-        setError("Impossible de contacter le serveur.");
-    } finally {
-        setLoading(false);
+    if (resRegister.success) {
+      // 4. Connexion automatique après inscription
+      const resLogin = await login(formData.email, formData.password);
+      if (resLogin.success) {
+        navigate('/select-circle');
+      } else {
+        navigate('/login'); // Fallback si le login auto échoue
+      }
+    } else {
+      setError(resRegister.error || "Une erreur est survenue.");
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg shadow-xl border-t-4 border-blue-600">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 py-8">
+      <Card className="w-full max-w-lg shadow-xl border-t-6 border-blue-600">
         <CardHeader className="space-y-2 pb-6">
-          <Link to="/login" className="flex items-center text-lg text-gray-600 hover:text-blue-700 mb-4">
-            <ArrowLeft className="w-6 h-6 mr-2" /> Retour connexion
+          <Link to="/" className="flex items-center text-lg text-gray-600 hover:text-blue-700 mb-4">
+            <ArrowLeft className="w-6 h-6 mr-2" /> Retour
           </Link>
-          <CardTitle className="text-3xl font-bold text-blue-900">Créer un compte</CardTitle>
+          <CardTitle className="text-3xl font-bold text-blue-900">Créer mon compte</CardTitle>
         </CardHeader>
+
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-4">
+          <form onSubmit={handleSubmit} className="space-y-6">
 
             {error && (
-              <div className="p-3 text-red-700 bg-red-100 rounded-md text-sm font-medium border border-red-200 flex items-center gap-2">
-                <AlertCircle className="w-4 h-4" />
+              <div className="p-3 text-red-700 bg-red-100 rounded-md text-sm font-medium border border-red-200">
                 {error}
               </div>
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="name">Nom complet</Label>
-              <div className="relative">
-                <User className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                <Input
-                  id="name"
-                  name="name"
-                  placeholder="Jean Dupont"
-                  className="pl-10 h-12"
-                  value={formData.name}
-                  onChange={handleChange}
-                  required
-                />
+              <Label htmlFor="name" className="text-lg font-semibold text-gray-800">Nom complet *</Label>
+              <Input id="name" name="name" required className="h-14 text-lg bg-white" value={formData.name} onChange={handleChange} />
+            </div>
+
+            <div className="space-y-2">
+              <Label htmlFor="email" className="text-lg font-semibold text-gray-800">Email *</Label>
+              <Input id="email" name="email" type="email" required className="h-14 text-lg bg-white" value={formData.email} onChange={handleChange} />
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="phone" className="text-lg font-semibold">Téléphone</Label>
+                <Input id="phone" name="phone" className="h-14 text-lg bg-white" value={formData.phone} onChange={handleChange} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="birth_date" className="text-lg font-semibold">Date de naissance</Label>
+                <Input id="birth_date" name="birth_date" type="date" className="h-14 text-lg bg-white block w-full" value={formData.birth_date} onChange={handleChange} />
               </div>
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                <Input
-                  id="email"
-                  name="email"
-                  type="email"
-                  placeholder="jean@exemple.com"
-                  className="pl-10 h-12"
-                  value={formData.email}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
+              <Label className="text-lg font-semibold">Rôle *</Label>
+              <Select onValueChange={handleSelectChange} required>
+                <SelectTrigger className="h-14 text-lg bg-white"><SelectValue placeholder="Sélectionner..." /></SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ADMIN">Administrateur</SelectItem>
+                  <SelectItem value="HELPER">Aidant</SelectItem>
+                  <SelectItem value="PC">Bénéficiaire</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
 
+            {/* Mot de passe */}
             <div className="space-y-2">
-              <Label htmlFor="password">Mot de passe</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                <Input
-                  id="password"
-                  name="password"
-                  type="password"
-                  className="pl-10 h-12"
-                  value={formData.password}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
+              <Label htmlFor="password" className="text-lg font-semibold">Mot de passe *</Label>
+              <Input
+                id="password"
+                name="password"
+                type="password"
+                required
+                className="h-14 text-lg bg-white"
+                value={formData.password}
+                onChange={handleChange}
+              />
+              <p className="text-sm text-gray-500">8 caractères, 1 majuscule, 1 chiffre, 1 caractère spécial min.</p>
             </div>
 
+            {/* Confirmation du mot de passe */}
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword">Confirmer le mot de passe</Label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                <Input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type="password"
-                  className="pl-10 h-12"
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
-                  required
-                />
-              </div>
+              <Label htmlFor="confirmPassword" className="text-lg font-semibold">Confirmer le mot de passe *</Label>
+              <Input
+                id="confirmPassword"
+                name="confirmPassword"
+                type="password"
+                required
+                className={`h-14 text-lg bg-white ${formData.confirmPassword && formData.password !== formData.confirmPassword ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                value={formData.confirmPassword}
+                onChange={handleChange}
+              />
             </div>
 
-            <Button
-              type="submit"
-              size="lg"
-              disabled={loading}
-              className="w-full h-14 text-lg font-bold bg-blue-700 hover:bg-blue-800 mt-6 shadow-md"
-            >
-              {loading ? <Loader2 className="animate-spin mr-2" /> : "S'inscrire"}
+            <Button type="submit" size="lg" disabled={loading} className="w-full h-16 text-xl font-bold bg-blue-700 hover:bg-blue-800 mt-6 shadow-md text-white">
+              {loading ? <Loader2 className="animate-spin mr-2" /> : "Confirmer l'inscription"}
             </Button>
 
           </form>
         </CardContent>
         <CardFooter className="justify-center py-6 bg-gray-50/50 rounded-b-xl">
-          <p className="text-gray-600">Déjà un compte ? <Link to="/login" className="font-bold text-blue-700 hover:underline">Se connecter</Link></p>
+          <p className="text-lg">Déjà inscrit ? <Link to="/login" className="font-bold text-blue-700 hover:underline">Se connecter</Link></p>
         </CardFooter>
       </Card>
     </div>

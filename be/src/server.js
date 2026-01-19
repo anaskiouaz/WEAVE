@@ -6,11 +6,7 @@ import { initFirebase } from './config/firebase.js';
 import initCronJobs from './services/cronService.js';
 import { initSocket } from './services/socketService.js';
 
-// --- IMPORTS DES ROUTES ---
-import usersRoutes from './routes/users.js';
-import tasksRoutes from './routes/tasks.js';
-import circlesRoutes from './routes/circles.js'; 
-import auditRoutes from './routes/audit.js';     
+dotenv.config();
 
 const PORT = process.env.PORT || 3000;
 
@@ -22,7 +18,7 @@ initSocket(server);
 
 // 3. Initialisation DB
 const initDB = async () => {
-  console.log("🛠️  Vérification de la Base de Données...");
+  console.log("Vérification de la structure de la base de données...");
   try {
     // Table Users
     await db.query(`
@@ -31,21 +27,6 @@ const initDB = async () => {
         name VARCHAR(100),
         email VARCHAR(100) UNIQUE NOT NULL,
         password_hash TEXT,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        fcm_token TEXT,
-        onboarding_role VARCHAR(50),
-        role_global VARCHAR(50) DEFAULT 'USER'
-      );
-    `);
-
-    // 2. Table AUDIT_LOGS (CORRECTION DU TYPE ICI)
-    // On crée la table avec user_id en TEXT (pour accepter les UUID)
-    await db.query(`
-      CREATE TABLE IF NOT EXISTS audit_logs (
-        id SERIAL PRIMARY KEY,
-        user_id TEXT, 
-        action VARCHAR(255),
-        details TEXT,
         created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
@@ -60,12 +41,7 @@ const initDB = async () => {
         assigned_to VARCHAR(100),
         due_date TIMESTAMP,
         completed BOOLEAN DEFAULT FALSE,
-        circle_id INTEGER,
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-        date DATE,
-        time TIME,
-        required_helpers INTEGER DEFAULT 1,
-        helper_name VARCHAR(100)
+        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
       );
     `);
 
@@ -124,7 +100,7 @@ const initDB = async () => {
 
 // Initialisation Services
 initFirebase();
-initDB();
+initDB(); 
 initCronJobs();
 
 // Démarrage Serveur

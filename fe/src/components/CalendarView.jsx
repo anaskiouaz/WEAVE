@@ -62,9 +62,7 @@ export default function CalendarView() {
       }
       const data = await apiGet('/tasks');
       const allTasks = data.data || [];
-      // Filtrage côté client (idéalement le backend devrait filtrer, mais on garde ta logique)
       const filtered = allTasks.filter(t => String(t.circle_id) === String(circleId));
-      
       setTasks(filtered);
       setError(null);
     } catch (err) {
@@ -93,7 +91,6 @@ export default function CalendarView() {
     activity: { icon: Activity, color: 'bg-green-100 text-green-600 border-green-200' },
   };
 
-  // 3. AJOUT TÂCHE (Remplacé apiPost par authenticatedFetch)
   const handleAddTask = async () => {
     // ... (Code identique à avant) ...
     try {
@@ -126,15 +123,10 @@ export default function CalendarView() {
     }
   };
 
-  // 4. SUPPRESSION TÂCHE (Remplacé apiDelete par authenticatedFetch)
   const handleDeleteTask = async (taskId) => {
     if (!window.confirm("Êtes-vous sûr de vouloir supprimer cette tâche ?")) return;
     try {
-      // Appel sécurisé DELETE
-      await authenticatedFetch(`/tasks/${taskId}`, {
-        method: 'DELETE'
-      });
-
+      await apiDelete(`/tasks/${taskId}`);
       await loadTasks();
       setSelectedTask(null);
     } catch (err) {

@@ -1,15 +1,10 @@
 import { useLocation, Link } from 'react-router-dom';
 import { Home, Calendar, Heart, MessageSquare, User, Settings } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext'; 
+import { useAuth } from '../../context/AuthContext'; // 👈 1. Import du contexte
 
 export default function Navigation() {
     const location = useLocation();
-    const { user } = useAuth(); 
-
-    // Logique Admin (Sécurisée)
-    const userRole = user?.onboarding_role ? user.onboarding_role.toUpperCase() : '';
-    const globalRole = user?.role_global ? user.role_global.toUpperCase() : '';
-    const isAdmin = userRole === 'ADMIN' || globalRole === 'ADMIN' || globalRole === 'SUPERADMIN';
+    const { user } = useAuth(); // 👈 2. Récupération de l'user
 
     // Liste de base
     const navItems = [
@@ -20,8 +15,11 @@ export default function Navigation() {
         { path: '/profile', label: 'Profil', icon: User },
     ];
 
-    // Ajout conditionnel
+    // 👈 3. Ajout dynamique pour le mobile aussi
+    const isAdmin = user?.onboarding_role === 'admin' || user?.role_global === 'ADMIN';
+
     if (isAdmin) {
+        // On ajoute l'admin sur mobile seulement si tu le souhaites
         navItems.push({ path: '/admin', label: 'Admin', icon: Settings });
     }
 
