@@ -1,13 +1,22 @@
 import admin from 'firebase-admin';
-import { createRequire } from 'module';
-const require = createRequire(import.meta.url);
+import 'dotenv/config'; // Charge les variables du fichier .env
 
 let serviceAccount;
+
 try {
-    serviceAccount = require('../../service-account.json');
+  // On vérifie que la variable existe
+  if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
+    throw new Error("La variable d'environnement FIREBASE_SERVICE_ACCOUNT est vide.");
+  }
+
+  // On transforme la string JSON en objet JavaScript
+  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+
 } catch (e) {
-    console.error("ERREUR CRITIQUE: Impossible de trouver 'service-account.json' à la racine du backend !");
-    process.exit(1);
+  console.error("ERREUR CRITIQUE: Impossible de lire la configuration Firebase !");
+  console.error("Détail de l'erreur :", e.message);
+  // Vérifie bien que ton JSON est valide et sur une seule ligne dans le .env
+  process.exit(1);
 }
 
 export const initFirebase = () => {
@@ -16,7 +25,7 @@ export const initFirebase = () => {
       admin.initializeApp({
         credential: admin.credential.cert(serviceAccount)
       });
-      console.log("Firebase Admin initialisé avec succès");
+      console.log("Firebase Admin initialisé avec succès via variable d'environnement");
     }
   } catch (error) {
     console.error("Erreur initialisation Firebase:", error);
