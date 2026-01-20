@@ -2,6 +2,7 @@ import express from 'express';
 import { pool } from '../config/db.js';
 import { authenticateToken } from './../middleware/auth.js';
 import bcrypt from 'bcryptjs';
+import { logAudit, AUDIT_ACTIONS } from '../utils/audits.js';
 
 const router = express.Router();
 
@@ -81,8 +82,8 @@ router.post('/', authenticateToken, async (req, res) => {
     const dummyPassword = await bcrypt.hash("WeaveSeniorInit!", 10);
 
     const userRes = await client.query(
-      `INSERT INTO users (name, email, password_hash, birth_date, phone, medical_info, onboarding_role, role_global) 
-       VALUES ($1, $2, $3, $4, $5, $6, 'PC', 'USER') 
+      `INSERT INTO users (name, email, password_hash, birth_date, phone, medical_info, role_global) 
+       VALUES ($1, $2, $3, $4, $5, $6, 'USER') 
        RETURNING id`,
       [
         senior_info.name,
@@ -177,6 +178,19 @@ router.post('/join', authenticateToken, async (req, res) => {
       [userId, circle.id]
     );
 
+    // Récupérer le nom de l'utilisateur pour le log
+    const userRes = await pool.query(`SELECT name FROM users WHERE id = $1`, [userId]);
+    const userName = userRes.rows[0]?.name || 'Utilisateur';
+
+    // 📝 Log de l'action
+    await logAudit(
+      userId, 
+      AUDIT_ACTIONS.MEMBER_JOINED, 
+      `${userName} a rejoint le cercle`, 
+      circle.id
+    );
+
+    // Retour standardisé
     res.json({ 
         success: true, 
         circle_id: circle.id,
@@ -259,6 +273,18 @@ router.delete('/:circleId/members/:memberId', authenticateToken, async (req, res
       [memberId, circleId]
     );
 
+    // Récupérer le nom du membre supprimé pour le log
+    const memberRes = await pool.query(`SELECT name FROM users WHERE id = $1`, [memberId]);
+    const memberName = memberRes.rows[0]?.name || 'Utilisateur';
+
+    // 📝 Log de l'action
+    await logAudit(
+      currentUserId, 
+      AUDIT_ACTIONS.MEMBER_REMOVED, 
+      `${memberName} a été retiré du cercle`, 
+      circleId
+    );
+
     res.json({ success: true, message: "Membre supprimé du cercle avec succès." });
 
   } catch (error) {
@@ -267,8 +293,113 @@ router.delete('/:circleId/members/:memberId', authenticateToken, async (req, res
   }
 });
 
+// 7. RÉCUPÉRER LES LOGS D'ACTIVITÉ DU CERCLE (DEPUIS DEV)
 // ============================================================
-// 7. GET INFO CERCLE (AJOUT POUR TA MESSAGERIE)
+router.get('/:circleId/logs', authenticateToken, async (req, res) => {
+  const { circleId } = req.params;
+  const { limit = 50 } = req.query;
+
+  try {
+    const memberCheck = await pool.query(
+      `SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2`,
+      [req.user.id, circleId]
+    );
+
+    if (memberCheck.rows.length === 0) {
+      return res.status(403).json({ error: "Vous n'avez pas accès à ce cercle." });
+    }
+
+    const result = await pool.query(`
+      SELECT 
+        al.id,
+        al.action,
+        al.details,
+        al.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Paris' as created_at,
+        u.name as user_name
+      FROM audit_logs al
+      LEFT JOIN users u ON al.user_id = u.id
+      WHERE al.circle_id = $1
+      ORDER BY al.created_at DESC
+      LIMIT $2
+    `, [circleId, parseInt(limit)]);
+
+    res.json({
+      status: 'ok',
+      data: result.rows,
+      count: result.rows.length
+    });
+
+  } catch (error) {
+    console.error('Erreur récupération logs:', error);
+    res.status(500).json({ error: "Impossible de récupérer les logs." });
+  }
+});
+
+// 8. SUPPRIMER UN CERCLE (DEPUIS DEV - GÈRE TES MESSAGES AUSSI)
+// ============================================================
+router.delete('/:circleId', authenticateToken, async (req, res) => {
+  const { circleId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    const adminCheck = await pool.query(
+      `SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2`,
+      [userId, circleId]
+    );
+
+    if (adminCheck.rows.length === 0 || adminCheck.rows[0].role !== 'ADMIN') {
+      return res.status(403).json({ error: "Seul l'administrateur peut supprimer le cercle." });
+    }
+
+    const circleRes = await pool.query(
+      `SELECT u.name as senior_name 
+       FROM care_circles c
+       JOIN users u ON c.senior_id = u.id
+       WHERE c.id = $1`, 
+      [circleId]
+    );
+    const circleName = circleRes.rows[0]?.senior_name || 'Cercle';
+
+    // Suppressions en cascade (tes collègues ont inclus tes tables ici, c'est parfait)
+    await pool.query(`DELETE FROM audit_logs WHERE circle_id = $1`, [circleId]);
+    await pool.query(`DELETE FROM journal_entries WHERE circle_id = $1`, [circleId]);
+    await pool.query(`DELETE FROM task_signups WHERE task_id IN (SELECT id FROM tasks WHERE circle_id = $1)`, [circleId]);
+    await pool.query(`DELETE FROM tasks WHERE circle_id = $1`, [circleId]);
+    await pool.query(`DELETE FROM user_availability WHERE circle_id = $1`, [circleId]);
+    
+    // Nettoyage Messagerie
+    await pool.query(`
+      DELETE FROM message 
+      WHERE conversation_id IN (SELECT id FROM conversation WHERE cercle_id = $1)
+    `, [circleId]);
+    
+    await pool.query(`
+      DELETE FROM participant_conversation 
+      WHERE conversation_id IN (SELECT id FROM conversation WHERE cercle_id = $1)
+    `, [circleId]);
+    
+    await pool.query(`DELETE FROM conversation WHERE cercle_id = $1`, [circleId]);
+    
+    // Nettoyage final
+    await pool.query(`DELETE FROM incidents WHERE circle_id = $1`, [circleId]);
+    await pool.query(`DELETE FROM helper_ratings WHERE circle_id = $1`, [circleId]);
+    await pool.query(`DELETE FROM user_roles WHERE circle_id = $1`, [circleId]);
+    await pool.query(`DELETE FROM care_circles WHERE id = $1`, [circleId]);
+
+    console.log(`🗑️ Cercle "${circleName}" (${circleId}) supprimé par l'utilisateur ${userId}`);
+
+    res.json({ 
+      success: true, 
+      message: `Le cercle "${circleName}" a été supprimé définitivement.` 
+    });
+
+  } catch (error) {
+    console.error('Erreur suppression cercle:', error);
+    res.status(500).json({ error: "Impossible de supprimer le cercle." });
+  }
+});
+
+// 9. GET INFO CERCLE (TA ROUTE - À GARDER POUR LE FRONT)
 // ============================================================
 router.get('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;

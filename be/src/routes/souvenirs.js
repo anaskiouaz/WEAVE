@@ -4,6 +4,7 @@ import crypto from 'crypto';
 import { generateBlobSASUrl } from '../utils/azureStorage.js';
 import { BlobServiceClient } from '@azure/storage-blob';
 import admin from '../config/firebase.js';
+import { logAudit, AUDIT_ACTIONS } from '../utils/audits.js';
 
 // Configuration Azure pour la suppression
 const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
@@ -147,6 +148,14 @@ export async function createJournalEntry(req, res) {
     const authorResult = await db.query(`SELECT name FROM users WHERE id = $1`, [author_id]);
     const authorName = authorResult.rows.length ? authorResult.rows[0].name : 'Inconnu';
 
+    // 📝 Log de l'action
+    await logAudit(
+      author_id,
+      AUDIT_ACTIONS.SOUVENIR_CREATED,
+      `${authorName} a ajouté un souvenir`,
+      resolvedCircleId
+    );
+
     // ✅ Réponse envoyée au client (Succès)
     res.status(201).json({
       status: 'ok',
@@ -219,8 +228,18 @@ export async function addCommentToEntry(req, res) {
       `UPDATE journal_entries 
        SET comments = comments || $1::jsonb 
        WHERE id = $2 
-       RETURNING comments`,
+       RETURNING comments, circle_id`,
       [JSON.stringify([newMessage]), id]
+    );
+
+    // 📝 Log de l'action
+    const circleId = result.rows[0]?.circle_id;
+    const truncatedContent = content.length > 100 ? content.substring(0, 100) + '...' : content;
+    await logAudit(
+      null, // On n'a pas l'ID utilisateur ici, juste le nom
+      AUDIT_ACTIONS.COMMENT_ADDED,
+      `${author_name} a commenté : "${truncatedContent}"`,
+      circleId
     );
 
     res.json({ status: 'ok', data: result.rows[0].comments });
@@ -273,6 +292,19 @@ export async function deleteCommentFromEntry(req, res) {
       [JSON.stringify(comments), id]
     );
 
+    // Récupérer le circle_id pour le log
+    const souvenirInfo = await db.query('SELECT circle_id FROM journal_entries WHERE id = $1', [id]);
+    const circleId = souvenirInfo.rows[0]?.circle_id;
+
+    // 📝 Log de l'action
+    const truncatedContent = comment.content?.length > 100 ? comment.content.substring(0, 100) + '...' : comment.content;
+    await logAudit(
+      null,
+      AUDIT_ACTIONS.COMMENT_DELETED,
+      `${author_name} a supprimé : "${truncatedContent}"`,
+      circleId
+    );
+
     res.json({ status: 'ok', data: comments });
   } catch (err) {
     res.status(500).json({ status: 'error', message: err.message });
@@ -292,9 +324,9 @@ export async function deleteJournalEntry(req, res) {
       });
     }
 
-    // Récupérer les informations du souvenir avant suppression (pour l'image)
+    // Récupérer les informations du souvenir avant suppression (pour l'image et le log)
     const souvenirResult = await db.query(
-      'SELECT id, author_id, photo_data FROM journal_entries WHERE id = $1',
+      'SELECT id, author_id, photo_data, circle_id FROM journal_entries WHERE id = $1',
       [id]
     );
 
@@ -322,6 +354,18 @@ export async function deleteJournalEntry(req, res) {
 
     // Supprimer le souvenir de la base de données
     await db.query('DELETE FROM journal_entries WHERE id = $1', [id]);
+
+    // Récupérer le nom de l'auteur pour le log
+    const authorResult = await db.query('SELECT name FROM users WHERE id = $1', [author_id]);
+    const authorName = authorResult.rows[0]?.name || 'Utilisateur';
+
+    // 📝 Log de l'action
+    await logAudit(
+      author_id,
+      AUDIT_ACTIONS.SOUVENIR_DELETED,
+      `${authorName} a supprimé un souvenir`,
+      souvenir.circle_id
+    );
 
     console.log('✅ Souvenir supprimé avec succès:', id);
     res.json({

@@ -15,7 +15,7 @@ router.get('/', async (req, res) => {
 
     try {
         const userResult = await db.query(
-            'SELECT id, name, email, phone, address, skills, notifications_enabled, fcm_token, created_at FROM users WHERE id = $1',
+            'SELECT id, name, email, phone, address, skills, notifications_enabled, fcm_token, profile_photo, created_at FROM users WHERE id = $1',
             [userId]
         );
         if (userResult.rows.length === 0) return res.status(404).json({ success: false, error: 'User not found' });
@@ -46,15 +46,16 @@ router.get('/', async (req, res) => {
 });
 
 // ============================================================
-// 2. SAUVEGARDER INFOS (Nom, Tel, Adresse)
+// 2. SAUVEGARDER INFOS (Tel, Adresse)
+// Note: Le nom (name) ne peut plus être modifié, comme l'email
 // ============================================================
 router.put('/info', async (req, res) => {
     const userId = getUserId(req);
-    const { name, phone, address } = req.body;
+    const { phone, address } = req.body;
     try {
         await db.query(
-            'UPDATE users SET name = $1, phone = $2, address = $3 WHERE id = $4',
-            [name, phone, address, userId]
+            'UPDATE users SET phone = $1, address = $2 WHERE id = $3',
+            [phone, address, userId]
         );
         res.json({ success: true });
     } catch (e) { res.status(500).json({ success: false, error: e.message }); }
@@ -157,8 +158,10 @@ router.get('/stats', async (req, res) => {
 
     try {
         // Compter les interventions (tasks assignées à l'utilisateur)
+        // Note: assigned_to est un tableau UUID[], donc on utilise l'opérateur @> ou ANY
+        // assigned_to is a uuid[]; use ANY(...) to check membership
         const tasksResult = await db.query(
-            'SELECT COUNT(*) as count FROM tasks WHERE assigned_to = $1 AND completed = true',
+            'SELECT COUNT(*) as count FROM tasks WHERE $1 = ANY(assigned_to) AND completed = true',
             [userId]
         );
         const interventions = parseInt(tasksResult.rows[0].count) || 0;
@@ -208,6 +211,39 @@ router.get('/stats', async (req, res) => {
         });
     } catch (error) {
         console.error('Erreur stats:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ============================================================
+// 5. UPLOADER PHOTO DE PROFIL
+// ============================================================
+router.post('/upload-photo', async (req, res) => {
+    const userId = getUserId(req);
+    const { photoBlobName } = req.body;
+
+    if (!userId || !photoBlobName) {
+        return res.status(400).json({ success: false, error: 'User ID et photoBlobName requis' });
+    }
+
+    try {
+        // Sauvegarder l'URL du blob Azure en base de données
+        const result = await db.query(
+            'UPDATE users SET profile_photo = $1 WHERE id = $2 RETURNING profile_photo',
+            [photoBlobName, userId]
+        );
+
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'User not found' });
+        }
+
+        console.log(`✅ Photo de profil sauvegardée pour user ${userId}: ${photoBlobName}`);
+        res.json({ 
+            success: true, 
+            photoUrl: result.rows[0].profile_photo 
+        });
+    } catch (error) {
+        console.error('Erreur sauvegarde photo:', error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

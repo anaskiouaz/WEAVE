@@ -6,26 +6,34 @@ import { useState } from 'react';
 import Dashboard from './components/Dashboard';
 import CalendarView from './components/CalendarView';
 import Memories from './components/Memories';
-import Messages from './components/messagerie/Messages'; 
+import Messages from './components/messagerie/Messages';
 import Profile from './components/Profile';
 import Admin from './components/Admin';
 import EmergencyDialog from './components/EmergencyDialog';
-// import Navigation from './components/ui-mobile/navigation'; // Je commente ça pour l'instant si le fichier n'existe pas
+import Navigation from './components/ui-mobile/navigation';
+import OnboardingTour from './components/OnboardingTour';
 
 import LandingPage from './components/LandingPage';
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
 import SelectCirclePage from './components/auth/SelectCirclePage';
 import AdminGuard from './components/auth/AdminGuard'; // J'ai ajouté l'import du Guard
-import { useAuth } from './context/AuthContext'; 
+import { useAuth } from './context/AuthContext';
+
+// RGPD - Gestion des cookies
+import { CookieProvider } from './context/CookieContext';
+import CookieBanner from './components/CookieBanner';
+import CookiePreferences from './components/CookiePreferences';
+import PrivacyPolicy from './components/PrivacyPolicy';
+import LegalNotice from './components/LegalNotice';
 
 function ProtectedLayout() {
   const location = useLocation();
   const hideNav = location.pathname.startsWith('/select-circle');
   const [emergencyOpen, setEmergencyOpen] = useState(false);
-  
+
   // 1. On récupère 'user' ici pour vérifier le rôle
-  const { token, logout, user } = useAuth(); 
+  const { token, logout, user } = useAuth();
   const navigate = useNavigate();
 
   const handleLogout = () => {
@@ -36,30 +44,25 @@ function ProtectedLayout() {
   if (!token) return <Navigate to="/" replace />;
 
   // --- LOGIQUE DE SÉCURITÉ ADMIN ---
-  // On met tout en majuscules pour éviter les bugs
-  const userRole = user?.onboarding_role ? user.onboarding_role.toUpperCase() : '';
+  // Déterminer le rôle via `role_global` ou via les rôles présents dans `user.circles`
   const globalRole = user?.role_global ? user.role_global.toUpperCase() : '';
-  
-  // Est-ce un admin ?
-  const isAdmin = userRole === 'ADMIN' || globalRole === 'ADMIN' || globalRole === 'SUPERADMIN';
+  const hasCircleAdmin = Array.isArray(user?.circles) && user.circles.some(c => (c.role || '').toUpperCase() === 'ADMIN' || (c.role || '').toUpperCase() === 'SUPERADMIN');
 
   // 2. Liste des liens DE BASE (accessibles à tous)
   const navItems = [
     { path: '/dashboard', icon: Home, label: 'Accueil' },
     { path: '/calendar', icon: Calendar, label: 'Calendrier' },
     { path: '/memories', icon: Heart, label: 'Souvenirs' },
-    { path: '/messages', icon: MessageSquare, label: 'Messages' }, 
+    { path: '/messages', icon: MessageSquare, label: 'Messages' },
     { path: '/profile', icon: User, label: 'Profil' },
+    { path: '/admin', icon: Settings, label: 'Administration' }
   ];
-
-  // 3. On ajoute le bouton Administration SEULEMENT si c'est un admin
-  if (isAdmin) {
-    navItems.push({ path: '/admin', icon: Settings, label: 'Administration' });
-  }
 
   return (
     <div className="flex h-screen bg-gray-50">
-      {/* SIDEBAR DESKTOP */}
+      <OnboardingTour />
+
+      {/* --- SIDEBAR (VISIBLE UNIQUEMENT SUR DESKTOP) --- */}
       {!hideNav && (
         <aside className="hidden md:flex w-64 bg-white shadow-lg flex-col z-50">
           <div className="p-6 border-b">
@@ -71,11 +74,11 @@ function ProtectedLayout() {
               <Link
                 key={path}
                 to={path}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-lg ${
-                  location.pathname === path
+                data-tour={`nav-${label.toLowerCase().replace(/\s+/g, '-')}`}
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-lg ${location.pathname === path
                   ? 'bg-blue-50 text-blue-600 font-medium'
                   : 'text-gray-700 hover:bg-gray-50'
-                }`}
+                  }`}
               >
                 <Icon className="w-6 h-6" />
                 <span>{label}</span>
@@ -125,30 +128,39 @@ function ProtectedLayout() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+    <CookieProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Routes Publiques */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/politique-confidentialite" element={<PrivacyPolicy />} />
+          <Route path="/mentions-legales" element={<LegalNotice />} />
 
-        {/* Routes Protégées */}
-        <Route element={<ProtectedLayout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/calendar" element={<CalendarView />} />
-          <Route path="/memories" element={<Memories />} />
-          <Route path="/messages" element={<Messages />} />
-          <Route path="/profile" element={<Profile />} />
-          
-          {/* Route Admin protégée par le Guard */}
-          <Route path="/admin" element={
-            <AdminGuard>
-              <Admin />
-            </AdminGuard>
-          } />
-          
-          <Route path="/select-circle" element={<SelectCirclePage />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+          {/* Routes Protégées */}
+          <Route element={<ProtectedLayout />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/calendar" element={<CalendarView />} />
+            <Route path="/memories" element={<Memories />} />
+            <Route path="/messages" element={<Messages />} />
+            <Route path="/profile" element={<Profile />} />
+
+            {/* Route Admin protégée par le Guard */}
+            <Route path="/admin" element={
+              <AdminGuard>
+                <Admin />
+              </AdminGuard>
+            } />
+
+            <Route path="/select-circle" element={<SelectCirclePage />} />
+          </Route>
+        </Routes>
+        
+        {/* RGPD - Bannière et modal de préférences cookies */}
+        <CookieBanner />
+        <CookiePreferences />
+      </BrowserRouter>
+    </CookieProvider>
   );
 }

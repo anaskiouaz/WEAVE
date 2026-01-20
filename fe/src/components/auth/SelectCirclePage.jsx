@@ -12,15 +12,15 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 const MEDICAL_OPTIONS = [
     "Risque d'Escarres", "Phlébite / Thrombose", "Fonte musculaire",
     "Ankyloses / Raideurs", "Constipation", "Incontinence",
-    "Encombrement bronchique", "Syndrome de glissement", "Ostéoporose"
+    "Encombrement bronchique", "Syndrome de glissement", "Ostéoporose", "Autre"
 ];
 
 export default function SelectCirclePage() {
     const navigate = useNavigate();
     // On utilise le contexte pour sauvegarder le choix de l'utilisateur
-    const { setCircleId, setCircleNom, token } = useAuth(); 
+    const { setCircleId, setCircleNom, token, refreshUser } = useAuth();
 
-    const [view, setView] = useState('selection'); 
+    const [view, setView] = useState('selection');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [myCircles, setMyCircles] = useState([]);
@@ -35,11 +35,11 @@ export default function SelectCirclePage() {
     const toggleMedicalOption = (option) => {
         setSeniorData(prev => {
             const isSelected = prev.medical_select.includes(option);
-            return { 
-                ...prev, 
-                medical_select: isSelected 
-                    ? prev.medical_select.filter(item => item !== option) 
-                    : [...prev.medical_select, option] 
+            return {
+                ...prev,
+                medical_select: isSelected
+                    ? prev.medical_select.filter(item => item !== option)
+                    : [...prev.medical_select, option]
             };
         });
     };
@@ -48,22 +48,22 @@ export default function SelectCirclePage() {
     const apiCall = async (endpoint, method = 'POST', body = null) => {
         setLoading(true);
         setError('');
-        
+
         try {
-            const config = { 
-                method, 
+            const config = {
+                method,
                 headers: {
                     'Content-Type': 'application/json',
                     'Authorization': `Bearer ${token}`
-                } 
+                }
             };
             if (body) config.body = JSON.stringify(body);
 
             const res = await fetch(`${API_BASE_URL}/circles${endpoint}`, config);
-            
+
             // Lire le texte d'abord
             const text = await res.text();
-            
+
             // Essayer de parser le JSON
             let data;
             try {
@@ -72,19 +72,19 @@ export default function SelectCirclePage() {
                 console.error('Réponse non-JSON reçue:', text.substring(0, 200));
                 throw new Error(`Le serveur n'a pas retourné de JSON valide (${res.status})`);
             }
-            
+
             // Vérifier si la réponse est OK
             if (!res.ok) {
                 const errorMessage = data.error || data.message || "Une erreur est survenue";
                 throw new Error(errorMessage);
             }
 
-            return data; 
+            return data;
 
         } catch (err) {
             const message = err.message || "Erreur de connexion au serveur";
             setError(message);
-            throw err; 
+            throw err;
         } finally {
             setLoading(false);
         }
@@ -95,7 +95,7 @@ export default function SelectCirclePage() {
     // 1. Charger la liste des cercles existants (Nouvelle feature !)
     const handleViewList = async () => {
         try {
-            const data = await apiCall('/', 'GET'); 
+            const data = await apiCall('/', 'GET');
             const circles = Array.isArray(data) ? data : (data.circles || []);
             setMyCircles(circles);
             setView('list');
@@ -108,9 +108,11 @@ export default function SelectCirclePage() {
     const selectExistingCircle = (circle) => {
         localStorage.setItem('circle_id', circle.id);
         localStorage.setItem('circle_nom', circle.name);
+        // Réinitialiser le tour onboarding
+        localStorage.removeItem('weave_onboarding_seen');
         setCircleId(circle.id);
-        setCircleNom(circle.name); 
-        navigate('/dashboard');
+        setCircleNom(circle.name);
+        navigate(`/dashboard?circle_id=${circle.id}`);
     };
 
     // 3. Créer un nouveau cercle
@@ -120,25 +122,32 @@ export default function SelectCirclePage() {
 
         const payloadInfo = {
             ...seniorData,
-            medical_info: seniorData.medical_select.length > 0 
-                ? seniorData.medical_select.join(', ') 
+            medical_info: seniorData.medical_select.length > 0
+                ? seniorData.medical_select.join(', ')
                 : null
         };
         delete payloadInfo.medical_select;
 
         try {
             const data = await apiCall('/', 'POST', { senior_info: payloadInfo });
-            
+
             if (data.circle_id || data.circle?.id) {
                 const finalId = data.circle_id || data.circle.id;
                 const finalName = data.circle_name || data.circle.senior_id || seniorData.name; // Fallback nom
+                const inviteCodeFromApi = data.invite_code || '';
 
                 localStorage.setItem('circle_id', finalId);
                 localStorage.setItem('circle_nom', finalName);
+                // Réinitialiser le tour onboarding
+                localStorage.removeItem('weave_onboarding_seen');
                 setCircleId(finalId);
-                setCircleNom(finalName); 
-                
-                navigate('/dashboard');
+                setCircleNom(finalName);
+
+                // Mettre à jour l'utilisateur en local (pour que les rôles soient à jour)
+                try { await refreshUser(); } catch (e) { /* ignore */ }
+
+                // Redirige directement vers le dashboard du cercle créé
+                navigate(`/dashboard?circle_id=${finalId}`);
             }
         } catch (err) {
             // Erreur gérée dans apiCall
@@ -149,10 +158,10 @@ export default function SelectCirclePage() {
     const handleJoin = async (e) => {
         e.preventDefault();
         if (!inviteCode.trim()) return setError("Le code est requis.");
-        
+
         try {
             const data = await apiCall('/join', 'POST', { invite_code: inviteCode });
-            
+
             if (data.circle_id || data.circle?.id) {
                 const finalId = data.circle_id || data.circle.id;
                 // On essaie de récupérer le nom, sinon "Nouveau Cercle"
@@ -160,10 +169,16 @@ export default function SelectCirclePage() {
 
                 localStorage.setItem('circle_id', finalId);
                 localStorage.setItem('circle_nom', finalName);
+                // Réinitialiser le tour onboarding
+                localStorage.removeItem('weave_onboarding_seen');
                 setCircleId(finalId);
                 setCircleNom(finalName);
 
-                navigate('/dashboard');
+                // Mettre à jour l'utilisateur en local (pour que les rôles soient à jour)
+                try { await refreshUser(); } catch (e) { /* ignore */ }
+
+                // Redirige directement vers le dashboard du cercle rejoint
+                navigate(`/dashboard?circle_id=${finalId}`);
             }
         } catch (err) {
             // Erreur gérée
@@ -191,7 +206,7 @@ export default function SelectCirclePage() {
                         {view === 'list' && "Sélectionnez le senior dont vous voulez voir le suivi."}
                     </CardDescription>
                 </CardHeader>
-                
+
                 <CardContent className="px-8 pb-10">
                     {error && (
                         <div className="mb-6 p-4 text-red-700 bg-red-100 rounded-lg text-sm font-medium border border-red-200 flex items-center">
@@ -283,7 +298,8 @@ export default function SelectCirclePage() {
                                 </div>
                             </div>
                             <div className="space-y-3 pt-2">
-                                <Label className="flex items-center gap-2"><Stethoscope className="w-4 h-4 text-blue-600" /> Pathologies / Risques</Label>
+                                <Label className="flex items-center gap-2"><Stethoscope className="w-4 h-4 text-blue-600" /> Pathologies / Risques <span className="text-xs text-gray-500 font-normal">(optionnel)</span></Label>
+                                <p className="text-xs text-gray-500">Ces informations ne sont pas obligatoires.</p>
                                 <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                                     <div className="flex flex-wrap gap-2">
                                         {MEDICAL_OPTIONS.map((option) => {

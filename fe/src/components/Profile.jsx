@@ -1,13 +1,16 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, Bell, Heart, LogOut, Camera, ChevronDown, ChevronUp, PenSquare } from 'lucide-react';
+import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, LogOut, Camera, RotateCcw, Cookie, Heart, ChevronDown, ChevronUp } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useCookieConsent } from '../context/CookieContext';
+import RestartOnboardingButton from './RestartOnboardingButton';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 
 export default function Profile() {
   const { user, logout } = useAuth();
+  const { openPreferences } = useCookieConsent();
   const navigate = useNavigate();
   
   // --- ID DYNAMIQUE (Vital pour que ça marche) ---
@@ -24,6 +27,7 @@ export default function Profile() {
   const [availability, setAvailability] = useState([]);
   const [stats, setStats] = useState({ interventions: 0, moments: 0, rating: 0 });
   const [skills, setSkills] = useState([]);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   
   // --- UI ETATS (Travail de l'équipe : Personnes aidées) ---
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -75,8 +79,8 @@ export default function Profile() {
           phone: userData.phone || '',
           address: userData.address || '',
           joinDate: createdDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
-          yearsActive: '0 jour', // Sera écrasé par les stats si dispo
-          photoUrl: null 
+          yearsActive: 0,  // Sera mis à jour par les stats
+          photoUrl: userData.profile_photo ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'}/uploads/${userData.profile_photo}` : null
         });
 
         // Formatage des disponibilités
@@ -254,8 +258,97 @@ export default function Profile() {
     navigate('/login');
   };
 
-  // --- RENDER ---
-  if (!USER_ID || isLoading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><Loader2 className="animate-spin text-blue-600 w-10 h-10"/></div>;
+  const handlePhotoClick = () => fileInputRef.current.click();
+  
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsUploadingPhoto(true);
+    try {
+      // 1. Afficher l'aperçu temporaire
+      const tempUrl = URL.createObjectURL(file);
+      setUserInfo({ ...userInfo, photoUrl: tempUrl });
+
+      // 2. Préparer le FormData pour l'upload
+      const formData = new FormData();
+      formData.append('image', file);
+
+      // 3. Uploader vers le backend qui uploadera à Azure
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+      const uploadResponse = await fetch(`${API_BASE_URL}/api/upload/image`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Erreur lors de l\'upload de l\'image');
+      }
+
+      const uploadData = await uploadResponse.json();
+      if (uploadData.status !== 'ok' || !uploadData.data.blobName) {
+        throw new Error('Erreur lors de la sauvegarde de l\'image');
+      }
+
+      // 4. Sauvegarder le nom du blob en base de données
+      const options = { headers: { 'x-user-id': USER_ID } };
+      const saveResponse = await apiPost('/module/profile/upload-photo', {
+        photoBlobName: uploadData.data.blobName
+      }, options);
+
+      if (saveResponse.success) {
+        // 5. Mettre à jour l'URL avec le blob Azure
+        const photoUrl = `${API_BASE_URL}/uploads/${uploadData.data.blobName}`;
+        setUserInfo({ ...userInfo, photoUrl });
+        alert('Photo de profil mise à jour avec succès!');
+      }
+    } catch (err) {
+      console.error('Erreur upload photo:', err);
+      alert(`Erreur lors de l'upload: ${err.message}`);
+      // Réinitialiser la photo en cas d'erreur
+      setUserInfo({ ...userInfo, photoUrl: userInfo.photoUrl });
+    } finally {
+      setIsUploadingPhoto(false);
+    }
+  };
+
+  const startEditProfile = () => { setProfileForm({ ...userInfo }); setIsEditingProfile(true); };
+  const startEditSkills = () => { setSkillsForm([...skills]); setIsEditingSkills(true); };
+  const toggleSkill = (skill) => {
+    if (skillsForm.includes(skill)) setSkillsForm(skillsForm.filter(s => s !== skill));
+    else setSkillsForm([...skillsForm, skill]);
+  };
+
+  const startEditAvail = () => { 
+    const initialForm = availability.length > 0 
+      ? availability.map(a => ({
+          day: a.day_of_week || a.day,
+          slots: a.slots
+        })) 
+      : [{ day: 'Lundi', slots: '08:00 - 18:00' }];
+    setAvailForm(initialForm); 
+    setIsEditingAvailability(true); 
+  };
+
+  const updateTimeSlot = (index, type, value) => {
+    const newAvail = [...availForm];
+    const currentSlots = newAvail[index].slots || '08:00 - 18:00';
+    let [start, end] = currentSlots.includes(' - ') ? currentSlots.split(' - ') : ['08:00', '18:00'];
+    if (type === 'start') start = value;
+    if (type === 'end') end = value;
+    newAvail[index].slots = `${start} - ${end}`;
+    setAvailForm(newAvail);
+  };
+
+  const updateAvailRow = (index, field, value) => { 
+    const newAvail = [...availForm]; 
+    newAvail[index][field] = value; 
+    setAvailForm(newAvail); 
+  };
+  const addAvailRow = () => setAvailForm([...availForm, { day: 'Lundi', slots: '08:00 - 18:00' }]); 
+  const removeAvailRow = (index) => setAvailForm(availForm.filter((_, i) => i !== index));
+
+  if (isLoading) return <div className="p-10 flex justify-center h-screen items-center"><Loader2 className="animate-spin text-blue-600 w-10 h-10"/></div>;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
@@ -265,13 +358,18 @@ export default function Profile() {
       <div className="bg-gradient-to-r from-blue-700 via-blue-500 to-orange-400 pb-32 shadow-md">
         <div className="max-w-4xl mx-auto p-8 pt-12">
           <div className="flex items-center gap-6">
-            <div className="relative group cursor-pointer" onClick={handlePhotoClick}>
-              <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-blue-600 text-3xl font-bold border-4 border-white/40 shadow-xl overflow-hidden">
+            <div className="relative group cursor-pointer" onClick={!isUploadingPhoto ? handlePhotoClick : null}>
+              <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-blue-600 text-3xl font-bold border-4 border-white/40 shadow-xl overflow-hidden relative">
+                {isUploadingPhoto && (
+                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 z-10">
+                    <Loader2 className="animate-spin text-white w-6 h-6" />
+                  </div>
+                )}
                 {userInfo.photoUrl ? <img src={userInfo.photoUrl} className="w-full h-full object-cover" /> : userInfo.name?.charAt(0).toUpperCase()}
               </div>
-              <div className="absolute bottom-0 right-0 bg-white p-2 rounded-full text-gray-600 hover:text-blue-600 shadow-lg border border-gray-100 transition-transform transform group-hover:scale-110">
-                <Camera size={16} />
-              </div>
+              {!isUploadingPhoto && (
+                <div className="absolute bottom-0 right-0 bg-white p-2 rounded-full text-gray-600 hover:text-blue-600 shadow-lg transition-transform transform group-hover:scale-110"><Camera size={16} /></div>
+              )}
             </div>
 
             <div className="text-white drop-shadow-md">
@@ -408,7 +506,15 @@ export default function Profile() {
            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                {isEditingProfile ? (
                  <>
-                    <div className="md:col-span-2"><label className="text-xs font-semibold text-gray-500 uppercase">Nom</label><input value={profileForm.name || ''} onChange={(e) => setProfileForm({...profileForm, name: e.target.value})} className="mt-1 w-full p-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"/></div>
+                    <div className="md:col-span-2">
+                      <label className="text-xs font-semibold text-gray-500 uppercase">Nom</label>
+                      <input 
+                        value={profileForm.name || ''} 
+                        disabled 
+                        className="mt-1 w-full p-2 border rounded bg-gray-100 text-gray-500 cursor-not-allowed"
+                        title="Le nom ne peut pas être modifié"
+                      />
+                    </div>
                     <div><label className="text-xs font-semibold text-gray-500 uppercase">Email</label><div className="flex items-center gap-3 mt-1 p-2 bg-gray-50 rounded border border-gray-100"><Mail className="w-4 h-4 text-gray-400"/><span className="text-gray-700">{userInfo.email}</span></div></div>
                     <div><label className="text-xs font-semibold text-gray-500 uppercase">Tel</label><input value={profileForm.phone || ''} onChange={(e) => setProfileForm({...profileForm, phone: e.target.value})} className="mt-1 w-full p-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"/></div>
                     <div className="md:col-span-2"><label className="text-xs font-semibold text-gray-500 uppercase">Adresse</label><input value={profileForm.address || ''} onChange={(e) => setProfileForm({...profileForm, address: e.target.value})} className="mt-1 w-full p-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"/></div>
@@ -445,7 +551,7 @@ export default function Profile() {
               </button>
             </div>
 
-            {/* PERSONNES AIDÉES (Nouvelle fonctionnalité équipe) */}
+            {/* PERSONNES AIDÉES (Ta branche) */}
             <div className="border-t border-gray-100 pt-4">
               <button 
                 onClick={() => setShowAssistedPeople(!showAssistedPeople)}
@@ -461,6 +567,20 @@ export default function Profile() {
                 </div>
               </button>
             </div>
+
+            {/* RELANCER LE TOUR ONBOARDING (Branche Dev) */}
+            <div className="pt-4 border-t border-gray-100">
+              <RestartOnboardingButton />
+            </div>
+
+            {/* GESTION COOKIES RGPD (Branche Dev) */}
+            <button 
+              onClick={openPreferences}
+              className="flex items-center gap-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition-colors w-full text-left"
+            >
+              <Cookie size={20} />
+              <span className="font-medium">Gérer mes cookies</span>
+            </button>
 
             {/* DÉCONNEXION */}
             <button 

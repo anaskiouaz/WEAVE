@@ -2,7 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import db from '../config/db.js';
-import { authenticateToken } from '../middleware/auth.js'; // Assure-toi que ce fichier existe
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -89,6 +89,7 @@ router.post('/login', async (req, res) => {
     
     delete user.password_hash; 
 
+
     res.json({ 
         success: true, 
         token, 
@@ -103,36 +104,56 @@ router.post('/login', async (req, res) => {
   }
 });
 
-// --- PERSISTANCE DE SESSION (/me) ---
-// Cette route est appelée quand on recharge la page pour vérifier si le token est valide
+router.get('/check-role', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const circleId = req.query.circle_id;
+    if (!userId) return res.status(401).json({ success: false, error: 'Token invalide.' });
+    if (!circleId) return res.status(400).json({ success: false, error: 'Paramètre circle_id manquant.' });
+
+    const q = 'SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2 LIMIT 1';
+    const result = await db.query(q, [userId, circleId]);
+    if (result.rows.length === 0) {
+      return res.json({ success: true, role: null });
+    }
+    return res.json({ success: true, role: result.rows[0].role });
+  } catch (err) {
+    console.error('ERREUR /auth/check-role:', err);
+    return res.status(500).json({ success: false, error: 'Erreur serveur.' });
+  }
+});
+
 router.get('/me', authenticateToken, async (req, res) => {
     try {
-        // req.user.id vient du middleware authenticateToken
-        const userResult = await db.query('SELECT id, name, email, onboarding_role, role_global, profile_photo FROM users WHERE id = $1', [req.user.id]);
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ success: false, error: 'Token invalide.' });
+
+        // SQL HYBRIDE : On demande TOUS les champs (les tiens + ceux de tes collègues)
+        const userRes = await db.query(
+            'SELECT id, name, email, onboarding_role, role_global, profile_photo, phone, birth_date FROM users WHERE id = $1', 
+            [userId]
+        );
         
-        if (userResult.rows.length === 0) {
-            return res.status(404).json({ success: false, message: "Utilisateur introuvable" });
-        }
+        if (userRes.rows.length === 0) return res.status(404).json({ success: false, message: "Utilisateur introuvable" });
+        const user = userRes.rows[0];
 
-        const user = userResult.rows[0];
-
-        // Récupérer aussi les cercles pour garder le contexte
         const circlesResult = await db.query(`
             SELECT cc.id, cc.invite_code, u.name AS senior_name, ur.role
             FROM care_circles cc
             JOIN user_roles ur ON cc.id = ur.circle_id
             JOIN users u ON cc.senior_id = u.id
             WHERE ur.user_id = $1
-        `, [user.id]);
+        `, [userId]);
 
         const circles = circlesResult.rows;
         let mainCircleId = null;
         if (circles.length > 0) mainCircleId = circles[0].id;
 
-        res.json({
-            success: true,
+        // RÉPONSE : On garde TA structure JSON qui renvoie circle_id à la racine
+        res.json({ 
+            success: true, 
             user: { ...user, circles },
-            circle_id: mainCircleId
+            circle_id: mainCircleId 
         });
 
     } catch (error) {

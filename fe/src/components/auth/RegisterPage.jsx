@@ -6,12 +6,14 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { ArrowLeft, Loader2 } from 'lucide-react';
+import { ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
   const { register, login, loading } = useAuth();
   const [error, setError] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Ajout du champ confirmPassword dans l'état
   const [formData, setFormData] = useState({
@@ -21,11 +23,33 @@ export default function RegisterPage() {
     confirmPassword: '',
     phone: '',
     birth_date: '',
-    onboarding_role: ''
+    // onboarding_role removed: role is assigned via circles/user_roles
   });
 
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-  const handleSelectChange = (value) => setFormData({ ...formData, onboarding_role: value });
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    
+    // Formatage automatique du numéro de téléphone
+    if (name === 'phone') {
+      // Retirer tous les caractères non-numériques
+      const onlyNums = value.replace(/\D/g, '');
+      
+      // Limiter à 10 chiffres
+      const limited = onlyNums.slice(0, 10);
+      
+      // Formater : XX XX XX XX XX
+      let formatted = '';
+      for (let i = 0; i < limited.length; i++) {
+        if (i > 0 && i % 2 === 0) formatted += ' ';
+        formatted += limited[i];
+      }
+      
+      setFormData({ ...formData, phone: formatted });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
+  };
+  // handleSelectChange removed (no role selection at registration)
 
   // Fonction de validation du mot de passe
   const validatePassword = (password) => {
@@ -45,10 +69,11 @@ export default function RegisterPage() {
 
   // Validation du numéro de téléphone (exemple France : 10 chiffres)
   const validatePhone = (phone) => {
-    const onlyDigits = /^\d+$/;
-    if (!phone) return null; // Champ optionnel
-    if (!onlyDigits.test(phone)) return "Le numéro de téléphone doit contenir uniquement des chiffres.";
-    if (phone.length !== 10) return "Le numéro de téléphone doit contenir exactement 10 chiffres.";
+    if (!phone) return "Le numéro de téléphone est obligatoire.";
+    // Retirer les espaces pour la validation
+    const onlyDigits = phone.replace(/\s/g, '');
+    if (!/^\d+$/.test(onlyDigits)) return "Le numéro de téléphone doit contenir uniquement des chiffres.";
+    if (onlyDigits.length !== 10) return "Le numéro de téléphone doit contenir exactement 10 chiffres.";
     return null;
   };
 
@@ -83,6 +108,9 @@ export default function RegisterPage() {
     const resRegister = await register(payload);
 
     if (resRegister.success) {
+      // Réinitialiser le flag du tour pour les nouveaux utilisateurs
+      localStorage.removeItem('weave_onboarding_seen');
+      
       // 4. Connexion automatique après inscription
       const resLogin = await login(formData.email, formData.password);
       if (resLogin.success) {
@@ -115,7 +143,7 @@ export default function RegisterPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-lg font-semibold text-gray-800">Nom complet *</Label>
+              <Label htmlFor="name" className="text-lg font-semibold text-gray-800">Nom * <span className="text-xs text-gray-500 font-normal">(choisissez un nom que votre famille reconnaitra)</span></Label>
               <Input id="name" name="name" required className="h-14 text-lg bg-white" value={formData.name} onChange={handleChange} />
             </div>
 
@@ -126,54 +154,78 @@ export default function RegisterPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="phone" className="text-lg font-semibold">Téléphone</Label>
-                <Input id="phone" name="phone" className="h-14 text-lg bg-white" value={formData.phone} onChange={handleChange} />
+                <Label htmlFor="phone" className="text-lg font-semibold text-gray-800">Téléphone *</Label>
+                <Input 
+                  id="phone" 
+                  name="phone" 
+                  type="tel"
+                  placeholder="06 12 34 56 78"
+                  required
+                  className="h-14 text-lg bg-white" 
+                  value={formData.phone} 
+                  onChange={handleChange} 
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="birth_date" className="text-lg font-semibold">Date de naissance</Label>
-                <Input id="birth_date" name="birth_date" type="date" className="h-14 text-lg bg-white block w-full" value={formData.birth_date} onChange={handleChange} />
+                <Label htmlFor="birth_date" className="text-lg font-semibold text-gray-800">Date de naissance *</Label>
+                <Input 
+                  id="birth_date" 
+                  name="birth_date" 
+                  type="date" 
+                  required
+                  className="h-14 text-lg bg-white block w-full" 
+                  value={formData.birth_date} 
+                  onChange={handleChange} 
+                />
               </div>
             </div>
-
-            <div className="space-y-2">
-              <Label className="text-lg font-semibold">Rôle *</Label>
-              <Select onValueChange={handleSelectChange} required>
-                <SelectTrigger className="h-14 text-lg bg-white"><SelectValue placeholder="Sélectionner..." /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ADMIN">Administrateur</SelectItem>
-                  <SelectItem value="HELPER">Aidant</SelectItem>
-                  <SelectItem value="PC">Bénéficiaire</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Role selection removed at registration — roles are managed via circles and admin assignment */}
 
             {/* Mot de passe */}
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-lg font-semibold">Mot de passe *</Label>
-              <Input
-                id="password"
-                name="password"
-                type="password"
-                required
-                className="h-14 text-lg bg-white"
-                value={formData.password}
-                onChange={handleChange}
-              />
+              <Label htmlFor="password" className="text-lg font-semibold text-gray-800">Mot de passe *</Label>
+              <div className="relative">
+                <Input
+                  id="password"
+                  name="password"
+                  type={showPassword ? "text" : "password"}
+                  required
+                  className="h-14 text-lg bg-white pr-12"
+                  value={formData.password}
+                  onChange={handleChange}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                >
+                  {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
               <p className="text-sm text-gray-500">8 caractères, 1 majuscule, 1 chiffre, 1 caractère spécial min.</p>
             </div>
 
             {/* Confirmation du mot de passe */}
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-lg font-semibold">Confirmer le mot de passe *</Label>
-              <Input
-                id="confirmPassword"
-                name="confirmPassword"
-                type="password"
-                required
-                className={`h-14 text-lg bg-white ${formData.confirmPassword && formData.password !== formData.confirmPassword ? "border-red-500 focus-visible:ring-red-500" : ""}`}
-                value={formData.confirmPassword}
-                onChange={handleChange}
-              />
+              <Label htmlFor="confirmPassword" className="text-lg font-semibold text-gray-800">Confirmer le mot de passe *</Label>
+              <div className="relative">
+                <Input
+                  id="confirmPassword"
+                  name="confirmPassword"
+                  type={showConfirmPassword ? "text" : "password"}
+                  required
+                  className={`h-14 text-lg bg-white pr-12 ${formData.confirmPassword && formData.password !== formData.confirmPassword ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                  value={formData.confirmPassword}
+                  onChange={handleChange}
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                >
+                  {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                </button>
+              </div>
             </div>
 
             <Button type="submit" size="lg" disabled={loading} className="w-full h-16 text-xl font-bold bg-blue-700 hover:bg-blue-800 mt-6 shadow-md text-white">

@@ -119,7 +119,7 @@ WEAVE/
 │   │   ├── routes/       # API Routes (health, tasks, users...)
 │   │   ├── app.js        # Setup Express
 │   │   └── server.js     # Entry point
-│   └── Dockerfile
+│   └── Dockerfile 
 ├── fe/                   # Frontend (React/Vite)
 │   ├── src/              # Composants, Pages, Assets
 │   ├── vite.config.js
