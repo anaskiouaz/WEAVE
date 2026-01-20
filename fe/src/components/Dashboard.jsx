@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { apiGet, apiPost } from '../api/client';
-import { Calendar, Heart, MessageSquare, Users, Clock, Activity, ShoppingCart, Stethoscope } from 'lucide-react';
+import { Calendar, Heart, MessageSquare, Users, Clock, Activity, ShoppingCart, Stethoscope, RefreshCw } from 'lucide-react';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 
@@ -8,6 +9,7 @@ import { Capacitor } from '@capacitor/core';
 import { useAuth } from '../context/AuthContext'; 
 
 export default function Dashboard() {
+  const navigate = useNavigate();
   // 2. RECUPERATION DU CIRCLE ID VIA LE CONTEXTE
   // Ce circleId vient directement du localStorage grâce à ton AuthProvider
   const { circleId, user } = useAuth(); 
@@ -91,12 +93,20 @@ export default function Dashboard() {
   return (
     <div className="p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-8" data-tour="nav-accueil">
-            <h1 className="text-gray-900 text-2xl font-bold mb-2">Tableau de bord</h1>
-            <p className="text-gray-600">
-                {/* Petit bonus : afficher l'ID pour debug si besoin */}
-                Vue d'ensemble {circleId && <span className="text-xs text-gray-400">(Cercle #{circleId})</span>}
-            </p>
+        <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
+            <div>
+              <h1 className="text-gray-900 text-2xl font-bold mb-2">Tableau de bord</h1>
+              <p className="text-gray-600">
+                  Vue d'ensemble {circleId && <span className="text-xs text-gray-400">(Cercle #{circleId.slice(0,8)}...)</span>}
+              </p>
+            </div>
+            <button
+              onClick={() => navigate('/select-circle')}
+              className="flex items-center gap-2 px-4 py-2 bg-white border border-gray-200 rounded-lg text-gray-700 hover:bg-gray-50 hover:border-gray-300 transition-colors shadow-sm"
+            >
+              <RefreshCw className="w-4 h-4" />
+              Changer de cercle
+            </button>
         </div>
 
         {/* Stats Grid */}
