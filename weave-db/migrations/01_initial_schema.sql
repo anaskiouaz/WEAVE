@@ -50,6 +50,7 @@ CREATE TABLE users (
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
     password_hash VARCHAR(255) NOT NULL,
+    onboarding_role VARCHAR(50),
     phone VARCHAR(20),
     profile_photo VARCHAR(500),
     address TEXT,
