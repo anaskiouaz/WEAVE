@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, LogOut, Camera, RotateCcw, Cookie, Heart, ChevronDown, ChevronUp } from 'lucide-react';
+import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, LogOut, Camera, Cookie, Heart, ChevronDown, ChevronUp } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useCookieConsent } from '../context/CookieContext';
@@ -13,7 +13,7 @@ export default function Profile() {
   const { openPreferences } = useCookieConsent();
   const navigate = useNavigate();
   
-  // --- ID DYNAMIQUE (Vital pour que ça marche) ---
+  // --- ID DYNAMIQUE ---
   const USER_ID = user?.id; 
 
   const [isLoading, setIsLoading] = useState(false);
@@ -29,7 +29,7 @@ export default function Profile() {
   const [skills, setSkills] = useState([]);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   
-  // --- UI ETATS (Travail de l'équipe : Personnes aidées) ---
+  // --- UI ETATS ---
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [showAssistedPeople, setShowAssistedPeople] = useState(false);
   const [assistedPeopleList] = useState(['Grand-Père Michel']); 
@@ -98,8 +98,7 @@ export default function Profile() {
             setNotificationsEnabled(userData.notifications_enabled);
         }
 
-        // 2. Charger les statistiques (Logique ÉQUIPE)
-        // On met un try/catch pour ne pas faire planter la page si l'API stats n'est pas encore prête
+        // 2. Charger les statistiques
         try {
             const statsData = await apiGet('/module/profile/stats', options);
             if (statsData.success) {
@@ -110,7 +109,7 @@ export default function Profile() {
             }
         } catch (statsError) {
             console.log("⚠️ API Stats non disponible ou vide, utilisation valeurs par défaut.");
-            setStats({ interventions: 0, moments: 0, rating: 5.0 }); // Valeurs par défaut sûres
+            setStats({ interventions: 0, moments: 0, rating: 5.0 });
         }
       }
     } catch (error) {
@@ -123,15 +122,59 @@ export default function Profile() {
   // --- GESTION PHOTO ---
   const handlePhotoClick = () => fileInputRef.current.click();
   
-  const handlePhotoUpload = (event) => {
-    const file = event.target.files[0];
-    if (file) {
-      const photoUrl = URL.createObjectURL(file);
-      setUserInfo({ ...userInfo, photoUrl: photoUrl });
+  const handlePhotoUpload = async (e) => {
+    const file = e.target.files[0];
+    if (!file) return;
+
+    setIsUploadingPhoto(true);
+    try {
+      // 1. Afficher l'aperçu temporaire
+      const tempUrl = URL.createObjectURL(file);
+      setUserInfo({ ...userInfo, photoUrl: tempUrl });
+
+      // 2. Préparer le FormData pour l'upload
+      const formData = new FormData();
+      formData.append('image', file);
+
+      // 3. Uploader vers le backend
+      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+      const uploadResponse = await fetch(`${API_BASE_URL}/api/upload/image`, {
+        method: 'POST',
+        body: formData,
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error('Erreur lors de l\'upload de l\'image');
+      }
+
+      const uploadData = await uploadResponse.json();
+      if (uploadData.status !== 'ok' || !uploadData.data.blobName) {
+        throw new Error('Erreur lors de la sauvegarde de l\'image');
+      }
+
+      // 4. Sauvegarder le nom du blob en base de données
+      const options = { headers: { 'x-user-id': USER_ID } };
+      const saveResponse = await apiPost('/module/profile/upload-photo', {
+        photoBlobName: uploadData.data.blobName
+      }, options);
+
+      if (saveResponse.success) {
+        // 5. Mettre à jour l'URL avec le blob final
+        const photoUrl = `${API_BASE_URL}/uploads/${uploadData.data.blobName}`;
+        setUserInfo({ ...userInfo, photoUrl });
+        alert('Photo de profil mise à jour avec succès!');
+      }
+    } catch (err) {
+      console.error('Erreur upload photo:', err);
+      alert(`Erreur lors de l'upload: ${err.message}`);
+      // Réinitialiser la photo en cas d'erreur
+      setUserInfo({ ...userInfo, photoUrl: userInfo.photoUrl }); // Remet l'ancienne si besoin, logic à affiner si on stockait l'ancienne URL
+    } finally {
+      setIsUploadingPhoto(false);
     }
   };
 
-  // --- SAUVEGARDES ---
+  // --- SAUVEGARDES PROFIL ---
   const startEditProfile = () => { setProfileForm({ ...userInfo }); setIsEditingProfile(true); };
   
   const saveProfile = async () => {
@@ -142,6 +185,7 @@ export default function Profile() {
     } catch (err) { console.error(err); }
   };
 
+  // --- SAUVEGARDES SKILLS ---
   const startEditSkills = () => { setSkillsForm([...skills]); setIsEditingSkills(true); };
   
   const toggleSkill = (skill) => {
@@ -157,6 +201,7 @@ export default function Profile() {
     } catch (err) { console.error(err); }
   };
 
+  // --- SAUVEGARDES DISPONIBILITÉS ---
   const startEditAvail = () => { 
     const initialForm = availability.length > 0 
       ? availability.map(a => ({
@@ -212,7 +257,7 @@ export default function Profile() {
     }
   };
 
-  // --- GESTION NOTIFICATIONS (Consolidée) ---
+  // --- GESTION NOTIFICATIONS ---
   const handleNotificationToggle = async () => {
     const newStatus = !notificationsEnabled;
     const options = { headers: { 'x-user-id': USER_ID } };
@@ -258,103 +303,13 @@ export default function Profile() {
     navigate('/login');
   };
 
-  const handlePhotoClick = () => fileInputRef.current.click();
-  
-  const handlePhotoUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    setIsUploadingPhoto(true);
-    try {
-      // 1. Afficher l'aperçu temporaire
-      const tempUrl = URL.createObjectURL(file);
-      setUserInfo({ ...userInfo, photoUrl: tempUrl });
-
-      // 2. Préparer le FormData pour l'upload
-      const formData = new FormData();
-      formData.append('image', file);
-
-      // 3. Uploader vers le backend qui uploadera à Azure
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
-      const uploadResponse = await fetch(`${API_BASE_URL}/api/upload/image`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error('Erreur lors de l\'upload de l\'image');
-      }
-
-      const uploadData = await uploadResponse.json();
-      if (uploadData.status !== 'ok' || !uploadData.data.blobName) {
-        throw new Error('Erreur lors de la sauvegarde de l\'image');
-      }
-
-      // 4. Sauvegarder le nom du blob en base de données
-      const options = { headers: { 'x-user-id': USER_ID } };
-      const saveResponse = await apiPost('/module/profile/upload-photo', {
-        photoBlobName: uploadData.data.blobName
-      }, options);
-
-      if (saveResponse.success) {
-        // 5. Mettre à jour l'URL avec le blob Azure
-        const photoUrl = `${API_BASE_URL}/uploads/${uploadData.data.blobName}`;
-        setUserInfo({ ...userInfo, photoUrl });
-        alert('Photo de profil mise à jour avec succès!');
-      }
-    } catch (err) {
-      console.error('Erreur upload photo:', err);
-      alert(`Erreur lors de l'upload: ${err.message}`);
-      // Réinitialiser la photo en cas d'erreur
-      setUserInfo({ ...userInfo, photoUrl: userInfo.photoUrl });
-    } finally {
-      setIsUploadingPhoto(false);
-    }
-  };
-
-  const startEditProfile = () => { setProfileForm({ ...userInfo }); setIsEditingProfile(true); };
-  const startEditSkills = () => { setSkillsForm([...skills]); setIsEditingSkills(true); };
-  const toggleSkill = (skill) => {
-    if (skillsForm.includes(skill)) setSkillsForm(skillsForm.filter(s => s !== skill));
-    else setSkillsForm([...skillsForm, skill]);
-  };
-
-  const startEditAvail = () => { 
-    const initialForm = availability.length > 0 
-      ? availability.map(a => ({
-          day: a.day_of_week || a.day,
-          slots: a.slots
-        })) 
-      : [{ day: 'Lundi', slots: '08:00 - 18:00' }];
-    setAvailForm(initialForm); 
-    setIsEditingAvailability(true); 
-  };
-
-  const updateTimeSlot = (index, type, value) => {
-    const newAvail = [...availForm];
-    const currentSlots = newAvail[index].slots || '08:00 - 18:00';
-    let [start, end] = currentSlots.includes(' - ') ? currentSlots.split(' - ') : ['08:00', '18:00'];
-    if (type === 'start') start = value;
-    if (type === 'end') end = value;
-    newAvail[index].slots = `${start} - ${end}`;
-    setAvailForm(newAvail);
-  };
-
-  const updateAvailRow = (index, field, value) => { 
-    const newAvail = [...availForm]; 
-    newAvail[index][field] = value; 
-    setAvailForm(newAvail); 
-  };
-  const addAvailRow = () => setAvailForm([...availForm, { day: 'Lundi', slots: '08:00 - 18:00' }]); 
-  const removeAvailRow = (index) => setAvailForm(availForm.filter((_, i) => i !== index));
-
   if (isLoading) return <div className="p-10 flex justify-center h-screen items-center"><Loader2 className="animate-spin text-blue-600 w-10 h-10"/></div>;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
       <input type="file" ref={fileInputRef} onChange={handlePhotoUpload} accept="image/*" className="hidden" />
 
-      {/* HEADER (Design Equipe) */}
+      {/* HEADER */}
       <div className="bg-gradient-to-r from-blue-700 via-blue-500 to-orange-400 pb-32 shadow-md">
         <div className="max-w-4xl mx-auto p-8 pt-12">
           <div className="flex items-center gap-6">
@@ -365,7 +320,7 @@ export default function Profile() {
                     <Loader2 className="animate-spin text-white w-6 h-6" />
                   </div>
                 )}
-                {userInfo.photoUrl ? <img src={userInfo.photoUrl} className="w-full h-full object-cover" /> : userInfo.name?.charAt(0).toUpperCase()}
+                {userInfo.photoUrl ? <img src={userInfo.photoUrl} className="w-full h-full object-cover" alt="Profil" /> : userInfo.name?.charAt(0).toUpperCase()}
               </div>
               {!isUploadingPhoto && (
                 <div className="absolute bottom-0 right-0 bg-white p-2 rounded-full text-gray-600 hover:text-blue-600 shadow-lg transition-transform transform group-hover:scale-110"><Camera size={16} /></div>
@@ -386,7 +341,7 @@ export default function Profile() {
       {/* --- CONTENU --- */}
       <div className="max-w-4xl mx-auto px-8 -mt-24 space-y-6">
 
-        {/* STATS (Design Equipe) */}
+        {/* STATS */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
           <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100 transform hover:-translate-y-1 transition-transform duration-200">
             <span className="text-3xl font-bold text-gray-800">{stats.interventions}</span>
@@ -490,7 +445,7 @@ export default function Profile() {
            </div>
         </div>
 
-        {/* INFOS */}
+        {/* INFOS PERSONNELLES */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
            <div className="flex justify-between items-center mb-6">
               <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2"><Mail className="text-blue-600" size={20} /> Infos personnelles</h2>
@@ -530,7 +485,7 @@ export default function Profile() {
            </div>
         </div>
 
-        {/* --- PARAMÈTRES (Design Equipe) --- */}
+        {/* --- PARAMÈTRES --- */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <h2 className="text-lg font-bold text-gray-900 mb-6">Paramètres</h2>
           <div className="space-y-6">
@@ -551,7 +506,7 @@ export default function Profile() {
               </button>
             </div>
 
-            {/* PERSONNES AIDÉES (Ta branche) */}
+            {/* PERSONNES AIDÉES */}
             <div className="border-t border-gray-100 pt-4">
               <button 
                 onClick={() => setShowAssistedPeople(!showAssistedPeople)}
@@ -566,14 +521,21 @@ export default function Profile() {
                   {showAssistedPeople ? <ChevronUp size={16} className="text-gray-400"/> : <ChevronDown size={16} className="text-gray-400"/>}
                 </div>
               </button>
+              {showAssistedPeople && (
+                <div className="mt-3 pl-8 text-gray-600 text-sm">
+                  {assistedPeopleList.map((person, index) => (
+                    <div key={index} className="py-1">• {person}</div>
+                  ))}
+                </div>
+              )}
             </div>
 
-            {/* RELANCER LE TOUR ONBOARDING (Branche Dev) */}
+            {/* RELANCER LE TOUR ONBOARDING */}
             <div className="pt-4 border-t border-gray-100">
               <RestartOnboardingButton />
             </div>
 
-            {/* GESTION COOKIES RGPD (Branche Dev) */}
+            {/* GESTION COOKIES RGPD */}
             <button 
               onClick={openPreferences}
               className="flex items-center gap-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition-colors w-full text-left"

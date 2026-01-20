@@ -7,6 +7,10 @@ import conversationsRoutes from './conversations.js';
 import dashboardRoutes from './dashboard.js';
 import uploadRoutes from './upload.js';
 import profileModule from './profile_module.js';
+import usersRoutes from './users.js';
+import tasksRoutes from './tasks.js';
+import souvenirsRoutes from './souvenirs.js';
+
 // Ajoute ici d'autres routes si tu en as (ex: tasks.js)
 
 const router = Router();
@@ -18,5 +22,8 @@ router.use('/conversations', conversationsRoutes);
 router.use('/dashboard', dashboardRoutes);
 router.use('/upload', uploadRoutes);
 router.use('/module/profile', profileModule);
+router.use('/users', usersRoutes);
+router.use('/tasks', tasksRoutes);
+router.use('/souvenirs', souvenirsRoutes);
 
 export default router;

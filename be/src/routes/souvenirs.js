@@ -5,6 +5,7 @@ import { generateBlobSASUrl } from '../utils/azureStorage.js';
 import { BlobServiceClient } from '@azure/storage-blob';
 import admin from '../config/firebase.js';
 import { logAudit, AUDIT_ACTIONS } from '../utils/audits.js';
+import { Router } from 'express';
 
 // Configuration Azure pour la suppression
 const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
@@ -381,3 +382,14 @@ export async function deleteJournalEntry(req, res) {
     });
   }
 }
+
+// --- Router Express pour exposer les endpoints ---
+const router = Router();
+
+router.get('/', getJournalEntries);
+router.post('/', createJournalEntry);
+router.post('/:id/comments', addCommentToEntry);
+router.delete('/:id/comments/:commentId', deleteCommentFromEntry);
+router.delete('/:id', deleteJournalEntry);
+
+export default router;
