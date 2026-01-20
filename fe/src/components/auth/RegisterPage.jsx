@@ -134,7 +134,6 @@ export default function RegisterPage() {
                 <Input id="birth_date" name="birth_date" type="date" className="h-14 text-lg bg-white block w-full" value={formData.birth_date} onChange={handleChange} />
               </div>
             </div>
-
             <div className="space-y-2">
               <Label className="text-lg font-semibold">Rôle *</Label>
               <Select onValueChange={handleSelectChange} required>

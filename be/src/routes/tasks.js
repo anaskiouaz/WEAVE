@@ -1,6 +1,7 @@
 import db from '../config/db.js';
 import admin from '../config/firebase.js';
 import { Router } from 'express';
+import { logAudit, AUDIT_ACTIONS } from '../utils/audits.js';
 
 const router = Router();
 
@@ -52,8 +53,17 @@ router.post('/:id/volunteer', async (req, res) => {
              SET assigned_to = array_append(assigned_to, $1),
                  helper_name = $2
              WHERE id = $3
-             RETURNING *`,
+             RETURNING *, circle_id`,
             [userId, newHelperName, id]
+        );
+
+        // 📝 Log de l'action
+        const task = updateRes.rows[0];
+        await logAudit(
+            userId,
+            AUDIT_ACTIONS.TASK_VOLUNTEERED,
+            `${userName} s'est engagé(e) sur "${task.title}"`,
+            task.circle_id
         );
 
         res.json({
@@ -196,8 +206,17 @@ router.post('/:id/volunteer', async (req, res) => {
              SET assigned_to = array_append(assigned_to, $1),
                  helper_name = $2
              WHERE id = $3
-             RETURNING *`,
+             RETURNING *, circle_id`,
             [userId, newHelperName, id]
+        );
+
+        // 📝 Log de l'action
+        const task = updateRes.rows[0];
+        await logAudit(
+            userId,
+            AUDIT_ACTIONS.TASK_VOLUNTEERED,
+            `${userName} s'est engagé(e) sur "${task.title}"`,
+            task.circle_id
         );
 
         res.json({

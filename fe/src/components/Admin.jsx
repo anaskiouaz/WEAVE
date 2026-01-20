@@ -1,14 +1,27 @@
 import { useState, useEffect } from 'react';
-import { Users, Copy, Check, Share2, Crown, Mail, Phone, Trash2, Shield } from 'lucide-react';
+import { Users, Copy, Check, Share2, Crown, Mail, Phone, Trash2, Shield, Clock, UserPlus, UserMinus, Image, MessageSquare, Calendar, Activity } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+
+// Mapping des actions pour affichage
+const ACTION_CONFIG = {
+  MEMBER_JOINED: { icon: UserPlus, color: 'bg-green-100 text-green-600', label: 'Nouveau membre' },
+  MEMBER_REMOVED: { icon: UserMinus, color: 'bg-red-100 text-red-600', label: 'Membre retiré' },
+  SOUVENIR_CREATED: { icon: Image, color: 'bg-purple-100 text-purple-600', label: 'Souvenir ajouté' },
+  SOUVENIR_DELETED: { icon: Image, color: 'bg-orange-100 text-orange-600', label: 'Souvenir supprimé' },
+  COMMENT_ADDED: { icon: MessageSquare, color: 'bg-blue-100 text-blue-600', label: 'Commentaire' },
+  COMMENT_DELETED: { icon: MessageSquare, color: 'bg-gray-100 text-gray-600', label: 'Commentaire supprimé' },
+  TASK_VOLUNTEERED: { icon: Calendar, color: 'bg-indigo-100 text-indigo-600', label: 'Engagement activité' },
+};
 
 export default function Admin() {
   const { user } = useAuth();
   const [copied, setCopied] = useState(false);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [activityLogs, setActivityLogs] = useState([]);
+  const [logsLoading, setLogsLoading] = useState(true);
 
   // 1. Trouver le cercle où je suis Admin
   // Note: user.circles vient du login (auth.js)
@@ -23,8 +36,10 @@ export default function Admin() {
   useEffect(() => {
     if (adminCircle?.id) {
       fetchMembers(adminCircle.id);
+      fetchActivityLogs(adminCircle.id);
     } else {
       setLoading(false);
+      setLogsLoading(false);
     }
   }, [adminCircle]);
 
@@ -43,6 +58,39 @@ export default function Admin() {
     } finally {
       setLoading(false);
     }
+  };
+
+  const fetchActivityLogs = async (circleId) => {
+    try {
+      const token = localStorage.getItem('weave_token');
+      const res = await fetch(`${API_BASE_URL}/circles/${circleId}/logs?limit=50`, {
+          headers: { 'Authorization': `Bearer ${token}` }
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setActivityLogs(data.data || []);
+      }
+    } catch (err) {
+      console.error("Erreur chargement logs", err);
+    } finally {
+      setLogsLoading(false);
+    }
+  };
+
+  const formatTimeAgo = (dateString) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffInSeconds = Math.floor((now - date) / 1000);
+    
+    // Formater l'heure
+    const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
+    
+    if (diffInSeconds < 60) return `À l'instant (${timeStr})`;
+    if (diffInSeconds < 3600) return `Il y a ${Math.floor(diffInSeconds / 60)} min (${timeStr})`;
+    if (diffInSeconds < 86400) return `Aujourd'hui à ${timeStr}`;
+    if (diffInSeconds < 172800) return `Hier à ${timeStr}`;
+    
+    return date.toLocaleDateString('fr-FR', { day: 'numeric', month: 'short' }) + ` à ${timeStr}`;
   };
 
   const handleCopyLink = () => {
@@ -114,14 +162,13 @@ export default function Admin() {
             </div>
           </div>
           
-          {/* Tu pourras brancher de vraies stats plus tard */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center justify-between opacity-70">
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center justify-between">
             <div>
-              <p className="text-gray-500 text-sm font-medium mb-1">Actions cette semaine</p>
-              <p className="text-3xl font-bold text-gray-900">-</p>
+              <p className="text-gray-500 text-sm font-medium mb-1">Actions récentes</p>
+              <p className="text-3xl font-bold text-gray-900">{activityLogs.length}</p>
             </div>
             <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center">
-              <Shield className="w-6 h-6 text-green-600" />
+              <Activity className="w-6 h-6 text-green-600" />
             </div>
           </div>
       </div>
@@ -234,6 +281,64 @@ export default function Admin() {
                     </div>
                   </div>
                 ))}
+            </div>
+        )}
+      </div>
+
+      {/* --- JOURNAL D'ACTIVITÉ --- */}
+      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
+        <div className="p-6 border-b border-gray-100">
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                <Clock className="w-5 h-5 text-blue-600" />
+                Journal d'activité
+            </h2>
+            <p className="text-sm text-gray-500 mt-1">Historique des actions récentes dans le cercle</p>
+        </div>
+
+        {logsLoading ? (
+            <div className="p-10 text-center text-gray-400">Chargement de l'historique...</div>
+        ) : activityLogs.length === 0 ? (
+            <div className="p-10 text-center text-gray-400">
+              <Activity className="w-12 h-12 mx-auto mb-3 text-gray-300" />
+              <p>Aucune activité enregistrée pour le moment</p>
+            </div>
+        ) : (
+            <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+                {activityLogs.map((log) => {
+                  const config = ACTION_CONFIG[log.action] || { 
+                    icon: Activity, 
+                    color: 'bg-gray-100 text-gray-600', 
+                    label: log.action 
+                  };
+                  const IconComponent = config.icon;
+                  
+                  return (
+                    <div key={log.id} className="p-4 hover:bg-gray-50 transition-colors">
+                      <div className="flex items-start gap-3">
+                        {/* Icône */}
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${config.color}`}>
+                          <IconComponent className="w-5 h-5" />
+                        </div>
+                        
+                        {/* Contenu */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                              {config.label}
+                            </span>
+                            <span className="text-xs text-gray-400 flex-shrink-0">
+                              {formatTimeAgo(log.created_at)}
+                            </span>
+                          </div>
+                          <p className="text-sm text-gray-700 mt-1">{log.details}</p>
+                          {log.user_name && (
+                            <p className="text-xs text-gray-400 mt-0.5">par {log.user_name}</p>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
             </div>
         )}
       </div>
