@@ -26,6 +26,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./be:/app
+      - /app/node_modules
     command: sh -c "npm install && npm start"
     env_file:
       - .env
@@ -60,6 +61,7 @@ services:
     restart: unless-stopped
     volumes:
       - ./fe:/app
+      - /app/node_modules
     command: sh -c "npm install && npm run dev -- --host 0.0.0.0 --port 5173"
     environment:
       VITE_API_BASE_URL: "http://localhost:4000/api"

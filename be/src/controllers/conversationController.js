@@ -1,94 +1,98 @@
 import db from '../config/db.js';
 import { getIo } from '../services/socketService.js';
 
-// --- CONSTANTES CORRIGÉES ---
-// Ces IDs doivent correspondre à ceux insérés par ton script SQL !
-const CURRENT_USER_ID = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'; // Alice (Admin)
-const CERCLE_ID = '11111111-1111-1111-1111-111111111111';       // ID du cercle créé en SQL
-
-// 1. Récupérer les membres du cercle (Pour la liste "Nouveau Groupe")
+// 1. Récupérer les membres du cercle (VERSION DEBUG)
 export const getMembresCercle = async (req, res) => {
     try {
-        // On sélectionne tous les membres du cercle SAUF soi-même
-        const result = await db.query(`
-            SELECT u.id, u.name as nom, ur.role
+        const userId = req.user.id;
+        console.log(`\n🔍 [DEBUG] getMembresCercle appelé par UserID: ${userId}`);
+
+        // A. Trouver le cercle
+        const cercleQuery = "SELECT circle_id, role FROM user_roles WHERE user_id = $1 LIMIT 1";
+        const cercleResult = await db.query(cercleQuery, [userId]);
+
+        if (cercleResult.rows.length === 0) {
+            console.log("❌ [DEBUG] Aucun cercle trouvé pour cet utilisateur !");
+            return res.json({ circle_id: null, membres: [] });
+        }
+
+        const { circle_id, role } = cercleResult.rows[0];
+        console.log(`✅ [DEBUG] Cercle trouvé: ${circle_id} (Rôle: ${role})`);
+
+        // B. Trouver les autres membres
+        const membresQuery = `
+            SELECT u.id, u.name, ur.role
             FROM users u
             JOIN user_roles ur ON u.id = ur.user_id
             WHERE ur.circle_id = $1 AND u.id != $2
-        `, [CERCLE_ID, CURRENT_USER_ID]);
+        `;
+        const membresResult = await db.query(membresQuery, [circle_id, userId]);
 
-        console.log("Membres trouvés :", result.rows); // Debug pour voir qui est trouvé
-        res.json(result.rows);
+        console.log(`👥 [DEBUG] ${membresResult.rows.length} autres membres trouvés :`);
+        membresResult.rows.forEach(m => console.log(`   - ${m.name} (${m.role})`));
+
+        res.json({ 
+            circle_id: circle_id, 
+            membres: membresResult.rows 
+        });
+
     } catch (error) {
-        console.error("Erreur get membres:", error);
+        console.error("🔥 [ERREUR] getMembresCercle:", error);
         res.status(500).json({ error: "Erreur serveur" });
     }
 };
 
 // 2. Créer une conversation
 export const creerConversation = async (req, res) => {
-    const { type, nom, participants } = req.body;
-    
-    console.log("📥 Création conversation:", { type, nom, participants });
+    const { type, nom, participants, cercle_id } = req.body;
+    const userId = req.user.id;
+    console.log(`\n📥 [DEBUG] Création conversation Type: ${type}, Participants: ${participants.length}`);
+
+    if (!cercle_id) return res.status(400).json({ error: "ID du cercle manquant" });
 
     try {
-        // --- Règle 1 - Unicité du chat PRIVE ---
+        // --- Règle : Eviter doublons PRIVE ---
         if (type === 'PRIVE') {
-            const targetUserId = participants[0]; // L'autre personne
-
-            const existingPrive = await db.query(`
-                SELECT c.id 
-                FROM conversation c
+            const targetUserId = participants[0];
+            const existing = await db.query(`
+                SELECT c.id FROM conversation c
                 JOIN participant_conversation pc1 ON c.id = pc1.conversation_id
                 JOIN participant_conversation pc2 ON c.id = pc2.conversation_id
-                WHERE c.type = 'PRIVE' 
-                AND c.cercle_id = $1
-                AND pc1.utilisateur_id = $2
-                AND pc2.utilisateur_id = $3
-            `, [CERCLE_ID, CURRENT_USER_ID, targetUserId]);
+                WHERE c.type = 'PRIVE' AND c.cercle_id = $1
+                AND pc1.utilisateur_id = $2 AND pc2.utilisateur_id = $3
+            `, [cercle_id, userId, targetUserId]);
 
-            if (existingPrive.rows.length > 0) {
+            if (existing.rows.length > 0) {
+                console.log(`♻️ [DEBUG] Conversation existante réouverte: ${existing.rows[0].id}`);
                 return res.status(200).json({ 
                     success: true, 
-                    conversationId: existingPrive.rows[0].id,
+                    conversationId: existing.rows[0].id,
                     message: "Conversation existante ouverte" 
                 });
             }
         }
 
-        // --- Règle 2 - Unicité du NOM DE GROUPE ---
-        if (type === 'GROUPE') {
-            const existingNom = await db.query(
-                "SELECT id FROM conversation WHERE cercle_id = $1 AND type = 'GROUPE' AND nom = $2",
-                [CERCLE_ID, nom]
-            );
-
-            if (existingNom.rows.length > 0) {
-                return res.status(409).json({ error: "Ce nom de groupe est déjà utilisé." });
-            }
-        }
-
-        // --- CRÉATION ---
+        // --- Création ---
         const result = await db.query(
-            "INSERT INTO conversation (type, nom, cercle_id) VALUES ($1, $2, $3) RETURNING id",
-            [type, nom, CERCLE_ID]
+            "INSERT INTO conversation (type, nom, cercle_id) VALUES ($1, $2, $3) RETURNING id, nom, type, date_creation",
+            [type, nom || 'Nouveau message', cercle_id]
         );
-        const convId = result.rows[0].id;
+        const conversation = result.rows[0];
 
-        // Ajout des participants (Soi-même + les sélectionnés)
-        const tousLesMembres = [...new Set([...participants, CURRENT_USER_ID])];
-
-        for (const userId of tousLesMembres) {
+        // --- Ajout participants ---
+        const tousLesMembres = [...new Set([...participants, userId])];
+        for (const pid of tousLesMembres) {
             await db.query(
                 "INSERT INTO participant_conversation (conversation_id, utilisateur_id) VALUES ($1, $2)",
-                [convId, userId]
+                [conversation.id, pid]
             );
         }
 
-        res.status(201).json({ success: true, conversationId: convId });
+        console.log(`✅ [DEBUG] Nouvelle conversation créée: ${conversation.id}`);
+        res.status(201).json({ success: true, conversation });
 
     } catch (error) {
-        console.error("Erreur création:", error);
+        console.error("🔥 [ERREUR] Création:", error);
         res.status(500).json({ error: error.message });
     }
 };
@@ -96,26 +100,29 @@ export const creerConversation = async (req, res) => {
 // 3. Récupérer mes conversations
 export const getMesConversations = async (req, res) => {
     try {
+        const userId = req.user.id;
         const result = await db.query(`
             SELECT 
-                c.id, 
-                c.type, 
-                c.cercle_id, 
-                c.date_creation,
+                c.id, c.type, c.cercle_id, c.date_creation,
                 CASE 
                     WHEN c.type = 'GROUPE' THEN c.nom
-                    ELSE u_other.name -- Si c'est PRIVE, on prend le nom de l'autre
-                END AS nom
+                    ELSE u_other.name 
+                END AS nom,
+                m.contenu as dernier_message,
+                m.date_envoi as date_dernier_message
             FROM conversation c
             JOIN participant_conversation pc_me ON c.id = pc_me.conversation_id
-            -- On cherche l'autre participant (pour les privés)
             LEFT JOIN participant_conversation pc_other 
                 ON c.id = pc_other.conversation_id AND pc_other.utilisateur_id != $1
             LEFT JOIN users u_other 
                 ON pc_other.utilisateur_id = u_other.id
+            LEFT JOIN message m ON m.conversation_id = c.id AND m.id = (
+                SELECT id FROM message WHERE conversation_id = c.id ORDER BY date_envoi DESC LIMIT 1
+            )
             WHERE pc_me.utilisateur_id = $1
-            ORDER BY c.date_creation DESC
-        `, [CURRENT_USER_ID]);
+            GROUP BY c.id, c.type, c.cercle_id, c.date_creation, c.nom, u_other.name, m.contenu, m.date_envoi
+            ORDER BY m.date_envoi DESC NULLS LAST, c.date_creation DESC
+        `, [userId]);
 
         res.json(result.rows);
     } catch (error) {
@@ -124,23 +131,21 @@ export const getMesConversations = async (req, res) => {
     }
 };
 
-// 4. Récupérer les messages
+// 4. Messages d'une conversation
 export const getMessages = async (req, res) => {
     const { id } = req.params;
+    const userId = req.user.id;
 
     try {
-        // Vérification des droits
+        // Sécurité
         const verif = await db.query(
-            "SELECT * FROM participant_conversation WHERE conversation_id = $1 AND utilisateur_id = $2",
-            [id, CURRENT_USER_ID]
+            "SELECT 1 FROM participant_conversation WHERE conversation_id = $1 AND utilisateur_id = $2",
+            [id, userId]
         );
+        if (verif.rows.length === 0) return res.status(403).json({ error: "Accès interdit" });
 
-        if (verif.rows.length === 0) {
-            return res.status(403).json({ error: "Accès interdit à cette conversation" });
-        }
-
-        // Récupération des messages
-        const result = await db.query(`
+        // Messages
+        const msgs = await db.query(`
             SELECT m.id, m.contenu, m.date_envoi, m.auteur_id, u.name as nom_auteur
             FROM message m
             JOIN users u ON m.auteur_id = u.id
@@ -148,81 +153,62 @@ export const getMessages = async (req, res) => {
             ORDER BY m.date_envoi ASC
         `, [id]);
 
-        res.json(result.rows);
+        // Participants (Pour la liste "info")
+        const parts = await db.query(`
+            SELECT u.id, u.name 
+            FROM participant_conversation pc
+            JOIN users u ON pc.utilisateur_id = u.id
+            WHERE pc.conversation_id = $1
+        `, [id]);
+
+        res.json({ messages: msgs.rows, participants: parts.rows });
     } catch (error) {
         console.error("Erreur get messages:", error);
         res.status(500).json({ error: "Erreur serveur" });
     }
 };
 
-// 5. Supprimer conversation (CORRIGÉ: Async/Await)
-export const deleteConversation = async (req, res) => {
-    const conversationId = req.params.id;
-    
-    try {
-        // 1. Supprimer les messages (Table 'message' au singulier selon ton SQL)
-        await db.query("DELETE FROM message WHERE conversation_id = $1", [conversationId]);
-
-        // 2. Supprimer les participants
-        await db.query("DELETE FROM participant_conversation WHERE conversation_id = $1", [conversationId]);
-
-        // 3. Supprimer la conversation (Table 'conversation' au singulier)
-        await db.query("DELETE FROM conversation WHERE id = $1", [conversationId]);
-
-        res.status(200).json({ message: "Conversation supprimée avec succès" });
-    } catch (error) {
-        console.error("Erreur suppression conversation :", error);
-        res.status(500).json({ error: "Erreur serveur lors de la suppression" });
-    }
-};
-
-// 6. Envoyer un message
+// 5. Envoyer message
 export const envoyerMessage = async (req, res) => {
-    const conversationId = req.params.id;
+    const conversationId = String(req.params.id);
     const { contenu } = req.body;
-    
-    // ID fixe (Alice) pour tes tests
-    const authorId = 'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11'; 
+    const authorId = req.user.id;
 
-    if (!contenu || contenu.trim() === "") {
-        return res.status(400).json({ error: "Message vide" });
-    }
+    if (!contenu || !contenu.trim()) return res.status(400).json({ error: "Message vide" });
 
     try {
-        // 1. Sauvegarde en DB
         const insertResult = await db.query(
             "INSERT INTO message (conversation_id, auteur_id, contenu) VALUES ($1, $2, $3) RETURNING id, date_envoi",
             [conversationId, authorId, contenu]
         );
         const newMessage = insertResult.rows[0];
         
-        // 2. Récupération du nom
         const userResult = await db.query("SELECT name FROM users WHERE id = $1", [authorId]);
         const authorName = userResult.rows[0].name;
 
         const messageComplet = {
             id: newMessage.id,
-            contenu: contenu,
+            contenu,
             date_envoi: newMessage.date_envoi,
             auteur_id: authorId,
             nom_auteur: authorName,
-            conversation_id: conversationId
+            conversation_id: parseInt(conversationId)
         };
 
-        // 3. ENVOI EN LIVE (SOCKET)
         try {
-            const io = getIo();
-            // On envoie seulement aux gens connectés sur CETTE conversation
-            io.to(conversationId).emit('receive_message', messageComplet);
-            console.log(`📡 Message envoyé en live dans la salle ${conversationId}`);
-        } catch (e) {
-            console.error("Erreur socket (pas grave):", e.message);
-        }
+            getIo().to(conversationId).emit('receive_message', messageComplet);
+        } catch (e) { console.error("Socket warning:", e.message); }
 
         res.status(201).json(messageComplet);
-
     } catch (error) {
         console.error("Erreur envoi:", error);
         res.status(500).json({ error: "Erreur serveur" });
     }
+};
+
+export const deleteConversation = async (req, res) => {
+    try {
+        await db.query('DELETE FROM conversation WHERE id = $1', [req.params.id]);
+        res.json({ success: true });
+    } catch (error) { res.status(500).json({ error: "Erreur" }); }
 };

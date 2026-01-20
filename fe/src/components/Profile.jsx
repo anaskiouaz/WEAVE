@@ -1,19 +1,21 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, Heart, LogOut, Camera, ChevronDown, ChevronUp } from 'lucide-react';
-import { apiGet, apiPut, apiPost } from '../api/client'; // 👇 J'ai ajouté apiPost
+import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, Bell, Heart, LogOut, Camera, ChevronDown, ChevronUp } from 'lucide-react';
+import { apiGet, apiPut, apiPost } from '../api/client';
 import { useAuth } from '../context/AuthContext';
-import { PushNotifications } from '@capacitor/push-notifications'; // 👇 Import Notifications
-import { Capacitor } from '@capacitor/core'; // 👇 Import Core
+import { PushNotifications } from '@capacitor/push-notifications';
+import { Capacitor } from '@capacitor/core';
 
 export default function Profile() {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
   
-  // Utilisation de l'ID du contexte s'il existe
-  const USER_ID = user?.id || "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380c33"; 
+  // --- CORRECTION CRUCIALE : ID DYNAMIQUE ---
+  // On utilise l'ID de l'utilisateur connecté.
+  // Si user est null (pas encore chargé), USER_ID sera undefined.
+  const USER_ID = user?.id; 
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef(null);
 
   // --- ÉTATS D'ÉDITION ---
@@ -29,8 +31,8 @@ export default function Profile() {
   const [stats, setStats] = useState({ interventions: 0, moments: 0, rating: 0 });
   const [skills, setSkills] = useState([]);
   
-  // NOUVEAUX ÉTATS
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false); // Par défaut false en attendant le check
+  // --- ÉTATS UI ---
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [showAssistedPeople, setShowAssistedPeople] = useState(false);
   const [assistedPeopleList] = useState(['Grand-Père Michel']); 
 
@@ -45,13 +47,14 @@ export default function Profile() {
 
   // --- CHARGEMENT DES DONNÉES ---
   useEffect(() => {
+    // On ne lance le chargement QUE si on a un ID valide
     if (USER_ID) {
+        setIsLoading(true);
         fetchData();
-        checkNotificationStatus(); // 👇 Vérifier l'état réel au chargement
+        checkNotificationStatus();
     }
   }, [USER_ID]);
 
-  // Vérifier si les notifs sont déjà activées sur le téléphone
   const checkNotificationStatus = async () => {
     if (Capacitor.getPlatform() === 'web') return;
     try {
@@ -83,12 +86,14 @@ export default function Profile() {
           photoUrl: null 
         });
 
-        const formattedAvail = data.availability.map(a => ({
+        // Formatage des disponibilités pour l'affichage
+        const formattedAvail = (data.availability || []).map(a => ({
             day: a.day_of_week,
             slots: a.slots
         }));
         setAvailability(formattedAvail);
 
+        // Données statiques pour l'instant (à connecter au back plus tard)
         setStats({ interventions: 24, moments: 18, rating: 4.8 });
         setSkills(['Courses', 'Cuisine', 'Accompagnement médical', 'Promenade']);
       }
@@ -99,7 +104,7 @@ export default function Profile() {
     }
   };
 
-  // --- GESTION PHOTO DE PROFIL ---
+  // --- GESTION PHOTO ---
   const handlePhotoClick = () => {
     fileInputRef.current.click(); 
   };
@@ -112,20 +117,18 @@ export default function Profile() {
     }
   };
 
-  // --- GESTION NOTIFICATIONS (Toggle) ---
+  // --- GESTION NOTIFICATIONS ---
   const handleNotificationToggle = async () => {
-    // Si on est sur le web, on ne fait rien (ou juste visuel)
     if (Capacitor.getPlatform() === 'web') {
         setNotificationsEnabled(!notificationsEnabled);
         return;
     }
 
     const newStatus = !notificationsEnabled;
-    setNotificationsEnabled(newStatus); // On change visuellement tout de suite
+    setNotificationsEnabled(newStatus); 
 
     try {
         if (newStatus === true) {
-            // --- ACTIVATION ---
             let perm = await PushNotifications.checkPermissions();
             if (perm.receive === 'prompt') {
                 perm = await PushNotifications.requestPermissions();
@@ -133,39 +136,29 @@ export default function Profile() {
 
             if (perm.receive === 'granted') {
                 await PushNotifications.register();
-                // On ajoute un listener temporaire pour capturer le token et l'envoyer
                 PushNotifications.addListener('registration', async (token) => {
                     console.log('Token réactivé:', token.value);
                     await apiPost('/users/device-token', { userId: USER_ID, token: token.value });
-                    // On nettoie le listener pour éviter les doublons
                     PushNotifications.removeAllListeners(); 
                 });
             } else {
-                // Si refusé, on remet le switch à OFF
                 setNotificationsEnabled(false);
-                alert("Les notifications sont bloquées dans les paramètres de votre téléphone.");
+                alert("Les notifications sont bloquées dans les paramètres.");
             }
-
         } else {
-            // --- DÉSACTIVATION ---
-            // 1. On dit au backend d'oublier ce token (en envoyant une chaine vide)
             await apiPost('/users/device-token', { userId: USER_ID, token: "" });
-            
-            // 2. On désinscrit le téléphone
             await PushNotifications.removeAllListeners();
             await PushNotifications.unregister();
-            console.log("Notifications désactivées et token supprimé.");
         }
     } catch (error) {
         console.error("Erreur toggle notifs:", error);
-        // En cas d'erreur, on annule le changement visuel
         setNotificationsEnabled(!newStatus); 
     }
   };
 
    const handleLogout = () => {
-    logout();           // Vide le localStorage et le state user
-    navigate('/login'); // Redirige vers la page de connexion
+    logout();           
+    navigate('/login'); 
   };
 
   // --- SAUVEGARDES ---
@@ -228,8 +221,10 @@ export default function Profile() {
     } catch (err) { console.error(err); }
   };
 
-
-  if (isLoading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-blue-600 w-8 h-8"/></div>;
+  // --- RENDER ---
+  
+  // 1. Si pas d'user (cas rare de latence context) ou loading actif
+  if (!USER_ID || isLoading) return <div className="min-h-screen flex items-center justify-center bg-gray-50"><Loader2 className="animate-spin text-blue-600 w-10 h-10"/></div>;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
@@ -250,7 +245,7 @@ export default function Profile() {
               <div className="absolute bottom-0 right-0 bg-white p-2 rounded-full text-gray-600 hover:text-blue-600 shadow-lg border border-gray-100 transition-transform transform group-hover:scale-110">
                 <Camera size={16} />
               </div>
-        </div>
+            </div>
 
             <div className="text-white drop-shadow-md">
               <h1 className="text-3xl font-bold tracking-tight">{userInfo.name}</h1>
@@ -259,9 +254,9 @@ export default function Profile() {
                 Aidant{userInfo.name && userInfo.name.endsWith('e') ? 'e' : ''} depuis {userInfo.yearsActive} ans
               </p>
             </div>
-                </div>
-                </div>
-                </div>
+          </div>
+        </div>
+      </div>
 
       {/* --- CONTENU --- */}
       <div className="max-w-4xl mx-auto px-8 -mt-24 space-y-6">
@@ -271,18 +266,18 @@ export default function Profile() {
           <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100 transform hover:-translate-y-1 transition-transform duration-200">
             <span className="text-3xl font-bold text-gray-800">{stats.interventions}</span>
             <span className="text-gray-500 text-sm font-bold uppercase tracking-wide mt-1">Interventions</span>
-                </div>
+          </div>
           <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100 transform hover:-translate-y-1 transition-transform duration-200">
             <span className="text-3xl font-bold text-gray-800">{stats.moments}</span>
             <span className="text-gray-500 text-sm font-bold uppercase tracking-wide mt-1">Moments partagés</span>
-              </div>
+          </div>
           <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100 transform hover:-translate-y-1 transition-transform duration-200">
             <div className="flex items-center gap-1 text-3xl font-bold text-gray-800">
               {stats.rating} <Star className="text-yellow-400 fill-yellow-400 w-6 h-6" />
             </div>
             <span className="text-gray-500 text-sm font-bold uppercase tracking-wide mt-1">Appréciation</span>
-            </div>
           </div>
+        </div>
 
         {/* COMPÉTENCES */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
@@ -468,14 +463,14 @@ export default function Profile() {
                 <span className="text-gray-700 font-medium">Notifications</span>
               </div>
               <button 
-                onClick={handleNotificationToggle} // 👇 Utilisation de la nouvelle fonction
+                onClick={handleNotificationToggle}
                 className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-300 focus:outline-none ${notificationsEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
               >
                 <div 
                   className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${notificationsEnabled ? 'translate-x-5' : 'translate-x-0'}`}
                 ></div>
-          </button>
-        </div>
+              </button>
+            </div>
 
             {/* PERSONNES AIDÉES */}
             <div className="border-t border-gray-100 pt-4">
@@ -509,7 +504,7 @@ export default function Profile() {
 
             {/* DÉCONNEXION */}
             <button 
-              onClick={handleLogout} // <--- 4. Remplacez l'alert par handleLogout
+              onClick={handleLogout}
               className="flex items-center gap-3 text-orange-600 hover:text-orange-700 hover:bg-orange-50 p-2 rounded-lg transition-colors w-full text-left pt-4 border-t border-gray-100 mt-2"
             >
               <LogOut size={20} />
