@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
-import { Users, Copy, Check, Share2, Crown, Mail, Phone, Trash2, Shield, Clock, UserPlus, UserMinus, Image, MessageSquare, Calendar, Activity } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Users, Copy, Check, Share2, Crown, Mail, Phone, Trash2, Shield, Clock, UserPlus, UserMinus, Image, MessageSquare, Calendar, Activity, AlertTriangle } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
@@ -16,12 +17,16 @@ const ACTION_CONFIG = {
 };
 
 export default function Admin() {
-  const { user, circleId } = useAuth();
+  const { user, circleId, logout } = useAuth();
+  const navigate = useNavigate();
   const [copied, setCopied] = useState(false);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
   const [activityLogs, setActivityLogs] = useState([]);
   const [logsLoading, setLogsLoading] = useState(true);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [deleting, setDeleting] = useState(false);
 
   // Déterminer le cercle courant :
   // - si un `circleId` est sélectionné dans le contexte, on l'utilise
@@ -97,6 +102,37 @@ export default function Admin() {
     navigator.clipboard.writeText(inviteCode);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const handleDeleteCircle = async () => {
+    if (deleteConfirmText !== currentCircle?.senior_name) {
+      alert("Le nom saisi ne correspond pas.");
+      return;
+    }
+
+    setDeleting(true);
+    try {
+      const token = localStorage.getItem('weave_token');
+      const res = await fetch(`${API_BASE_URL}/circles/${currentCircle.id}`, {
+        method: 'DELETE',
+        headers: { 'Authorization': `Bearer ${token}` }
+      });
+
+      if (res.ok) {
+        alert("Le cercle a été supprimé définitivement.");
+        // Rediriger vers la page de sélection de cercle
+        navigate('/select-circle');
+      } else {
+        const error = await res.json();
+        alert(`Erreur: ${error.error || "Impossible de supprimer le cercle"}`);
+      }
+    } catch (err) {
+      console.error("Erreur suppression cercle", err);
+      alert("Erreur lors de la suppression du cercle");
+    } finally {
+      setDeleting(false);
+      setShowDeleteModal(false);
+    }
   };
 
   const handleRemoveMember = async (memberId, memberName) => {
@@ -340,6 +376,113 @@ export default function Admin() {
           </div>
         )}
       </div>
+
+      {/* --- ZONE DE DANGER --- */}
+      <div className="bg-white rounded-xl shadow-sm border border-red-200 overflow-hidden">
+        <div className="p-6 border-b border-red-100 bg-red-50">
+          <h2 className="text-lg font-bold text-red-700 flex items-center gap-2">
+            <AlertTriangle className="w-5 h-5" />
+            Zone de danger
+          </h2>
+          <p className="text-sm text-red-600 mt-1">Ces actions sont irréversibles</p>
+        </div>
+
+        <div className="p-6">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <h3 className="font-semibold text-gray-900">Supprimer le cercle</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Cette action supprimera définitivement le cercle, tous ses membres, souvenirs, messages et tâches. 
+                Cette action est irréversible.
+              </p>
+            </div>
+            <button
+              onClick={() => setShowDeleteModal(true)}
+              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center gap-2 whitespace-nowrap"
+            >
+              <Trash2 className="w-4 h-4" />
+              Supprimer le cercle
+            </button>
+          </div>
+        </div>
+      </div>
+
+      {/* --- MODAL DE CONFIRMATION --- */}
+      {showDeleteModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 bg-red-50 border-b border-red-100">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-red-700">Supprimer le cercle ?</h3>
+                  <p className="text-sm text-red-600">Cette action est définitive</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-sm text-red-800">
+                  <strong>Attention :</strong> Vous êtes sur le point de supprimer définitivement le cercle 
+                  <span className="font-bold"> "{currentCircle?.senior_name}"</span>. 
+                  Toutes les données seront perdues :
+                </p>
+                <ul className="text-sm text-red-700 mt-2 list-disc list-inside space-y-1">
+                  <li>Tous les membres seront retirés</li>
+                  <li>Tous les souvenirs et commentaires</li>
+                  <li>Toutes les conversations et messages</li>
+                  <li>Toutes les tâches et disponibilités</li>
+                </ul>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Pour confirmer, tapez <span className="font-bold text-red-600">"{currentCircle?.senior_name}"</span>
+                </label>
+                <input
+                  type="text"
+                  value={deleteConfirmText}
+                  onChange={(e) => setDeleteConfirmText(e.target.value)}
+                  placeholder="Nom du cercle"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 bg-gray-50 border-t border-gray-100 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteModal(false);
+                  setDeleteConfirmText('');
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleDeleteCircle}
+                disabled={deleteConfirmText !== currentCircle?.senior_name || deleting}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {deleting ? (
+                  <>
+                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    Suppression...
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="w-4 h-4" />
+                    Supprimer définitivement
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
     </div>
   );

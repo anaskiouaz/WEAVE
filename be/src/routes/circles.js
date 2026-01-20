@@ -341,4 +341,86 @@ router.get('/:circleId/logs', authenticateToken, async (req, res) => {
   }
 });
 
+// ============================================================
+// 8. SUPPRIMER UN CERCLE (ADMIN seulement)
+// ============================================================
+router.delete('/:circleId', authenticateToken, async (req, res) => {
+  const { circleId } = req.params;
+  const userId = req.user.id;
+
+  try {
+    // Vérifier que l'utilisateur est ADMIN du cercle
+    const adminCheck = await pool.query(
+      `SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2`,
+      [userId, circleId]
+    );
+
+    if (adminCheck.rows.length === 0 || adminCheck.rows[0].role !== 'ADMIN') {
+      return res.status(403).json({ error: "Seul l'administrateur peut supprimer le cercle." });
+    }
+
+    // Récupérer le nom du bénéficiaire (senior) pour le log
+    const circleRes = await pool.query(
+      `SELECT u.name as senior_name 
+       FROM care_circles c
+       JOIN users u ON c.senior_id = u.id
+       WHERE c.id = $1`, 
+      [circleId]
+    );
+    const circleName = circleRes.rows[0]?.senior_name || 'Cercle';
+
+    // Supprimer toutes les données liées au cercle (ordre important pour les FK)
+    // 1. Supprimer les logs d'audit liés au cercle
+    await pool.query(`DELETE FROM audit_logs WHERE circle_id = $1`, [circleId]);
+    
+    // 2. Supprimer les souvenirs/journal entries du cercle
+    await pool.query(`DELETE FROM journal_entries WHERE circle_id = $1`, [circleId]);
+    
+    // 3. Supprimer les tâches du cercle
+    await pool.query(`DELETE FROM task_signups WHERE task_id IN (SELECT id FROM tasks WHERE circle_id = $1)`, [circleId]);
+    await pool.query(`DELETE FROM tasks WHERE circle_id = $1`, [circleId]);
+    
+    // 4. Supprimer les disponibilités des membres du cercle
+    await pool.query(`DELETE FROM user_availability WHERE circle_id = $1`, [circleId]);
+    
+    // 5. Supprimer les messages des conversations du cercle
+    await pool.query(`
+      DELETE FROM message 
+      WHERE conversation_id IN (SELECT id FROM conversation WHERE cercle_id = $1)
+    `, [circleId]);
+    
+    // 6. Supprimer les participants des conversations
+    await pool.query(`
+      DELETE FROM participant_conversation 
+      WHERE conversation_id IN (SELECT id FROM conversation WHERE cercle_id = $1)
+    `, [circleId]);
+    
+    // 7. Supprimer les conversations du cercle
+    await pool.query(`DELETE FROM conversation WHERE cercle_id = $1`, [circleId]);
+    
+    // 8. Supprimer les incidents du cercle
+    await pool.query(`DELETE FROM incidents WHERE circle_id = $1`, [circleId]);
+    
+    // 9. Supprimer les notations du cercle
+    await pool.query(`DELETE FROM helper_ratings WHERE circle_id = $1`, [circleId]);
+    
+    // 10. Supprimer les rôles utilisateurs du cercle
+    await pool.query(`DELETE FROM user_roles WHERE circle_id = $1`, [circleId]);
+    
+    // 11. Finalement, supprimer le cercle
+    await pool.query(`DELETE FROM care_circles WHERE id = $1`, [circleId]);
+
+    console.log(`🗑️ Cercle "${circleName}" (${circleId}) supprimé par l'utilisateur ${userId}`);
+
+    res.json({ 
+      success: true, 
+      message: `Le cercle "${circleName}" a été supprimé définitivement.` 
+    });
+
+  } catch (error) {
+    console.error('Erreur suppression cercle:', error);
+    res.status(500).json({ error: "Impossible de supprimer le cercle." });
+  }
+});
+
 export default router;
