@@ -1,10 +1,13 @@
 import { useLocation, Link } from 'react-router-dom';
 import { Home, Calendar, Heart, MessageSquare, User, Settings } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext'; // 👈 1. Import du contexte
+import { useAuth } from '../../context/AuthContext'; 
 
 export default function Navigation() {
     const location = useLocation();
-    const { user } = useAuth(); // 👈 2. Récupération de l'user
+    const { user } = useAuth(); 
+
+    // Bouton Admin affiché dans tous les cas
+    // (suppression de la vérification de rôle)
 
     // Liste de base
     const navItems = [
@@ -15,13 +18,8 @@ export default function Navigation() {
         { path: '/profile', label: 'Profil', icon: User },
     ];
 
-    // 👈 3. Ajout dynamique pour le mobile aussi
-    const isAdmin = user?.onboarding_role === 'admin' || user?.role_global === 'ADMIN';
-
-    if (isAdmin) {
-        // On ajoute l'admin sur mobile seulement si tu le souhaites
-        navItems.push({ path: '/admin', label: 'Admin', icon: Settings });
-    }
+    // Ajout inconditionnel du bouton Admin
+    navItems.push({ path: '/admin', label: 'Admin', icon: Settings });
 
     return (
         <div className="fixed bottom-6 left-0 right-0 px-4 flex justify-center z-50 pointer-events-none">

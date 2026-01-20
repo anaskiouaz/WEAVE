@@ -12,8 +12,16 @@ export const AuthProvider = ({ children }) => {
     const saved = localStorage.getItem('weave_user');
     return saved ? JSON.parse(saved) : null;
   });
-  const [circleId, setCircleId] = useState(() => localStorage.getItem('circle_id'));
-  const [circleNom, setCircleNom] = useState(() => localStorage.getItem('circle_nom'));
+  // `circleId` and `circleNom` are normally set when the user selects a circle
+  // (via `SelectCirclePage`). Read them from localStorage on init so the
+  // context is usable after a full page reload. Keep localStorage in sync
+  // whenever the app updates the circle.
+  const [circleId, setCircleId] = useState(() => {
+    try { return localStorage.getItem('circle_id') || null; } catch { return null; }
+  });
+  const [circleNom, setCircleNom] = useState(() => {
+    try { return localStorage.getItem('circle_nom') || null; } catch { return null; }
+  });
   // si local storage est vide, ce sera null par défaut
   
   const [loading, setLoading] = useState(false);
@@ -23,11 +31,11 @@ export const AuthProvider = ({ children }) => {
   const saveCircleData = (id, nom) => {
     if (id) {
         setCircleId(id);
-        localStorage.setItem('circle_id', id);
+        try { localStorage.setItem('circle_id', id); } catch {}
     }
     if (nom) {
         setCircleNom(nom);
-        localStorage.setItem('circle_nom', nom);
+        try { localStorage.setItem('circle_nom', nom); } catch {}
     }
   };
 
@@ -43,8 +51,8 @@ export const AuthProvider = ({ children }) => {
         localStorage.setItem('weave_token', data.token);
         localStorage.setItem('weave_user', JSON.stringify(data.user));
 
-        // Mise à jour du Cercle (via notre utilitaire)
-        saveCircleData(data.circle_id, data.circle_nom);
+        // Le cercle n'est pas initialisé ici : la sélection doit se faire
+        // uniquement depuis la page de sélection.
         
         return { success: true };
       }
@@ -58,7 +66,13 @@ export const AuthProvider = ({ children }) => {
 
   // 4. LOGOUT (Nettoyage complet)
   const logout = () => {
-    localStorage.clear(); // Ou supprimer item par item si tu veux garder d'autres trucs
+    // Remove only auth-related keys to avoid deleting unrelated data
+    try {
+      localStorage.removeItem('weave_token');
+      localStorage.removeItem('weave_user');
+      localStorage.removeItem('circle_id');
+      localStorage.removeItem('circle_nom');
+    } catch {}
     setToken(null);
     setUser(null);
     setCircleId(null);
@@ -78,39 +92,34 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // 6. SYNCHRONISATION (Refresh)
-  // Si on a un token mais PAS d'info de cercle (ex: refresh page), on va les chercher.
-  useEffect(() => {
-    const fetchCircleInfo = async () => {
-      if (!token) return;
+  // NOTE: Synchronisation automatique supprimée — le cercle doit être choisi
+  // explicitement par l'utilisateur depuis `SelectCirclePage`.
 
-      try {
-        // Note: Assure-toi que apiPost ou un équivalent apiGet gère le header Authorization
-        // Ici je garde le fetch natif pour être sûr que ça marche avec ton token
-        const res = await fetch('/api/circles/me', {
-            headers: { 'Authorization': `Bearer ${token}` }
-        });
-        
-        if (res.ok) {
-            const data = await res.json();
-            saveCircleData(data.circle_id, data.circle_nom);
-        }
-      } catch (err) {
-        console.error("Erreur auto-fetch cercle:", err);
+  // Keep in sync across tabs: if another tab changes localStorage, reflect it here.
+  useEffect(() => {
+    const onStorage = (e) => {
+      if (!e.key) return;
+      if (e.key === 'circle_id') {
+        setCircleId(e.newValue || null);
+      }
+      if (e.key === 'circle_nom') {
+        setCircleNom(e.newValue || null);
       }
     };
 
-    if (token && (!circleId || !circleNom)) {
-      fetchCircleInfo();
-    }
-  }, [token, circleId, circleNom]);
+    window.addEventListener('storage', onStorage);
+    return () => window.removeEventListener('storage', onStorage);
+  }, []);
 
   return (
     <AuthContext.Provider value={{
       user, token, circleId, circleNom,
       login, register, logout, loading,
-      setCircleId: (id) => saveCircleData(id, circleNom), // Wrapper pour garder la synchro
-      setCircleNom: (nom) => saveCircleData(circleId, nom)
+      // Expose setters which persist to localStorage via saveCircleData
+      setCircleId: (id) => saveCircleData(id, circleNom),
+      setCircleNom: (nom) => saveCircleData(circleId, nom),
+      // Also expose a convenience to set both
+      setCircle: (id, nom) => saveCircleData(id, nom),
     }}>
       {children}
     </AuthContext.Provider>

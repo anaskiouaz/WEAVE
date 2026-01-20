@@ -1,66 +1,66 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
-// src/api/client.js
-
-export async function apiGet(path) {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
-  });
-
+const getHeaders = (options = {}) => {
+  return {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}), // Permet de passer x-user-id
+  };
+};
+/**
+ * Fonction utilitaire pour gérer la réponse du fetch.
+ * Si le statut est en erreur (4xx, 5xx), on tente de lire le JSON 
+ * pour récupérer le message "error" précis envoyé par le backend.
+ */
+async function handleResponse(res) {
   if (!res.ok) {
-    throw new Error(`API error: ${res.status}`);
+    // On essaie de parser le corps de la réponse en JSON
+    const errorData = await res.json().catch(() => null);
+
+    // Cas 1 : Le backend a renvoyé un JSON avec un champ "error" (C'est ce qu'on veut !)
+    if (errorData && errorData.error) {
+      throw new Error(errorData.error);
+    }
+
+    // Cas 2 : Pas de JSON ou pas de champ error, on renvoie le statut HTTP
+    throw new Error(`Erreur API (${res.status}): ${res.statusText}`);
   }
 
+  // Si tout va bien, on renvoie le JSON de succès
   return res.json();
 }
 
-export async function apiPost(path, data) {
+export async function apiGet(path, options = {}) {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'GET',
+    headers: getHeaders(options),
+  });
+  return handleResponse(res);
+}
+
+export async function apiPost(path, body, options = {}) {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
+    headers: getHeaders(options),
+    body: JSON.stringify(body),
+  });
+  return handleResponse(res);
+}
+
+export async function apiPut(path, body, options = {}) {
+  const res = await fetch(`${API_BASE_URL}${path}`, {
+    method: 'PUT',
+    headers: getHeaders(options),
+    body: JSON.stringify(body),
+  });
+  return handleResponse(res);
+}
+
+export async function apiDelete(path, data = null) {
+  const config = {
+    method: 'DELETE',
     headers: {
       'Content-Type': 'application/json',
     },
-    body: JSON.stringify(data),
-  });
-
-  if (!res.ok) {
-    throw new Error(`API error: ${res.status}`);
-  }
-
-  return res.json();
-}
-
-// --- C'est cette fonction qu'il te manquait ---
-// Dans client.js
-
-export async function apiPut(path, data) {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json', // <--- INDISPENSABLE
-    },
-    body: JSON.stringify(data), // <--- INDISPENSABLE : Convertir l'objet JS en texte JSON
-  });
-
-  if (!res.ok) {
-    // Cela nous aidera à voir l'erreur renvoyée par le backend (res.statusText ou le JSON d'erreur)
-    const errorData = await res.json().catch(() => ({})); 
-    throw new Error(`API error ${res.status}: ${errorData.error || res.statusText}`);
-  }
-
-  return res.json();
-}// ----------------------------------------------
-
-export async function apiDelete(path, data = null) {
-  const headers = {
-    'Content-Type': 'application/json',
-  };
-
-  const config = {
-    method: 'DELETE',
-    headers,
   };
 
   if (data) {
@@ -68,11 +68,5 @@ export async function apiDelete(path, data = null) {
   }
 
   const res = await fetch(`${API_BASE_URL}${path}`, config);
-
-  if (!res.ok) {
-    const errorData = await res.json().catch(() => ({}));
-    throw new Error(`API error ${res.status}: ${errorData.message || errorData.error || res.statusText}`);
-  }
-
-  return res.json();
+  return handleResponse(res);
 }

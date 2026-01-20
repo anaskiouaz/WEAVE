@@ -6,13 +6,11 @@ import usersRouter from './users.js';
 import testDbRouter from './testDb.js';
 import incidentsRouter from './incidents.js';
 import tasksRouter from './tasks.js';
-
+import profileModule from './profile_module.js'; // <--- AJOUT 1
 // Import des fonctions contrôleurs (Destructuring)
 import { getJournalEntries, createJournalEntry , addCommentToEntry, deleteCommentFromEntry, deleteJournalEntry} from './souvenirs.js'; // Le fichier qu'on vient de créer
 // --- AJOUT 1 : On importe le routeur des conversations ---
 import conversationRouter from './conversations.js'; 
-
-import { getTasks, createTask, deleteTask } from './tasks.js';
 
 const router = Router();
 
@@ -22,7 +20,7 @@ router.use('/users', usersRouter);
 router.use('/test-db', testDbRouter);
 router.use('/incidents', incidentsRouter);
 router.use('/tasks', tasksRouter);
-
+router.use('/module/profile', profileModule); // <--- AJOUT 2
 // --- ROUTES SOUVENIRS / JOURNAL (EXPRESS) ---
 // Note : Le frontend appelle /api/souvenirs, donc ici on définit la suite
 router.get('/souvenirs', getJournalEntries);
