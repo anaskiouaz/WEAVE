@@ -108,6 +108,9 @@ export default function RegisterPage() {
     const resRegister = await register(payload);
 
     if (resRegister.success) {
+      // Réinitialiser le flag du tour pour les nouveaux utilisateurs
+      localStorage.removeItem('weave_onboarding_seen');
+      
       // 4. Connexion automatique après inscription
       const resLogin = await login(formData.email, formData.password);
       if (resLogin.success) {

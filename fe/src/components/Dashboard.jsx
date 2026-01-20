@@ -91,7 +91,7 @@ export default function Dashboard() {
   return (
     <div className="p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-8">
+        <div className="mb-8" data-tour="nav-accueil">
             <h1 className="text-gray-900 text-2xl font-bold mb-2">Tableau de bord</h1>
             <p className="text-gray-600">
                 {/* Petit bonus : afficher l'ID pour debug si besoin */}

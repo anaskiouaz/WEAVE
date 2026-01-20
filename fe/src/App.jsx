@@ -11,6 +11,7 @@ import Profile from './components/Profile';
 import Admin from './components/Admin';
 import EmergencyDialog from './components/EmergencyDialog';
 import Navigation from './components/ui-mobile/navigation';
+import OnboardingTour from './components/OnboardingTour';
 
 // Nouvelles pages d'authentification et d'accueil
 import LandingPage from './components/LandingPage';
@@ -57,6 +58,7 @@ function ProtectedLayout() {
 
   return (
     <div className="flex h-screen bg-gray-50">
+      <OnboardingTour />
 
       {/* --- SIDEBAR (VISIBLE UNIQUEMENT SUR DESKTOP) --- */}
       {!hideNav && (
@@ -71,6 +73,7 @@ function ProtectedLayout() {
               <Link
                 key={path}
                 to={path}
+                data-tour={`nav-${label.toLowerCase().replace(/\s+/g, '-')}`}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-lg ${location.pathname === path
                   ? 'bg-blue-50 text-blue-600 font-medium'
                   : 'text-gray-700 hover:bg-gray-50'

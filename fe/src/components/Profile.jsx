@@ -1,8 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, LogOut, Camera } from 'lucide-react';
+import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, LogOut, Camera, RotateCcw } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import RestartOnboardingButton from './RestartOnboardingButton';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 
@@ -472,6 +473,11 @@ export default function Profile() {
                   className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${notificationsEnabled ? 'translate-x-5' : 'translate-x-0'}`}
                 ></div>
               </button>
+            </div>
+
+            {/* RELANCER LE TOUR ONBOARDING */}
+            <div className="pt-4 border-t border-gray-100">
+              <RestartOnboardingButton />
             </div>
 
             {/* DÉCONNEXION */}
