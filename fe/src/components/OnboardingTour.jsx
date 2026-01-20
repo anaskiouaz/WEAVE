@@ -10,9 +10,19 @@ export default function OnboardingTour() {
   const [tourVisible, setTourVisible] = useState(false);
   const [hasSeenTour, setHasSeenTour] = useState(true); // Par défaut true pour éviter les bugs
 
+  // Stockage par utilisateur pour que chaque compte voie le tour une seule fois
+  const tourKey = user?.id ? `weave_onboarding_seen_${user.id}` : null;
+
   useEffect(() => {
+    // Si aucun utilisateur connecté, ne pas lancer le tour
+    if (!user || !tourKey) {
+      setHasSeenTour(true);
+      setTourVisible(false);
+      return;
+    }
+
     // Récupérer l'état du tour depuis localStorage
-    const hasSeenOnboarding = localStorage.getItem('weave_onboarding_seen');
+    const hasSeenOnboarding = localStorage.getItem(tourKey);
     
     // Afficher le tour si:
     // 1. L'utilisateur est connecté
@@ -25,7 +35,7 @@ export default function OnboardingTour() {
         setTourVisible(true);
       }, 500);
     }
-  }, [user, location.pathname]);
+  }, [user, tourKey, location.pathname]);
 
   const steps = [
     {
@@ -85,7 +95,9 @@ export default function OnboardingTour() {
 
     // Marquer le tour comme vu à la fin ou si l'utilisateur le ferme
     if (status === STATUS.FINISHED || status === STATUS.SKIPPED) {
-      localStorage.setItem('weave_onboarding_seen', 'true');
+      if (tourKey) {
+        localStorage.setItem(tourKey, 'true');
+      }
       setTourVisible(false);
       setHasSeenTour(true);
     }
