@@ -429,7 +429,15 @@ export default function Profile() {
            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                {isEditingProfile ? (
                  <>
-                    <div className="md:col-span-2"><label className="text-xs font-semibold text-gray-500 uppercase">Nom</label><input value={profileForm.name || ''} onChange={(e) => setProfileForm({...profileForm, name: e.target.value})} className="mt-1 w-full p-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"/></div>
+                    <div className="md:col-span-2">
+                      <label className="text-xs font-semibold text-gray-500 uppercase">Nom</label>
+                      <input 
+                        value={profileForm.name || ''} 
+                        disabled 
+                        className="mt-1 w-full p-2 border rounded bg-gray-100 text-gray-500 cursor-not-allowed"
+                        title="Le nom ne peut pas être modifié"
+                      />
+                    </div>
                     <div><label className="text-xs font-semibold text-gray-500 uppercase">Email</label><div className="flex items-center gap-3 mt-1 p-2 bg-gray-50 rounded border border-gray-100"><Mail className="w-4 h-4 text-gray-400"/><span className="text-gray-700">{userInfo.email}</span></div></div>
                     <div><label className="text-xs font-semibold text-gray-500 uppercase">Tel</label><input value={profileForm.phone || ''} onChange={(e) => setProfileForm({...profileForm, phone: e.target.value})} className="mt-1 w-full p-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"/></div>
                     <div className="md:col-span-2"><label className="text-xs font-semibold text-gray-500 uppercase">Adresse</label><input value={profileForm.address || ''} onChange={(e) => setProfileForm({...profileForm, address: e.target.value})} className="mt-1 w-full p-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"/></div>

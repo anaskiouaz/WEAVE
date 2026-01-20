@@ -158,6 +158,7 @@ router.get('/stats', async (req, res) => {
 
     try {
         // Compter les interventions (tasks assignées à l'utilisateur)
+        // Note: assigned_to est un tableau UUID[], donc on utilise l'opérateur @> ou ANY
         // assigned_to is a uuid[]; use ANY(...) to check membership
         const tasksResult = await db.query(
             'SELECT COUNT(*) as count FROM tasks WHERE $1 = ANY(assigned_to) AND completed = true',
