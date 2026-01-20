@@ -140,6 +140,21 @@ export default function CalendarView() {
     });
   }, [currentDate]);
 
+  // Grouper les tâches par date (YYYY-MM-DD) et trier par date+heure
+  const groupedTasks = useMemo(() => {
+    const sorted = tasks.slice().sort((a, b) => {
+      const da = new Date(a.date).getTime() + (a.time ? (parseInt(a.time.slice(0,2), 10) * 3600000 + parseInt(a.time.slice(3,5), 10) * 60000) : 0);
+      const db = new Date(b.date).getTime() + (b.time ? (parseInt(b.time.slice(0,2), 10) * 3600000 + parseInt(b.time.slice(3,5), 10) * 60000) : 0);
+      return da - db;
+    });
+    return sorted.reduce((acc, t) => {
+      const d = (t.date || '').split('T')[0];
+      if (!acc[d]) acc[d] = [];
+      acc[d].push(t);
+      return acc;
+    }, {});
+  }, [tasks]);
+
   // --- ACTIONS ---
 
   // Ouvre la modale (avec date optionnelle)
@@ -244,8 +259,30 @@ export default function CalendarView() {
               ))}
             </div>
           ) : (
-            /* Liste simplifiée pour l'exemple, tu peux remettre ton composant ListView complet ici */
-            <div className="bg-white rounded-2xl shadow-sm border p-4 text-center text-slate-500">Vue Liste active</div>
+            <div className="space-y-4">
+              {Object.keys(groupedTasks).length === 0 ? (
+                <div className="bg-white rounded-2xl shadow-sm border p-4 text-center text-slate-500">Aucune tâche</div>
+              ) : (
+                Object.entries(groupedTasks).map(([date, items]) => (
+                  <div key={date} className="bg-white rounded-2xl shadow-sm border p-4">
+                    <div className="flex items-center justify-between mb-3">
+                      <div>
+                        <div className="text-sm font-bold">{new Date(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+                        <div className="text-xs text-slate-400">{date}</div>
+                      </div>
+                      <div>
+                        <button onClick={() => openAddModal(date)} className="text-sm text-blue-600">Ajouter</button>
+                      </div>
+                    </div>
+                    <div className="divide-y">
+                      {items.map(t => (
+                        <TaskCard key={t.id} task={t} onClick={setSelectedTask} currentUserId={user?.id} viewMode="list" />
+                      ))}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
           )
         )}
 
