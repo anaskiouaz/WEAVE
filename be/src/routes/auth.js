@@ -2,6 +2,7 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import db from '../config/db.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -86,6 +87,7 @@ router.post('/login', async (req, res) => {
     
     delete user.password_hash; 
 
+
     res.json({ 
         success: true, 
         token, 
@@ -97,6 +99,56 @@ router.post('/login', async (req, res) => {
   } catch (error) {
     console.error('ERREUR LOGIN:', error);
     res.status(500).json({ success: false, error: "Erreur serveur lors de la connexion." });
+  }
+});
+
+
+// --- CHECK ROLE FOR CURRENT USER ON A CIRCLE ---
+// GET /auth/check-role?circle_id=...
+// Requires Authorization header (Bearer token). Uses req.user.id from the token.
+router.get('/check-role', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const circleId = req.query.circle_id;
+    if (!userId) return res.status(401).json({ success: false, error: 'Token invalide.' });
+    if (!circleId) return res.status(400).json({ success: false, error: 'Paramètre circle_id manquant.' });
+
+    const q = 'SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2 LIMIT 1';
+    const result = await db.query(q, [userId, circleId]);
+    if (result.rows.length === 0) {
+      return res.json({ success: true, role: null });
+    }
+    return res.json({ success: true, role: result.rows[0].role });
+  } catch (err) {
+    console.error('ERREUR /auth/check-role:', err);
+    return res.status(500).json({ success: false, error: 'Erreur serveur.' });
+  }
+});
+
+// --- ME: retourner l'utilisateur courant avec ses cercles ---
+router.get('/me', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    if (!userId) return res.status(401).json({ success: false, error: 'Token invalide.' });
+
+    const userRes = await db.query('SELECT id, name, email, role_global, phone, birth_date FROM users WHERE id = $1', [userId]);
+    if (userRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Utilisateur introuvable.' });
+    const user = userRes.rows[0];
+
+    const circlesResult = await db.query(`
+      SELECT cc.id, cc.invite_code, u.name AS senior_name, ur.role
+      FROM care_circles cc
+      JOIN user_roles ur ON cc.id = ur.circle_id
+      JOIN users u ON cc.senior_id = u.id
+      WHERE ur.user_id = $1
+    `, [userId]);
+
+    const circles = circlesResult.rows;
+
+    res.json({ success: true, user: { ...user, circles } });
+  } catch (err) {
+    console.error('ERREUR /auth/me:', err);
+    res.status(500).json({ success: false, error: 'Erreur serveur.' });
   }
 });
 

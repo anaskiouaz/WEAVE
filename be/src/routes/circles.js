@@ -83,8 +83,8 @@ router.post('/', authenticateToken, async (req, res) => {
     const dummyPassword = await bcrypt.hash("WeaveSeniorInit!", 10);
 
     const userRes = await client.query(
-      `INSERT INTO users (name, email, password_hash, birth_date, phone, medical_info, onboarding_role, role_global) 
-       VALUES ($1, $2, $3, $4, $5, $6, 'PC', 'USER') 
+      `INSERT INTO users (name, email, password_hash, birth_date, phone, medical_info, role_global) 
+       VALUES ($1, $2, $3, $4, $5, $6, 'USER') 
        RETURNING id`,
       [
         senior_info.name,

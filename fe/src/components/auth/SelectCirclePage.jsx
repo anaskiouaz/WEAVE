@@ -18,7 +18,7 @@ const MEDICAL_OPTIONS = [
 export default function SelectCirclePage() {
     const navigate = useNavigate();
     // On utilise le contexte pour sauvegarder le choix de l'utilisateur
-    const { setCircleId, setCircleNom, token } = useAuth();
+    const { setCircleId, setCircleNom, token, refreshUser } = useAuth();
 
     const [view, setView] = useState('selection');
     const [loading, setLoading] = useState(false);
@@ -139,6 +139,9 @@ export default function SelectCirclePage() {
                 setCircleId(finalId);
                 setCircleNom(finalName);
 
+                // Mettre à jour l'utilisateur en local (pour que les rôles soient à jour)
+                try { await refreshUser(); } catch (e) { /* ignore */ }
+
                 // Redirige directement vers le dashboard du cercle créé
                 navigate(`/dashboard?circle_id=${finalId}`);
             }
@@ -164,6 +167,9 @@ export default function SelectCirclePage() {
                 localStorage.setItem('circle_nom', finalName);
                 setCircleId(finalId);
                 setCircleNom(finalName);
+
+                // Mettre à jour l'utilisateur en local (pour que les rôles soient à jour)
+                try { await refreshUser(); } catch (e) { /* ignore */ }
 
                 // Redirige directement vers le dashboard du cercle rejoint
                 navigate(`/dashboard?circle_id=${finalId}`);

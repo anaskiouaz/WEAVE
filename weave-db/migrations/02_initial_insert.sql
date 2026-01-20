@@ -4,14 +4,13 @@
 
 -- 1. Création des utilisateurs
 -- NOTE : On doit créer "Mamie Monique" en tant qu'utilisateur car care_circles demande un senior_id
-INSERT INTO users (id, name, email, password_hash, role_global, onboarding_role, medical_info, privacy_consent) VALUES
+INSERT INTO users (id, name, email, password_hash, role_global, medical_info, privacy_consent) VALUES
 (
     'a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11', 
     'Thomas Durand', 
     'thomas@weave.app', 
     'hash_secret_123', 
     'SUPERADMIN',
-    'ADMIN',
     NULL,
     TRUE
 ),
@@ -21,7 +20,6 @@ INSERT INTO users (id, name, email, password_hash, role_global, onboarding_role,
     'sophie@weave.app', 
     'hash_secret_456', 
     'USER', 
-    'HELPER',
     NULL, 
     FALSE
 ),
@@ -31,7 +29,6 @@ INSERT INTO users (id, name, email, password_hash, role_global, onboarding_role,
     'marc@weave.app', 
     'hash_secret_789', 
     'USER', 
-    'HELPER',
     NULL, 
     FALSE
 ),
@@ -41,7 +38,6 @@ INSERT INTO users (id, name, email, password_hash, role_global, onboarding_role,
     'monique.durand@nomail.com', -- Email fictif requis par la contrainte UNIQUE
     'hash_secret_000', 
     'USER',
-    'PC', -- Rôle d'onboarding "Person Cared For"
     NULL, 
     TRUE
 );

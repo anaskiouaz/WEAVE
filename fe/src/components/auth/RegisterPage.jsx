@@ -21,11 +21,11 @@ export default function RegisterPage() {
     confirmPassword: '',
     phone: '',
     birth_date: '',
-    onboarding_role: ''
+    // onboarding_role removed: role is assigned via circles/user_roles
   });
 
   const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
-  const handleSelectChange = (value) => setFormData({ ...formData, onboarding_role: value });
+  // handleSelectChange removed (no role selection at registration)
 
   // Fonction de validation du mot de passe
   const validatePassword = (password) => {
@@ -134,17 +134,7 @@ export default function RegisterPage() {
                 <Input id="birth_date" name="birth_date" type="date" className="h-14 text-lg bg-white block w-full" value={formData.birth_date} onChange={handleChange} />
               </div>
             </div>
-            <div className="space-y-2">
-              <Label className="text-lg font-semibold">Rôle *</Label>
-              <Select onValueChange={handleSelectChange} required>
-                <SelectTrigger className="h-14 text-lg bg-white"><SelectValue placeholder="Sélectionner..." /></SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="ADMIN">Administrateur</SelectItem>
-                  <SelectItem value="HELPER">Aidant</SelectItem>
-                  <SelectItem value="PC">Bénéficiaire</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
+            {/* Role selection removed at registration — roles are managed via circles and admin assignment */}
 
             {/* Mot de passe */}
             <div className="space-y-2">
