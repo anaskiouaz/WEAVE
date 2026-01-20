@@ -2,6 +2,7 @@ import express from 'express';
 import { pool } from '../config/db.js'; // On privilégie pool comme dans la branche dev
 import { authenticateToken } from './../middleware/auth.js';
 import bcrypt from 'bcryptjs';
+import { logAudit, AUDIT_ACTIONS } from '../utils/audits.js';
 
 const router = express.Router();
 
@@ -180,6 +181,18 @@ router.post('/join', authenticateToken, async (req, res) => {
       [userId, circle.id]
     );
 
+    // Récupérer le nom de l'utilisateur pour le log
+    const userRes = await pool.query(`SELECT name FROM users WHERE id = $1`, [userId]);
+    const userName = userRes.rows[0]?.name || 'Utilisateur';
+
+    // 📝 Log de l'action
+    await logAudit(
+      userId, 
+      AUDIT_ACTIONS.MEMBER_JOINED, 
+      `${userName} a rejoint le cercle`, 
+      circle.id
+    );
+
     // Retour standardisé
     res.json({ 
         success: true, 
@@ -263,11 +276,68 @@ router.delete('/:circleId/members/:memberId', authenticateToken, async (req, res
       [memberId, circleId]
     );
 
+    // Récupérer le nom du membre supprimé pour le log
+    const memberRes = await pool.query(`SELECT name FROM users WHERE id = $1`, [memberId]);
+    const memberName = memberRes.rows[0]?.name || 'Utilisateur';
+
+    // 📝 Log de l'action
+    await logAudit(
+      currentUserId, 
+      AUDIT_ACTIONS.MEMBER_REMOVED, 
+      `${memberName} a été retiré du cercle`, 
+      circleId
+    );
+
     res.json({ success: true, message: "Membre supprimé du cercle avec succès." });
 
   } catch (error) {
     console.error('Erreur suppression membre:', error);
     res.status(500).json({ error: "Impossible de supprimer le membre." });
+  }
+});
+
+// ============================================================
+// 7. RÉCUPÉRER LES LOGS D'ACTIVITÉ DU CERCLE
+// ============================================================
+router.get('/:circleId/logs', authenticateToken, async (req, res) => {
+  const { circleId } = req.params;
+  const { limit = 50 } = req.query;
+
+  try {
+    // Vérifier que l'utilisateur fait partie du cercle
+    const memberCheck = await pool.query(
+      `SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2`,
+      [req.user.id, circleId]
+    );
+
+    if (memberCheck.rows.length === 0) {
+      return res.status(403).json({ error: "Vous n'avez pas accès à ce cercle." });
+    }
+
+    // Récupérer les logs avec le nom de l'utilisateur
+    const result = await pool.query(`
+      SELECT 
+        al.id,
+        al.action,
+        al.details,
+        al.created_at AT TIME ZONE 'UTC' AT TIME ZONE 'Europe/Paris' as created_at,
+        u.name as user_name
+      FROM audit_logs al
+      LEFT JOIN users u ON al.user_id = u.id
+      WHERE al.circle_id = $1
+      ORDER BY al.created_at DESC
+      LIMIT $2
+    `, [circleId, parseInt(limit)]);
+
+    res.json({
+      status: 'ok',
+      data: result.rows,
+      count: result.rows.length
+    });
+
+  } catch (error) {
+    console.error('Erreur récupération logs:', error);
+    res.status(500).json({ error: "Impossible de récupérer les logs." });
   }
 });
 
