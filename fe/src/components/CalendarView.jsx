@@ -174,6 +174,17 @@ export default function CalendarView() {
       };
 
       await apiPost('/tasks', payload);
+      // Poster un log d'audit (non bloquant)
+      (async () => {
+        try {
+          await apiPost('/users/audit-logs', {
+            userId: user?.id || null,
+            action: 'TASK_CREATED',
+            details: `${user?.name || 'Utilisateur'} a créé la tâche "${formData.title}"`,
+            circleId: circleId || null
+          });
+        } catch (e) { console.debug('Audit create task failed:', e.message || e); }
+      })();
       await loadTasks();
       setShowAddTask(false);
       showNotification('success', "Nouvelle tâche ajoutée !");
@@ -186,6 +197,18 @@ export default function CalendarView() {
   const handleVolunteer = async (taskId) => {
     try {
       await apiPost(`/tasks/${taskId}/volunteer`, { userId: user.id });
+      // Poster audit côté front (non bloquant)
+      (async () => {
+        try {
+          const task = tasks.find(t => String(t.id) === String(taskId));
+          await apiPost('/users/audit-logs', {
+            userId: user.id,
+            action: 'TASK_VOLUNTEERED',
+            details: `${user.name || 'Utilisateur'} s'est engagé(e) sur \"${task?.title || taskId}\"`,
+            circleId: task?.circle_id || circleId || null
+          });
+        } catch (e) { console.debug('Audit volunteer failed:', e.message || e); }
+      })();
       await loadTasks();
       setSelectedTask(null);
     } catch (err) { showNotification('error', "Erreur inscription"); }
@@ -194,6 +217,18 @@ export default function CalendarView() {
   const handleUnvolunteer = async (taskId) => {
     try {
       await apiPost(`/tasks/${taskId}/unvolunteer`, { userId: user.id });
+      // Poster audit côté front (non bloquant)
+      (async () => {
+        try {
+          const task = tasks.find(t => String(t.id) === String(taskId));
+          await apiPost('/users/audit-logs', {
+            userId: user.id,
+            action: 'TASK_WITHDRAWN',
+            details: `${user.name || 'Utilisateur'} s'est retiré(e) de \"${task?.title || taskId}\"`,
+            circleId: task?.circle_id || circleId || null
+          });
+        } catch (e) { console.debug('Audit unvolunteer failed:', e.message || e); }
+      })();
       await loadTasks();
       setSelectedTask(null);
     } catch (err) { showNotification('error', "Erreur désistement"); }

@@ -37,6 +37,22 @@ router.get('/audit-logs', async (req, res) => {
     }
 });
 
+// 2bis. ENREGISTRER UN LOG D'AUDIT (utilisé par le front pour poster des événements)
+router.post('/audit-logs', async (req, res) => {
+    try {
+        const { userId, action, details, circleId } = req.body;
+        // appel non bloquant — on renvoie OK même si le log échoue
+        try {
+            if (typeof logAudit === 'function') await logAudit(userId || null, action || 'UNKNOWN', details || '', circleId || null);
+        } catch (err) {
+            console.error('Erreur enregistrement audit depuis endpoint:', err);
+        }
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // 3. INSCRIPTION (FUSIONNÉE)
 router.post('/', async (req, res) => {
     const { name, email, password, phone, birth_date, medical_info, consent } = req.body;
