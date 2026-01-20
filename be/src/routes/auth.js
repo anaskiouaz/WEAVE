@@ -2,12 +2,13 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import db from '../config/db.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = Router();
 
 // --- INSCRIPTION (REGISTER) ---
 router.post('/register', async (req, res) => {
-  const { name, email, password, role, phone, birth_date } = req.body;
+  const { name, email, password, onboarding_role, phone, birth_date } = req.body;
 
   try {
     // 1. Vérifier si l'email existe déjà
@@ -21,11 +22,12 @@ router.post('/register', async (req, res) => {
     const passwordHash = await bcrypt.hash(password, salt);
 
     // 3. Insérer le nouvel utilisateur
-    // Note: Adapte les colonnes selon ton schéma de base de données réel (ex: onboarding_role vs role)
+    // On met aussi 'role_global' à 'USER' par défaut si c'est null, pour la compatibilité
     const newUser = await db.query(
-      `INSERT INTO users (name, email, password_hash, role, phone, birth_date) 
-       VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, name, email, role`,
-      [name, email, passwordHash, role, phone, birth_date]
+      `INSERT INTO users (name, email, password_hash, onboarding_role, role_global, phone, birth_date) 
+       VALUES ($1, $2, $3, $4, 'USER', $5, $6) 
+       RETURNING id, name, email, onboarding_role, role_global`,
+      [name, email, passwordHash, onboarding_role, phone, birth_date]
     );
 
     res.status(201).json({ success: true, user: newUser.rows[0] });
@@ -40,16 +42,11 @@ router.post('/register', async (req, res) => {
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   
-  console.log('--- Tentative de connexion ---');
-  console.log('Email reçu:', email);
-
   try {
     // 1. Chercher l'utilisateur
     const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
     
     if (result.rows.length === 0) {
-      console.log('Échec: Email introuvable.');
-      // Message spécifique pour le frontend
       return res.status(404).json({ success: false, error: "Aucun compte associé à cet email." });
     }
 
@@ -59,16 +56,12 @@ router.post('/login', async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password_hash);
     
     if (!isMatch) {
-      console.log('Échec: Mot de passe incorrect.');
-      // Message spécifique
       return res.status(401).json({ success: false, error: "Mot de passe incorrect." });
     }
 
-    console.log('Succès: Mot de passe validé pour', user.name);
-
-    // 3. Récupérer les cercles (Logique existante)
+    // 3. Récupérer les cercles
     const circlesResult = await db.query(`
-      SELECT cc.id, u.name AS senior_name, ur.role
+      SELECT cc.id, cc.invite_code, u.name AS senior_name, ur.role
       FROM care_circles cc
       JOIN user_roles ur ON cc.id = ur.circle_id
       JOIN users u ON cc.senior_id = u.id
@@ -76,7 +69,6 @@ router.post('/login', async (req, res) => {
     `, [user.id]);
 
     const circles = circlesResult.rows;
-
     let mainCircleId = null;
     let mainCircleNom = null;
 
@@ -85,9 +77,18 @@ router.post('/login', async (req, res) => {
         mainCircleNom = circles[0].senior_name; 
     }
 
-    // Génération du token
-    const token = jwt.sign({ id: user.id }, process.env.JWT_SECRET || 'secret', { expiresIn: '30d' });
-    delete user.password_hash; // On ne renvoie pas le hash
+    // 4. Génération du token
+    // On utilise role_global s'il existe, sinon onboarding_role
+    const activeRole = user.role_global || user.onboarding_role;
+
+    const token = jwt.sign(
+        { id: user.id, role: activeRole }, 
+        process.env.JWT_SECRET || 'secret', 
+        { expiresIn: '30d' }
+    );
+    
+    delete user.password_hash; 
+
 
     res.json({ 
         success: true, 
@@ -101,6 +102,64 @@ router.post('/login', async (req, res) => {
     console.error('ERREUR LOGIN:', error);
     res.status(500).json({ success: false, error: "Erreur serveur lors de la connexion." });
   }
+});
+
+router.get('/check-role', authenticateToken, async (req, res) => {
+  try {
+    const userId = req.user?.id;
+    const circleId = req.query.circle_id;
+    if (!userId) return res.status(401).json({ success: false, error: 'Token invalide.' });
+    if (!circleId) return res.status(400).json({ success: false, error: 'Paramètre circle_id manquant.' });
+
+    const q = 'SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2 LIMIT 1';
+    const result = await db.query(q, [userId, circleId]);
+    if (result.rows.length === 0) {
+      return res.json({ success: true, role: null });
+    }
+    return res.json({ success: true, role: result.rows[0].role });
+  } catch (err) {
+    console.error('ERREUR /auth/check-role:', err);
+    return res.status(500).json({ success: false, error: 'Erreur serveur.' });
+  }
+});
+
+router.get('/me', authenticateToken, async (req, res) => {
+    try {
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ success: false, error: 'Token invalide.' });
+
+        // SQL HYBRIDE : On demande TOUS les champs (les tiens + ceux de tes collègues)
+        const userRes = await db.query(
+            'SELECT id, name, email, onboarding_role, role_global, profile_photo, phone, birth_date FROM users WHERE id = $1', 
+            [userId]
+        );
+        
+        if (userRes.rows.length === 0) return res.status(404).json({ success: false, message: "Utilisateur introuvable" });
+        const user = userRes.rows[0];
+
+        const circlesResult = await db.query(`
+            SELECT cc.id, cc.invite_code, u.name AS senior_name, ur.role
+            FROM care_circles cc
+            JOIN user_roles ur ON cc.id = ur.circle_id
+            JOIN users u ON cc.senior_id = u.id
+            WHERE ur.user_id = $1
+        `, [userId]);
+
+        const circles = circlesResult.rows;
+        let mainCircleId = null;
+        if (circles.length > 0) mainCircleId = circles[0].id;
+
+        // RÉPONSE : On garde TA structure JSON qui renvoie circle_id à la racine
+        res.json({ 
+            success: true, 
+            user: { ...user, circles },
+            circle_id: mainCircleId 
+        });
+
+    } catch (error) {
+        console.error('ERREUR /me:', error);
+        res.status(500).json({ success: false, error: "Erreur récupération session." });
+    }
 });
 
 export default router;

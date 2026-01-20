@@ -14,7 +14,7 @@ router.get('/', async (req, res) => {
     const currentUserId = req.headers['x-user-id'] || 'ANONYMOUS';
     if (typeof logAudit === 'function') await logAudit(currentUserId, 'ACCESS_ALL_USERS', 'Consultation liste');
     
-    const result = await db.query('SELECT id, name, email, role_global, onboarding_role, created_at, privacy_consent FROM users ORDER BY created_at DESC');
+        const result = await db.query('SELECT id, name, email, role_global, created_at, privacy_consent FROM users ORDER BY created_at DESC');
     res.json({ success: true, count: result.rows.length, users: result.rows });
   } catch (error) {
     console.error('❌ Erreur GET users:', error);
@@ -37,9 +37,25 @@ router.get('/audit-logs', async (req, res) => {
     }
 });
 
+// 2bis. ENREGISTRER UN LOG D'AUDIT (utilisé par le front pour poster des événements)
+router.post('/audit-logs', async (req, res) => {
+    try {
+        const { userId, action, details, circleId } = req.body;
+        // appel non bloquant — on renvoie OK même si le log échoue
+        try {
+            if (typeof logAudit === 'function') await logAudit(userId || null, action || 'UNKNOWN', details || '', circleId || null);
+        } catch (err) {
+            console.error('Erreur enregistrement audit depuis endpoint:', err);
+        }
+        res.json({ success: true });
+    } catch (error) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // 3. INSCRIPTION (FUSIONNÉE)
 router.post('/', async (req, res) => {
-  const { name, email, password, phone, birth_date, onboarding_role, medical_info, consent } = req.body;
+    const { name, email, password, phone, birth_date, medical_info, consent } = req.body;
   if (!name || !email || !password) return res.status(400).json({ success: false, error: "Champs manquants" });
 
   try {
@@ -52,12 +68,12 @@ router.post('/', async (req, res) => {
         try { finalMedicalInfo = encrypt(medical_info); } catch (e) { console.error(e); }
     }
 
-    const query = `
-      INSERT INTO users (name, email, password_hash, phone, birth_date, onboarding_role, medical_info, privacy_consent) 
-      VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
-      RETURNING id, name, email, role_global, onboarding_role, created_at
-    `;
-    const result = await db.query(query, [name, email, passwordHash, phone, birth_date, onboarding_role, finalMedicalInfo, finalConsent]);
+        const query = `
+            INSERT INTO users (name, email, password_hash, phone, birth_date, medical_info, privacy_consent) 
+            VALUES ($1, $2, $3, $4, $5, $6, $7) 
+            RETURNING id, name, email, role_global, created_at
+        `;
+        const result = await db.query(query, [name, email, passwordHash, phone, birth_date, finalMedicalInfo, finalConsent]);
     
     if (typeof logAudit === 'function') await logAudit(result.rows[0].id, 'USER_REGISTERED', 'Nouvelle inscription');
     res.status(201).json({ success: true, user: result.rows[0] });

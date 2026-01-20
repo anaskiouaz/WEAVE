@@ -1,13 +1,14 @@
 import db from '../config/db.js';
 import admin from '../config/firebase.js';
 import { Router } from 'express';
+import { logAudit, AUDIT_ACTIONS } from '../utils/audits.js';
 
 const router = Router();
 
+// Get all tasks
 router.get('/', async (req, res) => {
     try {
-        // Insertion en base de données
-          const result = await db.query(
+        const result = await db.query(
             `SELECT 
           t.id,
           t.circle_id,
@@ -16,165 +17,151 @@ router.get('/', async (req, res) => {
           t.title,
           t.task_type,
           t.helper_name,
+          t.assigned_to,
           t.required_helpers,
           u.name AS senior_name
          FROM tasks t
          LEFT JOIN care_circles c ON c.id = t.circle_id
          LEFT JOIN users u ON c.senior_id = u.id
          ORDER BY t.date ASC, t.time ASC`
-       );
-    
-    res.json({
-      status: 'ok',
-      data: result.rows,
-      count: result.rows.length,
-    });
-  } catch (err) {
-    console.error('Error fetching tasks:', err);
-    res.status(500).json({
-      status: 'error',
-      message: err.message,
-    });
-  }
+        );
+
+        res.json({ status: 'ok', data: result.rows, count: result.rows.length });
+    } catch (err) {
+        console.error('Error fetching tasks:', err);
+        res.status(500).json({ status: 'error', message: err.message });
+    }
 });
 
+// Create a task
 router.post('/', async (req, res) => {
-  try {
-    // 1. On récupère required_helpers en plus des autres champs
-    const { date, time, title, task_type, helper_name, circle_id, required_helpers } = req.body;
+    try {
+        const { date, time, title, task_type, helper_name, circle_id, required_helpers } = req.body;
 
-    if (!date || !time || !title || !task_type) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Missing required fields',
-      });
-    }
-
-    let resolvedCircle = null;
-
-
-    if (circle_id) {
-      const specificCircle = await db.query(
-        `SELECT c.id, u.name AS senior_name FROM care_circles c LEFT JOIN users u ON c.senior_id = u.id WHERE c.id = $1`,
-        [circle_id]
-      );
-                 
-      if (!specificCircle.rows.length) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Care circle not found',
-        });
-      }
-
-      resolvedCircle = specificCircle.rows[0];
-    } else {
-      const defaultCircle = await db.query(
-        `SELECT c.id, u.name AS senior_name FROM care_circles c LEFT JOIN users u ON c.senior_id = u.id ORDER BY c.created_at ASC LIMIT 1`
-      );
-
-      if (!defaultCircle.rows.length) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'No care circle available. Please create one first.',
-        });
-      }
-
-      resolvedCircle = defaultCircle.rows[0];
-    }
-
-    const helperName = helper_name || 'À pourvoir';
-    
-    // 2. On s'assure que le quota est un entier (par défaut 1 si non fourni)
-    const quota = required_helpers ? parseInt(required_helpers, 10) : 1;
-    
-    const result = await db.query(
-      `INSERT INTO tasks (circle_id, title, task_type, date, time, required_helpers, helper_name)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)
-       RETURNING id, circle_id, title, task_type, date, time, required_helpers, helper_name`,
-      [
-        resolvedCircle.id,
-                title, 
-                task_type,
-        date,
-        time,
-        quota, // 3. ICI : on utilise la variable quota au lieu de "1" en dur
-        helperName,
-      ]
-    );
-    // On cherche TOUS les tokens existants
-        const userTokens = await db.query("SELECT fcm_token FROM users WHERE fcm_token IS NOT NULL AND fcm_token != ''");
-
-        // On nettoie la liste (pas de doublons)
-        const tokens = [...new Set(userTokens.rows.map(r => r.fcm_token))];
-
-        console.log(`Préparation notif. Tokens trouvés en DB : ${tokens.length}`);
-
-        if (tokens.length > 0) {
-             try {
-                 const message = {
-                    notification: {
-                        title: `Nouvelle activité :  ${time}`,
-                        body: `Tâche ajoutée : ${title}`
-                    },
-                    data: { taskId: result.rows[0].id.toString(), type: 'task_created' },
-                    tokens: tokens
-                 };
-
-                 console.log("Envoi à Firebase en cours...");
-                 const response = await admin.messaging().sendEachForMulticast(message);
-                 console.log(`Bilan Firebase : ${response.successCount} succès, ${response.failureCount} échecs.`);
-
-                 if (response.failureCount > 0) {
-                    const failedTokens = [];
-                    response.responses.forEach((resp, idx) => {
-                        if (!resp.success) {
-                            failedTokens.push(resp.error);
-                            console.error(`ERREUR sur le token ${idx} :`, JSON.stringify(resp.error));
-                        }
-                    });
-                 }
-
-             } catch (e) {
-                 console.error('CRASH Envoi Firebase:', e);
-             }
-        } else {
-            console.warn("Aucun token trouvé en base. Personne ne recevra la notif.");
+        if (!date || !time || !title || !task_type) {
+            return res.status(400).json({ status: 'error', message: 'Missing required fields' });
         }
 
-    res.status(201).json({
-      status: 'ok',
-      message: 'Task created',
-      data: {
-        ...result.rows[0],
-        senior_name: resolvedCircle.senior_name,
-      },
-    });
+        let resolvedCircle = null;
+        if (circle_id) {
+            const specificCircle = await db.query(`SELECT c.id, u.name AS senior_name FROM care_circles c LEFT JOIN users u ON c.senior_id = u.id WHERE c.id = $1`, [circle_id]);
+            if (!specificCircle.rows.length) return res.status(400).json({ status: 'error', message: 'Care circle not found' });
+            resolvedCircle = specificCircle.rows[0];
+        } else {
+            const defaultCircle = await db.query(`SELECT c.id, u.name AS senior_name FROM care_circles c LEFT JOIN users u ON c.senior_id = u.id ORDER BY c.created_at ASC LIMIT 1`);
+            if (!defaultCircle.rows.length) return res.status(400).json({ status: 'error', message: 'No care circle available' });
+            resolvedCircle = defaultCircle.rows[0];
+        }
+
+        const helperName = helper_name || 'À pourvoir';
+        const quota = required_helpers ? parseInt(required_helpers, 10) : 1;
+
+        const result = await db.query(
+            `INSERT INTO tasks (circle_id, title, task_type, date, time, required_helpers, helper_name)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)
+           RETURNING id, circle_id, title, task_type, date, time, required_helpers, helper_name, assigned_to`,
+            [resolvedCircle.id, title, task_type, date, time, quota, helperName]
+        );
+
+        res.status(201).json({ status: 'ok', message: 'Task created', data: { ...result.rows[0], senior_name: resolvedCircle.senior_name } });
     } catch (err) {
-    console.error('Error creating task:', err);
-    res.status(500).json({
-      status: 'error',
-      message: err.message,
-    });
+        console.error('Error creating task:', err);
+        res.status(500).json({ status: 'error', message: err.message });
     }
 });
 
-router.delete('/:id', async (req, res) => {
-  try {
-    const { id } = req.params;
-    
-        await db.query('DELETE FROM tasks WHERE id = $1', [id]);
-    
-    res.json({
-      status: 'ok',
-      message: 'Task deleted',
-    });
-    } catch (err) {
-    console.error('Error deleting task:', err);
-    res.status(500).json({
-      status: 'error',
-      message: err.message,
-    });
-    }}
-  );
+// Volunteer for a task
+router.post('/:id/volunteer', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { userId } = req.body;
 
-  export default router;
+        if (!userId) return res.status(400).json({ status: 'error', message: 'User ID is required' });
+
+        const userRes = await db.query('SELECT name FROM users WHERE id = $1', [userId]);
+        if (userRes.rows.length === 0) return res.status(404).json({ status: 'error', message: 'User not found' });
+        const userName = userRes.rows[0].name;
+
+        const taskRes = await db.query('SELECT helper_name, assigned_to, required_helpers, title, circle_id FROM tasks WHERE id = $1', [id]);
+        if (taskRes.rows.length === 0) return res.status(404).json({ status: 'error', message: 'Task not found' });
+
+        const currentTask = taskRes.rows[0];
+        const currentVolunteersCount = currentTask.assigned_to ? currentTask.assigned_to.length : 0;
+
+        if (currentTask.required_helpers && currentVolunteersCount >= currentTask.required_helpers) {
+            return res.status(400).json({ status: 'error', message: 'Task is full (quota reached)' });
+        }
+
+        if (currentTask.assigned_to && currentTask.assigned_to.includes(userId)) {
+            return res.status(400).json({ status: 'error', message: 'You are already volunteered' });
+        }
+
+        let newHelperName = currentTask.helper_name;
+        if (newHelperName === 'À pourvoir' || !newHelperName) newHelperName = userName;
+        else newHelperName = `${newHelperName}, ${userName}`;
+
+        const updateRes = await db.query(
+            `UPDATE tasks SET assigned_to = array_append(assigned_to, $1), helper_name = $2 WHERE id = $3 RETURNING *`,
+            [userId, newHelperName, id]
+        );
+
+        const task = updateRes.rows[0];
+        await logAudit(userId, AUDIT_ACTIONS.TASK_VOLUNTEERED, `${userName} s'est engagé(e) sur \"${task.title}\"`, task.circle_id);
+
+        res.json({ status: 'ok', message: 'Volunteer added', data: task });
+    } catch (err) {
+        console.error('Error volunteering:', err);
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+});
+
+// Unvolunteer (withdraw) from a task
+router.post('/:id/unvolunteer', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { userId } = req.body;
+
+        if (!userId) return res.status(400).json({ status: 'error', message: 'User ID is required' });
+
+        // Remove user from assigned_to
+        const removeRes = await db.query(`UPDATE tasks SET assigned_to = array_remove(assigned_to, $1) WHERE id = $2 RETURNING *`, [userId, id]);
+        if (removeRes.rowCount === 0) return res.status(404).json({ status: 'error', message: 'Task not found' });
+
+        let task = removeRes.rows[0];
+
+        // Recompute helper_name based on remaining assigned_to
+        const assigned = task.assigned_to || [];
+        if (assigned.length === 0) {
+            await db.query(`UPDATE tasks SET helper_name = $1 WHERE id = $2`, ['À pourvoir', id]);
+            task.helper_name = 'À pourvoir';
+        } else {
+            // Fetch names of remaining users
+            const namesRes = await db.query(`SELECT name FROM users WHERE id = ANY($1::uuid[])`, [assigned]);
+            const names = namesRes.rows.map(r => r.name);
+            const newHelperName = names.join(', ');
+            await db.query(`UPDATE tasks SET helper_name = $1 WHERE id = $2`, [newHelperName, id]);
+            task.helper_name = newHelperName;
+        }
+
+        await logAudit(userId, AUDIT_ACTIONS.TASK_WITHDRAWN, `Utilisateur retiré de la tâche \"${task.title}\"`, task.circle_id);
+
+        res.json({ status: 'ok', message: 'Unvolunteered', data: task });
+    } catch (err) {
+        console.error('Error unvolunteering:', err);
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+});
+
+// Delete a task
+router.delete('/:id', async (req, res) => {
+    try {
+        const { id } = req.params;
+        await db.query('DELETE FROM tasks WHERE id = $1', [id]);
+        res.json({ status: 'ok', message: 'Task deleted' });
+    } catch (err) {
+        console.error('Error deleting task:', err);
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+});
+
+export default router;

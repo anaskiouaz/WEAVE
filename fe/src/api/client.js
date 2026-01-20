@@ -1,55 +1,71 @@
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+
+// --- CORRECTION ICI ---
+const getHeaders = (options = {}) => {
+  // 1. On récupère le token du stockage
+  const token = localStorage.getItem('weave_token');
+
+  // 2. On prépare les headers de base
+  const headers = {
+    'Content-Type': 'application/json',
+    ...(options.headers || {}),
+  };
+
+  // 3. Si le token existe, on l'ajoute ! (C'est ça qui manquait)
+  if (token) {
+    headers['Authorization'] = `Bearer ${token}`;
+  }
+
+  return headers;
+};
 
 /**
  * Fonction utilitaire pour gérer la réponse du fetch.
- * Si le statut est en erreur (4xx, 5xx), on tente de lire le JSON 
- * pour récupérer le message "error" précis envoyé par le backend.
  */
 async function handleResponse(res) {
   if (!res.ok) {
-    // On essaie de parser le corps de la réponse en JSON
+    // Si on a une erreur 401 (Non autorisé), c'est souvent que le token est périmé
+    if (res.status === 401) {
+        console.warn("⚠️ Erreur 401 : Token invalide ou manquant");
+        // Optionnel : rediriger vers le login si besoin
+        // window.location.href = '/login';
+    }
+
     const errorData = await res.json().catch(() => null);
 
-    // Cas 1 : Le backend a renvoyé un JSON avec un champ "error" (C'est ce qu'on veut !)
     if (errorData && errorData.error) {
       throw new Error(errorData.error);
     }
-
-    // Cas 2 : Pas de JSON ou pas de champ error, on renvoie le statut HTTP
+    
+    // Fallback message
     throw new Error(`Erreur API (${res.status}): ${res.statusText}`);
   }
 
-  // Si tout va bien, on renvoie le JSON de succès
   return res.json();
 }
 
-export async function apiGet(path) {
+export async function apiGet(path, options = {}) {
   const res = await fetch(`${API_BASE_URL}${path}`, {
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    method: 'GET',
+    headers: getHeaders(options), // Maintenant ça envoie le token !
   });
   return handleResponse(res);
 }
 
-export async function apiPost(path, data) {
+export async function apiPost(path, body, options = {}) {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
+    headers: getHeaders(options),
+    body: JSON.stringify(body),
   });
   return handleResponse(res);
 }
 
-export async function apiPut(path, data) {
+export async function apiPut(path, body, options = {}) {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(data),
+    headers: getHeaders(options),
+    body: JSON.stringify(body),
   });
   return handleResponse(res);
 }
@@ -57,9 +73,7 @@ export async function apiPut(path, data) {
 export async function apiDelete(path, data = null) {
   const config = {
     method: 'DELETE',
-    headers: {
-      'Content-Type': 'application/json',
-    },
+    headers: getHeaders(), // Correction : utiliser getHeaders ici aussi
   };
 
   if (data) {

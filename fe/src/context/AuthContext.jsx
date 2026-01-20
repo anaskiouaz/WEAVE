@@ -23,19 +23,19 @@ export const AuthProvider = ({ children }) => {
     try { return localStorage.getItem('circle_nom') || null; } catch { return null; }
   });
   // si local storage est vide, ce sera null par défaut
-  
+
   const [loading, setLoading] = useState(false);
 
   // 2. FONCTION UTILITAIRE (Pour éviter de répéter le code)
   // Sert à sauvegarder les infos du cercle partout en même temps
   const saveCircleData = (id, nom) => {
     if (id) {
-        setCircleId(id);
-        try { localStorage.setItem('circle_id', id); } catch {}
+      setCircleId(id);
+      try { localStorage.setItem('circle_id', id); } catch { }
     }
     if (nom) {
-        setCircleNom(nom);
-        try { localStorage.setItem('circle_nom', nom); } catch {}
+      setCircleNom(nom);
+      try { localStorage.setItem('circle_nom', nom); } catch { }
     }
   };
 
@@ -43,7 +43,7 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password) => {
     setLoading(true);
     try {
-        const data = await apiPost('/auth/login', { email, password });      
+      const data = await apiPost('/auth/login', { email, password });
       if (data.success) {
         // Mise à jour du Token et User
         setToken(data.token);
@@ -53,7 +53,7 @@ export const AuthProvider = ({ children }) => {
 
         // Le cercle n'est pas initialisé ici : la sélection doit se faire
         // uniquement depuis la page de sélection.
-        
+
         return { success: true };
       }
     } catch (error) {
@@ -64,6 +64,30 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
+  // 6. Rafraîchir les données utilisateur depuis le backend
+  const refreshUser = async () => {
+    const t = localStorage.getItem('weave_token') || token;
+    if (!t) return null;
+    try {
+      const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
+      const res = await fetch(`${API_BASE}/auth/me`, {
+        method: 'GET',
+        headers: { 'Authorization': `Bearer ${t}` }
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      if (data && data.user) {
+        setUser(data.user);
+        try { localStorage.setItem('weave_user', JSON.stringify(data.user)); } catch { }
+        return data.user;
+      }
+    } catch (err) {
+      console.error('refreshUser failed', err);
+      return null;
+    }
+    return null;
+  };
+
   // 4. LOGOUT (Nettoyage complet)
   const logout = () => {
     // Remove only auth-related keys to avoid deleting unrelated data
@@ -72,7 +96,7 @@ export const AuthProvider = ({ children }) => {
       localStorage.removeItem('weave_user');
       localStorage.removeItem('circle_id');
       localStorage.removeItem('circle_nom');
-    } catch {}
+    } catch { }
     setToken(null);
     setUser(null);
     setCircleId(null);
@@ -120,6 +144,9 @@ export const AuthProvider = ({ children }) => {
       setCircleNom: (nom) => saveCircleData(circleId, nom),
       // Also expose a convenience to set both
       setCircle: (id, nom) => saveCircleData(id, nom),
+      // Expose setUser and refresh helper so pages can update context after actions
+      setUser,
+      refreshUser,
     }}>
       {children}
     </AuthContext.Provider>
