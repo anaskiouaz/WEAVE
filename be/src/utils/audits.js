@@ -39,4 +39,5 @@ export const AUDIT_ACTIONS = {
     
     // Tâches/Activités
     TASK_VOLUNTEERED: 'TASK_VOLUNTEERED',
+    TASK_WITHDRAWN: 'TASK_WITHDRAWN',
 };
