@@ -12,7 +12,7 @@ const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 const MEDICAL_OPTIONS = [
     "Risque d'Escarres", "Phlébite / Thrombose", "Fonte musculaire",
     "Ankyloses / Raideurs", "Constipation", "Incontinence",
-    "Encombrement bronchique", "Syndrome de glissement", "Ostéoporose"
+    "Encombrement bronchique", "Syndrome de glissement", "Ostéoporose", "Autre"
 ];
 
 export default function SelectCirclePage() {
@@ -298,7 +298,8 @@ export default function SelectCirclePage() {
                                 </div>
                             </div>
                             <div className="space-y-3 pt-2">
-                                <Label className="flex items-center gap-2"><Stethoscope className="w-4 h-4 text-blue-600" /> Pathologies / Risques</Label>
+                                <Label className="flex items-center gap-2"><Stethoscope className="w-4 h-4 text-blue-600" /> Pathologies / Risques <span className="text-xs text-gray-500 font-normal">(optionnel)</span></Label>
+                                <p className="text-xs text-gray-500">Ces informations ne sont pas obligatoires.</p>
                                 <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                                     <div className="flex flex-wrap gap-2">
                                         {MEDICAL_OPTIONS.map((option) => {
