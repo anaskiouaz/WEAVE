@@ -1,13 +1,15 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, LogOut, Camera } from 'lucide-react';
+import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, LogOut, Camera, Cookie } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../api/client';
 import { useAuth } from '../context/AuthContext';
+import { useCookieConsent } from '../context/CookieContext';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 
 export default function Profile() {
   const { user, logout } = useAuth();
+  const { openPreferences } = useCookieConsent();
   const navigate = useNavigate();
   
   const USER_ID = user?.id || "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380c33";
@@ -473,6 +475,15 @@ export default function Profile() {
                 ></div>
               </button>
             </div>
+
+            {/* GESTION COOKIES RGPD */}
+            <button 
+              onClick={openPreferences}
+              className="flex items-center gap-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition-colors w-full text-left"
+            >
+              <Cookie size={20} />
+              <span className="font-medium">Gérer mes cookies</span>
+            </button>
 
             {/* DÉCONNEXION */}
             <button 
