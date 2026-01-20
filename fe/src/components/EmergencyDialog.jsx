@@ -44,10 +44,10 @@ export default function EmergencyDialog({ open, onClose }) {
   };
 
   const emergencyContacts = [
-    { name: "SAMU", label: "Urgence médicale", number: "15", color: "bg-red-600" },
-    { name: "Police", label: "Secours", number: "17", color: "bg-blue-600" },
-    { name: "Pompiers", label: "Incendie/Accident", number: "18", color: "bg-red-600" },
-    { name: "Europe", label: "Urgence", number: "112", color: "bg-orange-500" },
+    { name: "SAMU", label: " ", number: "15", color: "bg-red-600" },
+    { name: "Police", label: "", number: "17", color: "bg-blue-600" },
+    { name: "Pompiers", label: "", number: "18", color: "bg-red-600" },
+    { name: "Europe", label: "", number: "112", color: "bg-orange-500" },
   ];
 
   const modalContent = (

@@ -21,6 +21,13 @@ import SelectCirclePage from './components/auth/SelectCirclePage';
 import AdminGuard from './components/auth/AdminGuard'; // J'ai ajouté l'import du Guard
 import { useAuth } from './context/AuthContext';
 
+// RGPD - Gestion des cookies
+import { CookieProvider } from './context/CookieContext';
+import CookieBanner from './components/CookieBanner';
+import CookiePreferences from './components/CookiePreferences';
+import PrivacyPolicy from './components/PrivacyPolicy';
+import LegalNotice from './components/LegalNotice';
+
 // Layout avec Sidebar (Desktop) et Navigation Flottante (Mobile)
 function ProtectedLayout() {
   const location = useLocation();
@@ -138,31 +145,39 @@ function ProtectedLayout() {
 
 export default function App() {
   return (
-    <BrowserRouter>
-      <Routes>
-        {/* Routes Publiques */}
-        <Route path="/" element={<LandingPage />} />
-        <Route path="/login" element={<LoginPage />} />
-        <Route path="/register" element={<RegisterPage />} />
+    <CookieProvider>
+      <BrowserRouter>
+        <Routes>
+          {/* Routes Publiques */}
+          <Route path="/" element={<LandingPage />} />
+          <Route path="/login" element={<LoginPage />} />
+          <Route path="/register" element={<RegisterPage />} />
+          <Route path="/politique-confidentialite" element={<PrivacyPolicy />} />
+          <Route path="/mentions-legales" element={<LegalNotice />} />
 
-        {/* Routes Protégées */}
-        <Route element={<ProtectedLayout />}>
-          <Route path="/dashboard" element={<Dashboard />} />
-          <Route path="/calendar" element={<CalendarView />} />
-          <Route path="/memories" element={<Memories />} />
-          <Route path="/messages" element={<Messages />} />
-          <Route path="/profile" element={<Profile />} />
+          {/* Routes Protégées */}
+          <Route element={<ProtectedLayout />}>
+            <Route path="/dashboard" element={<Dashboard />} />
+            <Route path="/calendar" element={<CalendarView />} />
+            <Route path="/memories" element={<Memories />} />
+            <Route path="/messages" element={<Messages />} />
+            <Route path="/profile" element={<Profile />} />
 
-          {/* Route Admin protégée par le Guard */}
-          <Route path="/admin" element={
-            <AdminGuard>
-              <Admin />
-            </AdminGuard>
-          } />
+            {/* Route Admin protégée par le Guard */}
+            <Route path="/admin" element={
+              <AdminGuard>
+                <Admin />
+              </AdminGuard>
+            } />
 
-          <Route path="/select-circle" element={<SelectCirclePage />} />
-        </Route>
-      </Routes>
-    </BrowserRouter>
+            <Route path="/select-circle" element={<SelectCirclePage />} />
+          </Route>
+        </Routes>
+        
+        {/* RGPD - Bannière et modal de préférences cookies */}
+        <CookieBanner />
+        <CookiePreferences />
+      </BrowserRouter>
+    </CookieProvider>
   );
 }
