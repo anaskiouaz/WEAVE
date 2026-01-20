@@ -4,7 +4,7 @@ const getHeaders = () => {
   const headers = {
     'Content-Type': 'application/json',
   };
-  // 👇 C'EST ICI QUE TOUT SE JOUE 👇
+  
   const token = localStorage.getItem('weave_token'); 
   if (token) {
     headers['Authorization'] = `Bearer ${token}`; 
@@ -12,19 +12,27 @@ const getHeaders = () => {
   return headers;
 };
 
-export async function apiGet(path) {
+// --- GET ---
+export async function apiGet(path, options = {}) {
+  // On fusionne les options (pour permettre l'ajout de signaux d'annulation, etc.)
   const res = await fetch(`${API_BASE_URL}${path}`, {
-    headers: getHeaders(), // Utilise les headers avec le token
+    ...options,
+    headers: { 
+      ...getHeaders(), 
+      ...options.headers 
+    }, 
   });
 
   if (!res.ok) {
     // On essaie de lire l'erreur renvoyée par le serveur
     const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || `API error: ${res.status}`);
+    console.error("❌ API GET Error:", path, res.status, errorData);
+    throw new Error(errorData.message || errorData.error || `Erreur API (${res.status})`);
   }
   return res.json();
 }
 
+// --- POST ---
 export async function apiPost(path, data) {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'POST',
@@ -34,11 +42,13 @@ export async function apiPost(path, data) {
 
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || `API error: ${res.status}`);
+    console.error("❌ API POST Error:", path, res.status, errorData);
+    throw new Error(errorData.message || errorData.error || `Erreur API (${res.status})`);
   }
   return res.json();
 }
 
+// --- PUT ---
 export async function apiPut(path, data) {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'PUT',
@@ -48,11 +58,13 @@ export async function apiPut(path, data) {
 
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || `API error: ${res.status}`);
+    console.error("❌ API PUT Error:", path, res.status, errorData);
+    throw new Error(errorData.message || errorData.error || `Erreur API (${res.status})`);
   }
   return res.json();
 }
 
+// --- DELETE ---
 export async function apiDelete(path) {
   const res = await fetch(`${API_BASE_URL}${path}`, {
     method: 'DELETE',
@@ -61,7 +73,8 @@ export async function apiDelete(path) {
 
   if (!res.ok) {
     const errorData = await res.json().catch(() => ({}));
-    throw new Error(errorData.error || `API error: ${res.status}`);
+    console.error("❌ API DELETE Error:", path, res.status, errorData);
+    throw new Error(errorData.message || errorData.error || `Erreur API (${res.status})`);
   }
   return res.json();
 }

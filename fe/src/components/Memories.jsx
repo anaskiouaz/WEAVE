@@ -10,7 +10,7 @@ export default function Memories() {
   const [tempPhoto, setTempPhoto] = useState(null);
   const [newContent, setNewContent] = useState('');
 
-  const { user } = useAuth(); // Récupération de l'utilisateur connecté
+  const { user, circleId } = useAuth(); // Récupération de l'utilisateur connecté ET du circleId
   const [memories, setMemories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
@@ -27,8 +27,8 @@ export default function Memories() {
   const [commentText, setCommentText] = useState("");
   const [isSending, setIsSending] = useState(false);
 
-  // ID du cercle (famille) à récupérer dynamiquement depuis l'utilisateur connecté
-  const CIRCLE_ID = user?.circles?.[0]?.id || "d0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44"; // Fallback au cercle par défaut
+  // ID du cercle - utilise le circleId du contexte (sélectionné par l'utilisateur)
+  const CIRCLE_ID = circleId || user?.circles?.[0]?.id || "d0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44";
 
   // Récupération des données depuis la base de données
   const fetchMemories = async () => {
@@ -79,11 +79,10 @@ export default function Memories() {
         formData.append('image', newPhotoFile);
 
         // 1. On définit l'URL de base de l'API (Port 4000)
-        // Si vous avez configuré Vite, on utilise la variable d'env, sinon le lien en dur
-        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
 
-        // 2. On fait l'appel vers la bonne route (ex: /api/upload/image)
-        const uploadResponse = await fetch(`${API_BASE_URL}/upload/image`, {
+        // 2. On fait l'appel vers la bonne route (avec /api)
+        const uploadResponse = await fetch(`${API_BASE_URL}/api/upload/image`, {
           method: 'POST',
           body: formData,
           // Note : Ne JAMAIS mettre de header 'Content-Type' manuellement avec FormData
@@ -223,7 +222,7 @@ export default function Memories() {
   };
 
   // 🔹 Construire l'URL complète de l'image
-  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+  const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
   // Si la variable inclut /api, on le retire pour servir les fichiers statiques
   const FILES_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, '');
 
@@ -247,7 +246,7 @@ const loadImageAsBase64 = async (url) => {
       } catch {}
 
       if (blobName) {
-        const API_BASE_URL_FULL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+        const API_BASE_URL_FULL = import.meta.env.VITE_API_BASE_URL || '';
         const proxyUrl = `${API_BASE_URL_FULL}/upload/blob/${blobName}`;
         const resp = await fetch(proxyUrl);
         if (!resp.ok) throw new Error('Proxy image fetch failed');
