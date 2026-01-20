@@ -32,13 +32,22 @@ const Messages = () => {
     if (!user) return;
 
     const token = localStorage.getItem('weave_token');
-    socketRef.current = io('http://localhost:4000', { 
+
+    // 🔗 CONFIGURATION DYNAMIQUE DE L'URL
+    // Si on est en mode dev (npm run dev), on utilise localhost:4000
+    // Sinon (sur Vercel), on utilise l'URL Azure.
+    // REMPLACE L'URL CI-DESSOUS PAR TON LIEN AZURE EXACT (sans le / à la fin)
+    const SOCKET_URL = import.meta.env.MODE === 'development' 
+        ? 'http://localhost:4000' 
+        : 'https://weave-be-server-d8badmaafzdvc8aq.swedencentral-01.azurewebsites.net'; 
+
+    socketRef.current = io(SOCKET_URL, { 
       path: '/socket.io',
       transports: ['websocket', 'polling'], 
       auth: { token } 
     });
 
-    socketRef.current.on('connect', () => console.log("✅ Socket connecté !"));
+    socketRef.current.on('connect', () => console.log("✅ Socket connecté sur", SOCKET_URL));
 
     loadConversations();
     loadMembers();
