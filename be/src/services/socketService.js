@@ -6,8 +6,9 @@ let io;
 export const initSocket = (server) => {
   io = new Server(server, {
     cors: {
-      // On autorise toutes les origines possibles en local
+      // AJOUT DE L'URL VERCEL ICI
       origin: [
+        "https://weave-steel.vercel.app", // <--- INDISPENSABLE
         "http://localhost:5173", 
         "http://localhost:4000",
         "http://127.0.0.1:5173",
@@ -16,9 +17,8 @@ export const initSocket = (server) => {
       ],
       methods: ["GET", "POST"],
       credentials: true,
-      allowedHeaders: ["Authorization"], // Important
+      allowedHeaders: ["Authorization"], 
     },
-    // Options de transport pour forcer la stabilité
     transports: ['websocket', 'polling'], 
     path: '/socket.io'
   });

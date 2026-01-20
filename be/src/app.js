@@ -4,8 +4,6 @@ import helmet from 'helmet';
 import morgan from 'morgan';
 import path from 'path';
 import { fileURLToPath } from 'url';
-
-// Import du Hub de routes (celui qu'on vient de corriger)
 import routes from './routes/index.js';
 
 const app = express();
@@ -13,28 +11,36 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // --- Middlewares Globaux ---
 app.use(helmet({
-  crossOriginResourcePolicy: false, // Autorise l'affichage des images
+  crossOriginResourcePolicy: false, 
 }));
 app.use(morgan('dev'));
 app.use(express.json());
 
-// --- CORS (Important pour le Frontend) ---
+// --- 1. DÉFINITION DE LA LISTE BLANCHE (CORS) ---
+const allowedOrigins = [
+  "https://weave-steel.vercel.app", // VOTRE FRONTEND VERCEL
+  "http://localhost:5173",          // Vite Local
+  "http://localhost:4000",          // Backend Local
+  "capacitor://localhost"           // Mobile
+];
+
+// --- 2. CONFIGURATION CORS EXPRESS ---
 app.use(cors({
-  origin: true, // Accepte tout (Frontend)
+  origin: function (origin, callback) {
+    // Autoriser les requêtes sans origine (ex: Postman, App Mobile native)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      console.log("🚫 CORS Bloqué pour l'origine:", origin);
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
   methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization', 'x-user-id'],
-  credentials: true,
+  credentials: true, // OBLIGATOIRE pour les cookies/sessions
 }));
-
-// --- Middleware OPTIONS (Fix pour Firefox/Chrome) ---
-app.use((req, res, next) => {
-  if (req.method === 'OPTIONS') {
-    res.header("Access-Control-Allow-Methods", "GET, PUT, POST, PATCH, DELETE, OPTIONS");
-    res.header("Access-Control-Allow-Headers", "Content-Type, Authorization");
-    return res.status(200).json({});
-  }
-  next();
-});
 
 // --- Dossier Uploads Public ---
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
@@ -49,6 +55,10 @@ app.use((req, res) => {
 
 app.use((err, req, res, next) => {
   console.error('❌ Erreur serveur:', err);
+  // Si l'erreur vient de CORS, on renvoie un message propre
+  if (err.message === 'Not allowed by CORS') {
+    return res.status(403).json({ message: 'Blocage CORS (Origine non autorisée)' });
+  }
   res.status(500).json({ message: 'Erreur interne serveur', error: err.message });
 });
 
