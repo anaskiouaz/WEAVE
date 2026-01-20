@@ -25,6 +25,7 @@ import { CookieProvider } from './context/CookieContext';
 import CookieBanner from './components/CookieBanner';
 import CookiePreferences from './components/CookiePreferences';
 import PrivacyPolicy from './components/PrivacyPolicy';
+import LegalNotice from './components/LegalNotice';
 
 // Layout avec Sidebar (Desktop) et Navigation Flottante (Mobile)
 function ProtectedLayout() {
@@ -149,6 +150,7 @@ export default function App() {
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
           <Route path="/politique-confidentialite" element={<PrivacyPolicy />} />
+          <Route path="/mentions-legales" element={<LegalNotice />} />
 
           {/* Routes Protégées */}
           <Route element={<ProtectedLayout />}>

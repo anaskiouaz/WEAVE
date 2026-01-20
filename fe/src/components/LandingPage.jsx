@@ -1,12 +1,15 @@
 import { Link } from 'react-router-dom';
 import { Button } from './ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from './ui/card';
-import { Heart, ShieldCheck, Users } from 'lucide-react';
+import { Heart, ShieldCheck, Users, Cookie } from 'lucide-react';
+import { useCookieConsent } from '../context/CookieContext';
 
 export default function LandingPage() {
+  const { openPreferences } = useCookieConsent();
+
   return (
-    <div className="min-h-screen bg-blue-50/50 flex flex-col items-center justify-center p-6 font-sans">
-      <main className="w-full max-w-5xl flex flex-col items-center text-center gap-10 animate-in fade-in duration-700">
+    <div className="min-h-screen bg-blue-50/50 flex flex-col items-center p-6 font-sans">
+      <main className="w-full max-w-5xl flex flex-col items-center text-center gap-10 animate-in fade-in duration-700 flex-1 justify-center">
         
         {/* Titre et Accroche */}
         <div className="space-y-6 mt-8">
@@ -45,6 +48,35 @@ export default function LandingPage() {
           <FeatureCard icon={ShieldCheck} title="Sécurité" desc="Vos données et celles de vos proches sont protégées." />
         </div>
       </main>
+
+      {/* Footer */}
+      <footer className="w-full max-w-5xl mt-16 pt-8 border-t border-gray-200">
+        <div className="flex flex-col md:flex-row items-center justify-between gap-4 text-sm text-gray-600">
+          <p>© 2026 Weave - Tous droits réservés</p>
+          
+          <div className="flex items-center gap-6">
+            <Link 
+              to="/mentions-legales" 
+              className="hover:text-blue-600 transition-colors"
+            >
+              Mentions légales
+            </Link>
+            <Link 
+              to="/politique-confidentialite" 
+              className="hover:text-blue-600 transition-colors"
+            >
+              Confidentialité
+            </Link>
+            <button 
+              onClick={openPreferences}
+              className="flex items-center gap-1.5 hover:text-blue-600 transition-colors"
+            >
+              <Cookie size={14} />
+              Cookies
+            </button>
+          </div>
+        </div>
+      </footer>
     </div>
   );
 }
