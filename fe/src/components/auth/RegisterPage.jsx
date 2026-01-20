@@ -143,7 +143,7 @@ export default function RegisterPage() {
             )}
 
             <div className="space-y-2">
-              <Label htmlFor="name" className="text-lg font-semibold text-gray-800">Nom complet *</Label>
+              <Label htmlFor="name" className="text-lg font-semibold text-gray-800">Nom * <span className="text-xs text-gray-500 font-normal">(choisissez un nom que votre famille reconnaitra)</span></Label>
               <Input id="name" name="name" required className="h-14 text-lg bg-white" value={formData.name} onChange={handleChange} />
             </div>
 
