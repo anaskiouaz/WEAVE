@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, LogOut, Camera, RotateCcw, Cookie } from 'lucide-react';
+import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, LogOut, Camera, RotateCcw, Cookie, Heart, ChevronDown, ChevronUp } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useCookieConsent } from '../context/CookieContext';
@@ -13,23 +13,26 @@ export default function Profile() {
   const { openPreferences } = useCookieConsent();
   const navigate = useNavigate();
   
-  const USER_ID = user?.id || "c0eebc99-9c0b-4ef8-bb6d-6bb9bd380c33";
-  const token = localStorage.getItem('token') || user?.token; 
+  // --- ID DYNAMIQUE (Vital pour que ça marche) ---
+  const USER_ID = user?.id; 
 
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef(null);
 
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isEditingAvailability, setIsEditingAvailability] = useState(false);
   const [isEditingSkills, setIsEditingSkills] = useState(false);
   
-  const [userInfo, setUserInfo] = useState({ name: '', email: '', phone: '', address: '', joinDate: '', yearsActive: 0, photoUrl: null });
+  const [userInfo, setUserInfo] = useState({ name: '', email: '', phone: '', address: '', joinDate: '', yearsActive: '0 jour', photoUrl: null });
   const [availability, setAvailability] = useState([]);
   const [stats, setStats] = useState({ interventions: 0, moments: 0, rating: 0 });
   const [skills, setSkills] = useState([]);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   
+  // --- UI ETATS (Travail de l'équipe : Personnes aidées) ---
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+  const [showAssistedPeople, setShowAssistedPeople] = useState(false);
+  const [assistedPeopleList] = useState(['Grand-Père Michel']); 
 
   const [profileForm, setProfileForm] = useState({});
   const [availForm, setAvailForm] = useState([]);
@@ -41,15 +44,29 @@ export default function Profile() {
 
   useEffect(() => {
     if (USER_ID) {
+        setIsLoading(true);
         fetchData();
-        // On ne vérifie plus les permissions ici pour l'état initial, on fait confiance à la DB
-        // Mais on peut vérifier la cohérence si besoin plus tard
+        checkNotificationStatus();
     }
   }, [USER_ID]);
+
+  const checkNotificationStatus = async () => {
+    if (Capacitor.getPlatform() === 'web') return;
+    try {
+      const perm = await PushNotifications.checkPermissions();
+      if (perm.receive === 'granted') {
+        setNotificationsEnabled(true);
+      }
+    } catch (e) {
+      console.error("Erreur check notifs", e);
+    }
+  };
 
   const fetchData = async () => {
     try {
       const options = { headers: { 'x-user-id': USER_ID } };
+      
+      // 1. Charger le profil de base
       const data = await apiGet('/module/profile', options);
       
       if (data.success) {
@@ -66,24 +83,35 @@ export default function Profile() {
           photoUrl: userData.profile_photo ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'}/uploads/${userData.profile_photo}` : null
         });
 
+        // Formatage des disponibilités
+        const formattedAvail = (data.availability || []).map(a => ({
+            day: a.day_of_week,
+            slots: a.slots
+        }));
+        setAvailability(formattedAvail);
+        
+        // Initialisation des skills
         setSkills(Array.isArray(userData.skills) ? userData.skills : []);
-        setAvailability(data.availability || []);
         
-        // Charger les statistiques (interventions, moments et yearsActive)
-        try {
-          const statsData = await apiGet('/module/profile/stats', options);
-          if (statsData.success) {
-            setStats(statsData.stats);
-            // Mettre à jour yearsActive avec le texte formaté
-            setUserInfo(prev => ({ ...prev, yearsActive: statsData.stats.yearsActiveText || '0 jour' }));
-          }
-        } catch (err) {
-          console.log('Stats non disponibles, valeurs par défaut');
-          setStats({ interventions: 0, moments: 0, rating: 0 });
+        // Notifs depuis la DB
+        if (userData.notifications_enabled !== undefined) {
+            setNotificationsEnabled(userData.notifications_enabled);
         }
-        
-        // 👇 CHARGEMENT DEPUIS LA DB (booléen)
-        setNotificationsEnabled(userData.notifications_enabled === true);
+
+        // 2. Charger les statistiques (Logique ÉQUIPE)
+        // On met un try/catch pour ne pas faire planter la page si l'API stats n'est pas encore prête
+        try {
+            const statsData = await apiGet('/module/profile/stats', options);
+            if (statsData.success) {
+                setStats(statsData.stats);
+                if (statsData.stats.yearsActiveText) {
+                    setUserInfo(prev => ({ ...prev, yearsActive: statsData.stats.yearsActiveText }));
+                }
+            }
+        } catch (statsError) {
+            console.log("⚠️ API Stats non disponible ou vide, utilisation valeurs par défaut.");
+            setStats({ interventions: 0, moments: 0, rating: 5.0 }); // Valeurs par défaut sûres
+        }
       }
     } catch (error) {
       console.error("Erreur chargement:", error);
@@ -92,12 +120,33 @@ export default function Profile() {
     }
   };
 
+  // --- GESTION PHOTO ---
+  const handlePhotoClick = () => fileInputRef.current.click();
+  
+  const handlePhotoUpload = (event) => {
+    const file = event.target.files[0];
+    if (file) {
+      const photoUrl = URL.createObjectURL(file);
+      setUserInfo({ ...userInfo, photoUrl: photoUrl });
+    }
+  };
+
+  // --- SAUVEGARDES ---
+  const startEditProfile = () => { setProfileForm({ ...userInfo }); setIsEditingProfile(true); };
+  
   const saveProfile = async () => {
     try {
       const options = { headers: { 'x-user-id': USER_ID } };
       const data = await apiPut('/module/profile/info', profileForm, options);
       if (data.success) { setUserInfo({ ...userInfo, ...profileForm }); setIsEditingProfile(false); }
     } catch (err) { console.error(err); }
+  };
+
+  const startEditSkills = () => { setSkillsForm([...skills]); setIsEditingSkills(true); };
+  
+  const toggleSkill = (skill) => {
+    if (skillsForm.includes(skill)) setSkillsForm(skillsForm.filter(s => s !== skill));
+    else setSkillsForm([...skillsForm, skill]);
   };
 
   const saveSkills = async () => {
@@ -107,6 +156,35 @@ export default function Profile() {
       if (data.success) { setSkills(skillsForm); setIsEditingSkills(false); }
     } catch (err) { console.error(err); }
   };
+
+  const startEditAvail = () => { 
+    const initialForm = availability.length > 0 
+      ? availability.map(a => ({
+          day: a.day_of_week || a.day,
+          slots: a.slots
+        })) 
+      : [{ day: 'Lundi', slots: '08:00 - 18:00' }];
+    setAvailForm(initialForm); 
+    setIsEditingAvailability(true); 
+  };
+
+  const updateTimeSlot = (index, type, value) => {
+    const newAvail = [...availForm];
+    const currentSlots = newAvail[index].slots || '08:00 - 18:00';
+    let [start, end] = currentSlots.includes(' - ') ? currentSlots.split(' - ') : ['08:00', '18:00'];
+    if (type === 'start') start = value;
+    if (type === 'end') end = value;
+    newAvail[index].slots = `${start} - ${end}`;
+    setAvailForm(newAvail);
+  };
+
+  const updateAvailRow = (index, field, value) => { 
+    const newAvail = [...availForm]; 
+    newAvail[index][field] = value; 
+    setAvailForm(newAvail); 
+  };
+  const addAvailRow = () => setAvailForm([...availForm, { day: 'Lundi', slots: '08:00 - 18:00' }]); 
+  const removeAvailRow = (index) => setAvailForm(availForm.filter((_, i) => i !== index));
 
   const saveAvailability = async () => {
     try {
@@ -134,23 +212,19 @@ export default function Profile() {
     }
   };
 
-  // --- GESTION NOTIFICATIONS (DB + Mobile) ---
+  // --- GESTION NOTIFICATIONS (Consolidée) ---
   const handleNotificationToggle = async () => {
     const newStatus = !notificationsEnabled;
     const options = { headers: { 'x-user-id': USER_ID } };
 
-    // 1. Optimistic UI Update
+    // Optimistic UI Update
     setNotificationsEnabled(newStatus);
 
     try {
-        // 2. Sauvegarder la préférence en BDD
-        const saveResult = await apiPut('/module/profile/notifications', { notifications_enabled: newStatus }, options);
-        console.log('✅ Notification pref sauvegardée:', newStatus, saveResult);
+        await apiPut('/module/profile/notifications', { notifications_enabled: newStatus }, options);
 
-        // 3. Gérer la partie technique (Token FCM) si sur mobile
         if (Capacitor.getPlatform() !== 'web') {
             if (newStatus === true) {
-                // --- ACTIVATION ---
                 let perm = await PushNotifications.checkPermissions();
                 if (perm.receive === 'prompt') {
                     perm = await PushNotifications.requestPermissions();
@@ -158,39 +232,24 @@ export default function Profile() {
 
                 if (perm.receive === 'granted') {
                     await PushNotifications.register();
-                    // On attend l'event 'registration'
                     PushNotifications.addListener('registration', async (token) => {
-                        console.log('Token réactivé:', token.value);
-                        // On envoie le token au backend
                         await apiPost('/users/device-token', { userId: USER_ID, token: token.value }, options);
                         PushNotifications.removeAllListeners(); 
                     });
                 } else {
-                    // Si refusé par l'OS, on remet à false et on prévient
                     setNotificationsEnabled(false);
-                    await apiPut('/module/profile/notifications', { enabled: false }, options); // Rollback DB
-                    alert("Les notifications sont bloquées dans les paramètres de votre téléphone.");
+                    await apiPut('/module/profile/notifications', { enabled: false }, options); 
+                    alert("Les notifications sont bloquées dans les paramètres.");
                 }
-
             } else {
-                // --- DÉSACTIVATION ---
-                // On efface le token côté backend
                 await apiPost('/users/device-token', { userId: USER_ID, token: "" }, options);
-                
-                // On désinscrit le téléphone
                 await PushNotifications.removeAllListeners();
                 await PushNotifications.unregister();
             }
         } 
-        
-        // Sur le web, on a déjà sauvegardé en DB, rien de plus à faire pour l'instant
-        // (Sauf si vous implémentez les notifs Web Push plus tard)
-
     } catch (error) {
         console.error("Erreur toggle notifs:", error);
-        // Rollback UI en cas d'erreur API
         setNotificationsEnabled(!newStatus);
-        alert("Impossible de modifier les paramètres de notification.");
     }
   };
 
@@ -295,7 +354,7 @@ export default function Profile() {
     <div className="min-h-screen bg-gray-50 pb-12">
       <input type="file" ref={fileInputRef} onChange={handlePhotoUpload} accept="image/*" className="hidden" />
 
-      {/* HEADER */}
+      {/* HEADER (Design Equipe) */}
       <div className="bg-gradient-to-r from-blue-700 via-blue-500 to-orange-400 pb-32 shadow-md">
         <div className="max-w-4xl mx-auto p-8 pt-12">
           <div className="flex items-center gap-6">
@@ -312,22 +371,37 @@ export default function Profile() {
                 <div className="absolute bottom-0 right-0 bg-white p-2 rounded-full text-gray-600 hover:text-blue-600 shadow-lg transition-transform transform group-hover:scale-110"><Camera size={16} /></div>
               )}
             </div>
+
             <div className="text-white drop-shadow-md">
               <h1 className="text-3xl font-bold tracking-tight">{userInfo.name}</h1>
-              <p className="opacity-95 flex items-center gap-2 font-medium mt-1"><Award size={18} className="text-orange-200" /> Aidant depuis {userInfo.yearsActive}</p>
+              <p className="opacity-95 flex items-center gap-2 font-medium mt-1">
+                <Award size={18} className="text-orange-200" /> 
+                Aidant{userInfo.name && userInfo.name.endsWith('e') ? 'e' : ''} depuis {userInfo.yearsActive}
+              </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* CONTENU */}
+      {/* --- CONTENU --- */}
       <div className="max-w-4xl mx-auto px-8 -mt-24 space-y-6">
-        
-        {/* STATS */}
+
+        {/* STATS (Design Equipe) */}
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-           <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100"><span className="text-3xl font-bold text-gray-800">{stats.interventions}</span><span className="text-gray-500 text-sm font-bold uppercase mt-1">Interventions</span></div>
-           <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100"><span className="text-3xl font-bold text-gray-800">{stats.moments}</span><span className="text-gray-500 text-sm font-bold uppercase mt-1">Moments</span></div>
-           <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100"><div className="flex items-center gap-1 text-3xl font-bold text-gray-800">{stats.rating} <Star className="text-yellow-400 fill-yellow-400 w-6 h-6"/></div><span className="text-gray-500 text-sm font-bold uppercase mt-1">Appréciation</span></div>
+          <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100 transform hover:-translate-y-1 transition-transform duration-200">
+            <span className="text-3xl font-bold text-gray-800">{stats.interventions}</span>
+            <span className="text-gray-500 text-sm font-bold uppercase tracking-wide mt-1">Interventions</span>
+          </div>
+          <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100 transform hover:-translate-y-1 transition-transform duration-200">
+            <span className="text-3xl font-bold text-gray-800">{stats.moments}</span>
+            <span className="text-gray-500 text-sm font-bold uppercase tracking-wide mt-1">Moments partagés</span>
+          </div>
+          <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100 transform hover:-translate-y-1 transition-transform duration-200">
+            <div className="flex items-center gap-1 text-3xl font-bold text-gray-800">
+              {stats.rating} <Star className="text-yellow-400 fill-yellow-400 w-6 h-6" />
+            </div>
+            <span className="text-gray-500 text-sm font-bold uppercase tracking-wide mt-1">Appréciation</span>
+          </div>
         </div>
 
         {/* COMPÉTENCES */}
@@ -456,7 +530,7 @@ export default function Profile() {
            </div>
         </div>
 
-        {/* --- PARAMÈTRES --- */}
+        {/* --- PARAMÈTRES (Design Equipe) --- */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <h2 className="text-lg font-bold text-gray-900 mb-6">Paramètres</h2>
           <div className="space-y-6">
@@ -477,11 +551,29 @@ export default function Profile() {
               </button>
             </div>
 
-            {/* RELANCER LE TOUR ONBOARDING */}
+            {/* PERSONNES AIDÉES (Ta branche) */}
+            <div className="border-t border-gray-100 pt-4">
+              <button 
+                onClick={() => setShowAssistedPeople(!showAssistedPeople)}
+                className="w-full flex items-center justify-between group"
+              >
+                <div className="flex items-center gap-3">
+                  <Heart className="text-gray-500 group-hover:text-red-500 transition-colors" size={20} />
+                  <span className="text-gray-700 font-medium group-hover:text-gray-900">Personnes aidées</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded text-sm">{assistedPeopleList.length}</span>
+                  {showAssistedPeople ? <ChevronUp size={16} className="text-gray-400"/> : <ChevronDown size={16} className="text-gray-400"/>}
+                </div>
+              </button>
+            </div>
+
+            {/* RELANCER LE TOUR ONBOARDING (Branche Dev) */}
             <div className="pt-4 border-t border-gray-100">
               <RestartOnboardingButton />
             </div>
-            {/* GESTION COOKIES RGPD */}
+
+            {/* GESTION COOKIES RGPD (Branche Dev) */}
             <button 
               onClick={openPreferences}
               className="flex items-center gap-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition-colors w-full text-left"

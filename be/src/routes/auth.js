@@ -8,7 +8,6 @@ const router = Router();
 
 // --- INSCRIPTION (REGISTER) ---
 router.post('/register', async (req, res) => {
-  // On récupère bien 'onboarding_role'
   const { name, email, password, onboarding_role, phone, birth_date } = req.body;
 
   try {
@@ -23,10 +22,11 @@ router.post('/register', async (req, res) => {
     const passwordHash = await bcrypt.hash(password, salt);
 
     // 3. Insérer le nouvel utilisateur
+    // On met aussi 'role_global' à 'USER' par défaut si c'est null, pour la compatibilité
     const newUser = await db.query(
-      `INSERT INTO users (name, email, password_hash, onboarding_role, phone, birth_date) 
-       VALUES ($1, $2, $3, $4, $5, $6) 
-       RETURNING id, name, email, onboarding_role`,
+      `INSERT INTO users (name, email, password_hash, onboarding_role, role_global, phone, birth_date) 
+       VALUES ($1, $2, $3, $4, 'USER', $5, $6) 
+       RETURNING id, name, email, onboarding_role, role_global`,
       [name, email, passwordHash, onboarding_role, phone, birth_date]
     );
 
@@ -59,8 +59,7 @@ router.post('/login', async (req, res) => {
       return res.status(401).json({ success: false, error: "Mot de passe incorrect." });
     }
 
-    // 3. Récupérer les cercles (AVEC LE CODE D'INVITATION)
-    // C'est ici la modification importante : cc.invite_code
+    // 3. Récupérer les cercles
     const circlesResult = await db.query(`
       SELECT cc.id, cc.invite_code, u.name AS senior_name, ur.role
       FROM care_circles cc
@@ -78,9 +77,12 @@ router.post('/login', async (req, res) => {
         mainCircleNom = circles[0].senior_name; 
     }
 
-    // Génération du token
+    // 4. Génération du token
+    // On utilise role_global s'il existe, sinon onboarding_role
+    const activeRole = user.role_global || user.onboarding_role;
+
     const token = jwt.sign(
-        { id: user.id, role: user.onboarding_role }, 
+        { id: user.id, role: activeRole }, 
         process.env.JWT_SECRET || 'secret', 
         { expiresIn: '30d' }
     );
@@ -102,10 +104,6 @@ router.post('/login', async (req, res) => {
   }
 });
 
-
-// --- CHECK ROLE FOR CURRENT USER ON A CIRCLE ---
-// GET /auth/check-role?circle_id=...
-// Requires Authorization header (Bearer token). Uses req.user.id from the token.
 router.get('/check-role', authenticateToken, async (req, res) => {
   try {
     const userId = req.user?.id;
@@ -125,31 +123,43 @@ router.get('/check-role', authenticateToken, async (req, res) => {
   }
 });
 
-// --- ME: retourner l'utilisateur courant avec ses cercles ---
 router.get('/me', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    if (!userId) return res.status(401).json({ success: false, error: 'Token invalide.' });
+    try {
+        const userId = req.user?.id;
+        if (!userId) return res.status(401).json({ success: false, error: 'Token invalide.' });
 
-    const userRes = await db.query('SELECT id, name, email, role_global, phone, birth_date FROM users WHERE id = $1', [userId]);
-    if (userRes.rows.length === 0) return res.status(404).json({ success: false, error: 'Utilisateur introuvable.' });
-    const user = userRes.rows[0];
+        // SQL HYBRIDE : On demande TOUS les champs (les tiens + ceux de tes collègues)
+        const userRes = await db.query(
+            'SELECT id, name, email, onboarding_role, role_global, profile_photo, phone, birth_date FROM users WHERE id = $1', 
+            [userId]
+        );
+        
+        if (userRes.rows.length === 0) return res.status(404).json({ success: false, message: "Utilisateur introuvable" });
+        const user = userRes.rows[0];
 
-    const circlesResult = await db.query(`
-      SELECT cc.id, cc.invite_code, u.name AS senior_name, ur.role
-      FROM care_circles cc
-      JOIN user_roles ur ON cc.id = ur.circle_id
-      JOIN users u ON cc.senior_id = u.id
-      WHERE ur.user_id = $1
-    `, [userId]);
+        const circlesResult = await db.query(`
+            SELECT cc.id, cc.invite_code, u.name AS senior_name, ur.role
+            FROM care_circles cc
+            JOIN user_roles ur ON cc.id = ur.circle_id
+            JOIN users u ON cc.senior_id = u.id
+            WHERE ur.user_id = $1
+        `, [userId]);
 
-    const circles = circlesResult.rows;
+        const circles = circlesResult.rows;
+        let mainCircleId = null;
+        if (circles.length > 0) mainCircleId = circles[0].id;
 
-    res.json({ success: true, user: { ...user, circles } });
-  } catch (err) {
-    console.error('ERREUR /auth/me:', err);
-    res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
+        // RÉPONSE : On garde TA structure JSON qui renvoie circle_id à la racine
+        res.json({ 
+            success: true, 
+            user: { ...user, circles },
+            circle_id: mainCircleId 
+        });
+
+    } catch (error) {
+        console.error('ERREUR /me:', error);
+        res.status(500).json({ success: false, error: "Erreur récupération session." });
+    }
 });
 
 export default router;

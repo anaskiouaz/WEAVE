@@ -2,7 +2,6 @@ import { defineConfig } from 'vite'
 import react from '@vitejs/plugin-react'
 import tailwindcss from '@tailwindcss/vite'
 
-// https://vite.dev/config/
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
@@ -20,6 +19,11 @@ export default defineConfig({
       '/uploads': {
         target: 'http://weave-api:4000',
         changeOrigin: true
+      },
+      // Ajout pour Socket.io si nécessaire
+      '/socket.io': {
+        target: 'http://weave-api:4000',
+        ws: true
       }
     }
   }

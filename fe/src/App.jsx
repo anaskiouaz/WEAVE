@@ -2,7 +2,7 @@ import { BrowserRouter, Routes, Route, Link, useLocation, Outlet, Navigate, useN
 import { Home, Calendar, Heart, MessageSquare, User, Settings, AlertCircle, LogOut } from 'lucide-react';
 import { useState } from 'react';
 
-// --- IMPORTS DES COMPOSANTS ---
+// Composants
 import Dashboard from './components/Dashboard';
 import CalendarView from './components/CalendarView';
 import Memories from './components/Memories';
@@ -13,7 +13,6 @@ import EmergencyDialog from './components/EmergencyDialog';
 import Navigation from './components/ui-mobile/navigation';
 import OnboardingTour from './components/OnboardingTour';
 
-// Nouvelles pages d'authentification et d'accueil
 import LandingPage from './components/LandingPage';
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
@@ -28,7 +27,6 @@ import CookiePreferences from './components/CookiePreferences';
 import PrivacyPolicy from './components/PrivacyPolicy';
 import LegalNotice from './components/LegalNotice';
 
-// Layout avec Sidebar (Desktop) et Navigation Flottante (Mobile)
 function ProtectedLayout() {
   const location = useLocation();
   const hideNav = location.pathname.startsWith('/select-circle');
@@ -43,10 +41,7 @@ function ProtectedLayout() {
     navigate('/login');
   };
 
-  // SÉCURITÉ : Si pas de token, redirection vers la page d'accueil
-  if (!token) {
-    return <Navigate to="/" replace />;
-  }
+  if (!token) return <Navigate to="/" replace />;
 
   // --- LOGIQUE DE SÉCURITÉ ADMIN ---
   // Déterminer le rôle via `role_global` ou via les rôles présents dans `user.circles`
@@ -74,7 +69,6 @@ function ProtectedLayout() {
             <h1 className="text-blue-600 text-2xl font-bold">Weave</h1>
             <p className="text-gray-600 mt-1 text-sm">Plateforme d'entraide</p>
           </div>
-
           <nav className="flex-1 p-4 space-y-2">
             {navItems.map(({ path, icon: Icon, label }) => (
               <Link
@@ -90,18 +84,13 @@ function ProtectedLayout() {
                 <span>{label}</span>
               </Link>
             ))}
-
             <button onClick={handleLogout} className="flex w-full items-center gap-3 px-4 py-3 rounded-lg transition-colors text-lg text-gray-700 hover:bg-red-50 hover:text-red-600 mt-4">
               <LogOut className="w-6 h-6" />
               <span>Déconnexion</span>
             </button>
           </nav>
-
           <div className="p-4 border-t">
-            <button
-              onClick={() => setEmergencyOpen(true)}
-              className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors shadow-md"
-            >
+            <button onClick={() => setEmergencyOpen(true)} className="w-full flex items-center justify-center gap-2 px-4 py-4 bg-orange-600 text-white rounded-lg hover:bg-orange-700 transition-colors shadow-md">
               <AlertCircle className="w-6 h-6" />
               <span className="text-lg font-bold">Urgence</span>
             </button>
@@ -126,17 +115,11 @@ function ProtectedLayout() {
             <span className="font-medium">Urgence</span>
           </button>
         </div>
-
-        {/* Le contenu de la page change ici */}
         <Outlet />
       </main>
 
-      {/* --- NAVIGATION FLOTTANTE (VISIBLE UNIQUEMENT SUR MOBILE) --- */}
-      {!hideNav && (
-        <div className="md:hidden">
-          <Navigation />
-        </div>
-      )}
+      {/* NAV MOBILE (Décommenter si le fichier existe) */}
+      {/* {!hideNav && <div className="md:hidden"><Navigation /></div>} */}
 
       <EmergencyDialog open={emergencyOpen} onClose={() => setEmergencyOpen(false)} />
     </div>

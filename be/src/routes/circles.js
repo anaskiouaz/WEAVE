@@ -1,5 +1,5 @@
 import express from 'express';
-import { pool } from '../config/db.js'; // On privilégie pool comme dans la branche dev
+import { pool } from '../config/db.js';
 import { authenticateToken } from './../middleware/auth.js';
 import bcrypt from 'bcryptjs';
 import { logAudit, AUDIT_ACTIONS } from '../utils/audits.js';
@@ -11,20 +11,20 @@ const generateInviteCode = () => {
 };
 
 // ============================================================
-// 1. RÉCUPÉRER LES MEMBRES (Fonctionnalité Admin - TA PARTIE)
+// 1. RÉCUPÉRER LES MEMBRES (TA FONCTIONNALITÉ VITALE)
 // ============================================================
-router.get('/:circleId/members', authenticateToken, async (req, res) => {
-  const { circleId } = req.params;
+// Note : J'ai adapté l'URL pour qu'elle corresponde à ce que ton Frontend appelle (/api/circles/:id/members)
+router.get('/:id/members', authenticateToken, async (req, res) => {
+  const { id } = req.params; // circleId
 
   try {
-    // Note: On utilise pool.query ici pour la cohérence
     const result = await pool.query(`
-      SELECT u.id, u.name, u.email, u.phone, ur.role, u.created_at
+      SELECT u.id, u.name, u.email, u.phone, u.profile_photo, u.onboarding_role, ur.role, u.created_at
       FROM user_roles ur
       JOIN users u ON ur.user_id = u.id
       WHERE ur.circle_id = $1
       ORDER BY ur.role ASC, u.name ASC
-    `, [circleId]);
+    `, [id]);
 
     res.json(result.rows);
   } catch (error) {
@@ -34,7 +34,7 @@ router.get('/:circleId/members', authenticateToken, async (req, res) => {
 });
 
 // ============================================================
-// 2. LISTER MES CERCLES (Fonctionnalité Dev - NOUVEAU)
+// 2. LISTER MES CERCLES (DEV - POUR DASHBOARD)
 // ============================================================
 router.get('/', authenticateToken, async (req, res) => {
     try {
@@ -43,7 +43,7 @@ router.get('/', authenticateToken, async (req, res) => {
         const query = `
             SELECT 
                 c.id, 
-                u.name, 
+                u.name as senior_name, 
                 ur.role
             FROM care_circles c
             JOIN user_roles ur ON c.id = ur.circle_id
@@ -61,7 +61,7 @@ router.get('/', authenticateToken, async (req, res) => {
 });
 
 // ============================================================
-// 3. CRÉER UN CERCLE
+// 3. CRÉER UN CERCLE (FONCTION ÉQUIPE)
 // ============================================================
 router.post('/', authenticateToken, async (req, res) => {
   const client = await pool.connect(); 
@@ -79,7 +79,6 @@ router.post('/', authenticateToken, async (req, res) => {
     // A. CRÉER LE COMPTE SENIOR
     const fakeEmail = `senior.${Date.now()}@weave.local`;
     const emailToUse = senior_info.email || fakeEmail;
-    // On utilise le mot de passe par défaut de la branche dev
     const dummyPassword = await bcrypt.hash("WeaveSeniorInit!", 10);
 
     const userRes = await client.query(
@@ -121,7 +120,6 @@ router.post('/', authenticateToken, async (req, res) => {
 
     await client.query('COMMIT');
 
-    // IMPORTANT : On renvoie les clés standardisées pour le Frontend (Version Dev)
     res.status(201).json({ 
         success: true, 
         circle_id: newCircle.id,
@@ -142,15 +140,14 @@ router.post('/', authenticateToken, async (req, res) => {
 });
 
 // ============================================================
-// 4. REJOINDRE UN CERCLE
+// 4. REJOINDRE UN CERCLE (FONCTION ÉQUIPE)
 // ============================================================
 router.post('/join', authenticateToken, async (req, res) => {
   try {
     const { invite_code } = req.body;
     const userId = req.user.id;
 
-    // 1. Trouver le cercle + le nom du senior associé
-    // (Version Dev : plus robuste car elle renvoie le nom directement)
+    // 1. Trouver le cercle
     const circleRes = await pool.query(
       `SELECT c.id, u.name as senior_name 
        FROM care_circles c
@@ -207,7 +204,7 @@ router.post('/join', authenticateToken, async (req, res) => {
 });
 
 // ============================================================
-// 5. RÉCUPÉRER MON CERCLE ACTIF
+// 5. RÉCUPÉRER MON CERCLE ACTIF (FONCTION UTILE)
 // ============================================================
 router.get('/me', authenticateToken, async (req, res) => {
   try {
@@ -239,7 +236,7 @@ router.get('/me', authenticateToken, async (req, res) => {
 });
 
 // ============================================================
-// 6. SUPPRIMER UN MEMBRE DU CERCLE
+// 6. SUPPRIMER UN MEMBRE DU CERCLE (FONCTION ADMIN ÉQUIPE)
 // ============================================================
 router.delete('/:circleId/members/:memberId', authenticateToken, async (req, res) => {
   const { circleId, memberId } = req.params;
@@ -296,15 +293,13 @@ router.delete('/:circleId/members/:memberId', authenticateToken, async (req, res
   }
 });
 
-// ============================================================
-// 7. RÉCUPÉRER LES LOGS D'ACTIVITÉ DU CERCLE
+// 7. RÉCUPÉRER LES LOGS D'ACTIVITÉ DU CERCLE (DEPUIS DEV)
 // ============================================================
 router.get('/:circleId/logs', authenticateToken, async (req, res) => {
   const { circleId } = req.params;
   const { limit = 50 } = req.query;
 
   try {
-    // Vérifier que l'utilisateur fait partie du cercle
     const memberCheck = await pool.query(
       `SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2`,
       [req.user.id, circleId]
@@ -314,7 +309,6 @@ router.get('/:circleId/logs', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: "Vous n'avez pas accès à ce cercle." });
     }
 
-    // Récupérer les logs avec le nom de l'utilisateur
     const result = await pool.query(`
       SELECT 
         al.id,
@@ -341,15 +335,13 @@ router.get('/:circleId/logs', authenticateToken, async (req, res) => {
   }
 });
 
-// ============================================================
-// 8. SUPPRIMER UN CERCLE (ADMIN seulement)
+// 8. SUPPRIMER UN CERCLE (DEPUIS DEV - GÈRE TES MESSAGES AUSSI)
 // ============================================================
 router.delete('/:circleId', authenticateToken, async (req, res) => {
   const { circleId } = req.params;
   const userId = req.user.id;
 
   try {
-    // Vérifier que l'utilisateur est ADMIN du cercle
     const adminCheck = await pool.query(
       `SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2`,
       [userId, circleId]
@@ -359,7 +351,6 @@ router.delete('/:circleId', authenticateToken, async (req, res) => {
       return res.status(403).json({ error: "Seul l'administrateur peut supprimer le cercle." });
     }
 
-    // Récupérer le nom du bénéficiaire (senior) pour le log
     const circleRes = await pool.query(
       `SELECT u.name as senior_name 
        FROM care_circles c
@@ -369,45 +360,30 @@ router.delete('/:circleId', authenticateToken, async (req, res) => {
     );
     const circleName = circleRes.rows[0]?.senior_name || 'Cercle';
 
-    // Supprimer toutes les données liées au cercle (ordre important pour les FK)
-    // 1. Supprimer les logs d'audit liés au cercle
+    // Suppressions en cascade (tes collègues ont inclus tes tables ici, c'est parfait)
     await pool.query(`DELETE FROM audit_logs WHERE circle_id = $1`, [circleId]);
-    
-    // 2. Supprimer les souvenirs/journal entries du cercle
     await pool.query(`DELETE FROM journal_entries WHERE circle_id = $1`, [circleId]);
-    
-    // 3. Supprimer les tâches du cercle
     await pool.query(`DELETE FROM task_signups WHERE task_id IN (SELECT id FROM tasks WHERE circle_id = $1)`, [circleId]);
     await pool.query(`DELETE FROM tasks WHERE circle_id = $1`, [circleId]);
-    
-    // 4. Supprimer les disponibilités des membres du cercle
     await pool.query(`DELETE FROM user_availability WHERE circle_id = $1`, [circleId]);
     
-    // 5. Supprimer les messages des conversations du cercle
+    // Nettoyage Messagerie
     await pool.query(`
       DELETE FROM message 
       WHERE conversation_id IN (SELECT id FROM conversation WHERE cercle_id = $1)
     `, [circleId]);
     
-    // 6. Supprimer les participants des conversations
     await pool.query(`
       DELETE FROM participant_conversation 
       WHERE conversation_id IN (SELECT id FROM conversation WHERE cercle_id = $1)
     `, [circleId]);
     
-    // 7. Supprimer les conversations du cercle
     await pool.query(`DELETE FROM conversation WHERE cercle_id = $1`, [circleId]);
     
-    // 8. Supprimer les incidents du cercle
+    // Nettoyage final
     await pool.query(`DELETE FROM incidents WHERE circle_id = $1`, [circleId]);
-    
-    // 9. Supprimer les notations du cercle
     await pool.query(`DELETE FROM helper_ratings WHERE circle_id = $1`, [circleId]);
-    
-    // 10. Supprimer les rôles utilisateurs du cercle
     await pool.query(`DELETE FROM user_roles WHERE circle_id = $1`, [circleId]);
-    
-    // 11. Finalement, supprimer le cercle
     await pool.query(`DELETE FROM care_circles WHERE id = $1`, [circleId]);
 
     console.log(`🗑️ Cercle "${circleName}" (${circleId}) supprimé par l'utilisateur ${userId}`);
@@ -421,6 +397,19 @@ router.delete('/:circleId', authenticateToken, async (req, res) => {
     console.error('Erreur suppression cercle:', error);
     res.status(500).json({ error: "Impossible de supprimer le cercle." });
   }
+});
+
+// 9. GET INFO CERCLE (TA ROUTE - À GARDER POUR LE FRONT)
+// ============================================================
+router.get('/:id', authenticateToken, async (req, res) => {
+    const { id } = req.params;
+    try {
+        const result = await pool.query('SELECT * FROM care_circles WHERE id = $1', [id]);
+        if (result.rows.length === 0) return res.status(404).json({message: "Cercle introuvable"});
+        res.json(result.rows[0]);
+    } catch (e) {
+        res.status(500).json({error: e.message});
+    }
 });
 
 export default router;

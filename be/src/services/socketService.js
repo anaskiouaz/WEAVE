@@ -1,37 +1,68 @@
 import { Server } from 'socket.io';
+import jwt from 'jsonwebtoken';
 
-let io = null;
+let io;
 
-export const initSocket = (httpServer) => {
-    // Configuration de base pour accepter les connexions du Frontend
-    io = new Server(httpServer, {
-        cors: {
-            origin: "*", // En production, il faudra mettre la vraie URL du site
-            methods: ["GET", "POST"]
+export const initSocket = (server) => {
+  io = new Server(server, {
+    cors: {
+      // On autorise toutes les origines possibles en local
+      origin: [
+        "http://localhost:5173", 
+        "http://localhost:4000",
+        "http://127.0.0.1:5173",
+        "http://localhost",
+        "capacitor://localhost" 
+      ],
+      methods: ["GET", "POST"],
+      credentials: true,
+      allowedHeaders: ["Authorization"], // Important
+    },
+    // Options de transport pour forcer la stabilité
+    transports: ['websocket', 'polling'], 
+    path: '/socket.io'
+  });
+
+  io.on('connection', (socket) => {
+    console.log('📡 [SOCKET] Nouveau client:', socket.id);
+
+    // Tentative d'auth via le handshake
+    const token = socket.handshake.auth?.token;
+    
+    if (token) {
+        try {
+            const decoded = jwt.verify(token, process.env.JWT_SECRET || 'secret');
+            socket.userId = decoded.id;
+            socket.join(decoded.id);
+            console.log(`✅ [SOCKET] User identifié: ${decoded.id}`);
+        } catch (err) {
+            console.log('⚠️ [SOCKET] Token invalide, connexion anonyme');
         }
+    }
+
+    socket.on('join_conversation', (conversationId) => {
+      const room = `conversation_${conversationId}`;
+      socket.join(room);
+      console.log(`➡️ [SOCKET] ${socket.id} rejoint ${room}`);
     });
 
-    io.on('connection', (socket) => {
-        console.log('🟢 Nouveau client connecté au socket:', socket.id);
-
-        // Quand le frontend dit "Je rejoins la conversation 123"
-        socket.on('join_conversation', (conversationId) => {
-            socket.join(conversationId);
-            console.log(`Socket ${socket.id} a rejoint la salle ${conversationId}`);
-        });
-
-        socket.on('disconnect', () => {
-            console.log('🔴 Client déconnecté:', socket.id);
-        });
+    socket.on('send_message', (data) => {
+        // Broadcast à la room
+        console.log(`📨 [SOCKET] Message dans conversation_${data.conversationId}`);
+        io.to(`conversation_${data.conversationId}`).emit('receive_message', data);
     });
 
-    return io;
+    socket.on('disconnect', () => {
+      // console.log('Client déconnecté');
+    });
+  });
+
+  return io;
 };
 
-// Fonction pour récupérer l'instance io n'importe où dans le code
 export const getIo = () => {
-    if (!io) {
-        throw new Error("Socket.io n'a pas été initialisé !");
-    }
-    return io;
+  if (!io) {
+    throw new Error("Socket.io n'est pas initialisé !");
+  }
+  return io;
 };
