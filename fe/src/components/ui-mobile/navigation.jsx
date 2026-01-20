@@ -6,10 +6,8 @@ export default function Navigation() {
     const location = useLocation();
     const { user } = useAuth(); 
 
-    // Logique Admin (Sécurisée)
-    const userRole = user?.onboarding_role ? user.onboarding_role.toUpperCase() : '';
-    const globalRole = user?.role_global ? user.role_global.toUpperCase() : '';
-    const isAdmin = userRole === 'ADMIN' || globalRole === 'ADMIN' || globalRole === 'SUPERADMIN';
+    // Bouton Admin affiché dans tous les cas
+    // (suppression de la vérification de rôle)
 
     // Liste de base
     const navItems = [
@@ -20,10 +18,8 @@ export default function Navigation() {
         { path: '/profile', label: 'Profil', icon: User },
     ];
 
-    // Ajout conditionnel
-    if (isAdmin) {
-        navItems.push({ path: '/admin', label: 'Admin', icon: Settings });
-    }
+    // Ajout inconditionnel du bouton Admin
+    navItems.push({ path: '/admin', label: 'Admin', icon: Settings });
 
     return (
         <div className="fixed bottom-6 left-0 right-0 px-4 flex justify-center z-50 pointer-events-none">
