@@ -108,6 +108,8 @@ export default function SelectCirclePage() {
     const selectExistingCircle = (circle) => {
         localStorage.setItem('circle_id', circle.id);
         localStorage.setItem('circle_nom', circle.name);
+        // Réinitialiser le tour onboarding
+        localStorage.removeItem('weave_onboarding_seen');
         setCircleId(circle.id);
         setCircleNom(circle.name);
         navigate(`/dashboard?circle_id=${circle.id}`);
@@ -136,6 +138,8 @@ export default function SelectCirclePage() {
 
                 localStorage.setItem('circle_id', finalId);
                 localStorage.setItem('circle_nom', finalName);
+                // Réinitialiser le tour onboarding
+                localStorage.removeItem('weave_onboarding_seen');
                 setCircleId(finalId);
                 setCircleNom(finalName);
 
@@ -165,6 +169,8 @@ export default function SelectCirclePage() {
 
                 localStorage.setItem('circle_id', finalId);
                 localStorage.setItem('circle_nom', finalName);
+                // Réinitialiser le tour onboarding
+                localStorage.removeItem('weave_onboarding_seen');
                 setCircleId(finalId);
                 setCircleNom(finalName);
 

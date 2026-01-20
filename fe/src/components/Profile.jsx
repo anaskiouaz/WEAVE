@@ -1,9 +1,10 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, LogOut, Camera, Cookie } from 'lucide-react';
+import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, LogOut, Camera, RotateCcw, Cookie } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useCookieConsent } from '../context/CookieContext';
+import RestartOnboardingButton from './RestartOnboardingButton';
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 
@@ -476,6 +477,10 @@ export default function Profile() {
               </button>
             </div>
 
+            {/* RELANCER LE TOUR ONBOARDING */}
+            <div className="pt-4 border-t border-gray-100">
+              <RestartOnboardingButton />
+            </div>
             {/* GESTION COOKIES RGPD */}
             <button 
               onClick={openPreferences}
