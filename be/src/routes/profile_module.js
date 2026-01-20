@@ -46,15 +46,16 @@ router.get('/', async (req, res) => {
 });
 
 // ============================================================
-// 2. SAUVEGARDER INFOS (Nom, Tel, Adresse)
+// 2. SAUVEGARDER INFOS (Tel, Adresse)
+// Note: Le nom (name) ne peut plus être modifié, comme l'email
 // ============================================================
 router.put('/info', async (req, res) => {
     const userId = getUserId(req);
-    const { name, phone, address } = req.body;
+    const { phone, address } = req.body;
     try {
         await db.query(
-            'UPDATE users SET name = $1, phone = $2, address = $3 WHERE id = $4',
-            [name, phone, address, userId]
+            'UPDATE users SET phone = $1, address = $2 WHERE id = $3',
+            [phone, address, userId]
         );
         res.json({ success: true });
     } catch (e) { res.status(500).json({ success: false, error: e.message }); }

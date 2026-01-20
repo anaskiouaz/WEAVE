@@ -24,7 +24,29 @@ export default function RegisterPage() {
     // onboarding_role removed: role is assigned via circles/user_roles
   });
 
-  const handleChange = (e) => setFormData({ ...formData, [e.target.name]: e.target.value });
+  const handleChange = (e) => {
+    const { name, value } = e.target;
+    
+    // Formatage automatique du numéro de téléphone
+    if (name === 'phone') {
+      // Retirer tous les caractères non-numériques
+      const onlyNums = value.replace(/\D/g, '');
+      
+      // Limiter à 10 chiffres
+      const limited = onlyNums.slice(0, 10);
+      
+      // Formater : XX XX XX XX XX
+      let formatted = '';
+      for (let i = 0; i < limited.length; i++) {
+        if (i > 0 && i % 2 === 0) formatted += ' ';
+        formatted += limited[i];
+      }
+      
+      setFormData({ ...formData, phone: formatted });
+    } else {
+      setFormData({ ...formData, [name]: value });
+    }
+  };
   // handleSelectChange removed (no role selection at registration)
 
   // Fonction de validation du mot de passe
@@ -45,10 +67,11 @@ export default function RegisterPage() {
 
   // Validation du numéro de téléphone (exemple France : 10 chiffres)
   const validatePhone = (phone) => {
-    const onlyDigits = /^\d+$/;
-    if (!phone) return null; // Champ optionnel
-    if (!onlyDigits.test(phone)) return "Le numéro de téléphone doit contenir uniquement des chiffres.";
-    if (phone.length !== 10) return "Le numéro de téléphone doit contenir exactement 10 chiffres.";
+    if (!phone) return "Le numéro de téléphone est obligatoire.";
+    // Retirer les espaces pour la validation
+    const onlyDigits = phone.replace(/\s/g, '');
+    if (!/^\d+$/.test(onlyDigits)) return "Le numéro de téléphone doit contenir uniquement des chiffres.";
+    if (onlyDigits.length !== 10) return "Le numéro de téléphone doit contenir exactement 10 chiffres.";
     return null;
   };
 
@@ -126,19 +149,36 @@ export default function RegisterPage() {
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="phone" className="text-lg font-semibold">Téléphone</Label>
-                <Input id="phone" name="phone" className="h-14 text-lg bg-white" value={formData.phone} onChange={handleChange} />
+                <Label htmlFor="phone" className="text-lg font-semibold text-gray-800">Téléphone *</Label>
+                <Input 
+                  id="phone" 
+                  name="phone" 
+                  type="tel"
+                  placeholder="06 12 34 56 78"
+                  required
+                  className="h-14 text-lg bg-white" 
+                  value={formData.phone} 
+                  onChange={handleChange} 
+                />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="birth_date" className="text-lg font-semibold">Date de naissance</Label>
-                <Input id="birth_date" name="birth_date" type="date" className="h-14 text-lg bg-white block w-full" value={formData.birth_date} onChange={handleChange} />
+                <Label htmlFor="birth_date" className="text-lg font-semibold text-gray-800">Date de naissance *</Label>
+                <Input 
+                  id="birth_date" 
+                  name="birth_date" 
+                  type="date" 
+                  required
+                  className="h-14 text-lg bg-white block w-full" 
+                  value={formData.birth_date} 
+                  onChange={handleChange} 
+                />
               </div>
             </div>
             {/* Role selection removed at registration — roles are managed via circles and admin assignment */}
 
             {/* Mot de passe */}
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-lg font-semibold">Mot de passe *</Label>
+              <Label htmlFor="password" className="text-lg font-semibold text-gray-800">Mot de passe *</Label>
               <Input
                 id="password"
                 name="password"
@@ -153,7 +193,7 @@ export default function RegisterPage() {
 
             {/* Confirmation du mot de passe */}
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-lg font-semibold">Confirmer le mot de passe *</Label>
+              <Label htmlFor="confirmPassword" className="text-lg font-semibold text-gray-800">Confirmer le mot de passe *</Label>
               <Input
                 id="confirmPassword"
                 name="confirmPassword"
