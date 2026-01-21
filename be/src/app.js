@@ -21,7 +21,7 @@ const allowedOrigins = [
   "https://weave-steel.vercel.app", // VOTRE FRONTEND VERCEL
   "http://localhost:5173",          // Vite Local
   "http://localhost:4000",          // Backend Local
-  "capacitor://localhost"           // Mobile
+  "http://localhost"           // Mobile
 ];
 
 // --- 2. CONFIGURATION CORS EXPRESS ---
