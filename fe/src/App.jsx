@@ -12,7 +12,8 @@ import Messages from './components/messagerie/Messages';
 import Profile from './components/Profile';
 import Admin from './components/Admin';
 import EmergencyDialog from './components/EmergencyDialog';
-import Navigation from './components/ui-mobile/navigation';
+// Assure-toi que le chemin correspond bien à l'emplacement de ton fichier de navigation mobile
+import Navigation from './components/ui-mobile/navigation'; 
 import OnboardingTour from './components/OnboardingTour';
 
 import LandingPage from './components/LandingPage';
@@ -85,7 +86,11 @@ function ProtectedLayout() {
 
   if (!token) return <Navigate to="/" replace />;
 
-  // 2. Liste des liens DE BASE (accessibles à tous)
+  // --- LOGIQUE DE SÉCURITÉ ADMIN ---
+  const globalRole = user?.role_global ? user.role_global.toUpperCase() : '';
+  const hasCircleAdmin = Array.isArray(user?.circles) && user.circles.some(c => (c.role || '').toUpperCase() === 'ADMIN' || (c.role || '').toUpperCase() === 'SUPERADMIN');
+
+  // 2. Liste des liens DE BASE (accessibles à tous sur Desktop)
   const navItems = [
     { path: '/dashboard', icon: Home, label: 'Accueil' },
     { path: '/calendar', icon: Calendar, label: 'Calendrier' },
@@ -134,15 +139,25 @@ function ProtectedLayout() {
           </div>
         </aside>
       )}
-
-      {/* --- CONTENU PRINCIPAL --- */}
+{/* --- CONTENU PRINCIPAL --- */}
       <main className="flex-1 overflow-auto w-full relative pb-28 md:pb-0 bg-gray-50">
 
         {/* HEADER MOBILE */}
         <div className="md:hidden sticky top-0 z-30 flex items-center justify-between px-4 py-4 bg-white border-b shadow-sm">
-          <div>
+          
+          {/* Groupe Gauche : Profil + Titre */}
+          <div className="flex items-center gap-3">
+            <Link 
+              to="/profile" 
+              className="flex items-center justify-center w-9 h-9 bg-blue-50 text-blue-600 rounded-full hover:bg-blue-100 transition-colors"
+              aria-label="Mon profil"
+            >
+              <User className="w-5 h-5" />
+            </Link>
             <p className="text-lg font-bold text-blue-600">Weave</p>
           </div>
+
+          {/* Bouton Urgence */}
           <button
             onClick={() => setEmergencyOpen(true)}
             className="flex items-center gap-2 px-3 py-2 bg-red-50 text-red-600 rounded-full hover:bg-red-100"
@@ -152,13 +167,15 @@ function ProtectedLayout() {
             <span className="font-medium">Urgence</span>
           </button>
         </div>
+        
         <Outlet />
       </main>
 
-      {/* NAV MOBILE (Décommentée) */}
+      {/* --- NAV MOBILE (Intégration) --- */}
+      {/* On vérifie hideNav et on ajoute md:hidden pour cacher sur PC */}
       {!hideNav && (
-        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50">
-            <Navigation />
+        <div className="md:hidden">
+          <Navigation />
         </div>
       )}
 
@@ -194,7 +211,7 @@ export default function App() {
           </Route>
         </Routes>
         
-        {/* RGPD - Bannière et modal de préférences cookies */}
+        {/* RGPD */}
         <CookieBanner />
         <CookiePreferences />
       </BrowserRouter>

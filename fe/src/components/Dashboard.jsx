@@ -136,12 +136,33 @@ export default function Dashboard() {
               purple: 'bg-purple-50 text-purple-600',
             }[stat.color];
 
+            // Map stat labels to routes
+            const navigationMap = {
+              'Aidants actifs': '/profile',
+              'Tâches cette semaine': '/calendar',
+              'Souvenirs partagés': '/memories',
+              'Messages non lus': '/messages',
+            };
+
+            const route = navigationMap[stat.label];
+            const isClickable = route && stat.value > 0;
+
+            const handleClick = () => {
+              if (isClickable) {
+                navigate(route);
+              }
+            };
+
             return (
-              <div key={stat.label} className="bg-white rounded-lg shadow p-6">
+              <div
+                key={stat.label}
+                onClick={handleClick}
+                className={`bg-white rounded-lg shadow p-6 ${isClickable ? 'cursor-pointer hover:shadow-lg hover:scale-105 transition-all' : ''}`}
+              >
                 <div className="flex items-center justify-between">
                   <div>
                     <p className="text-gray-600 mb-1 font-medium">{stat.label}</p>
-                    <p className="text-gray-900 text-2xl font-bold">{stat.value}</p>
+                    <p className={`text-2xl font-bold ${isClickable ? 'text-blue-600' : 'text-gray-900'}`}>{stat.value}</p>
                   </div>
                   <div className={`w-12 h-12 rounded-full flex items-center justify-center ${colorClass}`}>
                     <Icon className="w-6 h-6" />
