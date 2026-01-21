@@ -257,75 +257,39 @@ export default function Profile() {
 
   // --- GESTION NOTIFICATIONS ---
   const handleNotificationToggle = async () => {
-    // 1. Si on est sur le web (PC), on ne fait rien
-    if (Capacitor.getPlatform() === 'web') {
-        toast.info("Les notifications push ne marchent que sur mobile");
-        return;
-    }
+    // 1. Sur PC (Web), on ne fait rien (bouton caché mais sécurité en plus)
+    if (!Capacitor.isNativePlatform()) return;
 
     const newStatus = !notificationsEnabled;
     
-    // On change l'UI tout de suite pour la fluidité
+    // Mise à jour optimiste pour éviter le "flicker"
     setNotificationsEnabled(newStatus);
 
     try {
-        // Sauvegarde de la préférence en DB (On/Off)
+        // 2. Sauvegarde en base
         await apiPut('/users/me', { notifications_enabled: newStatus });
-
-        if (newStatus === true) {
-            // --- ACTIVATION ---
-            
-            // 1. Vérifier / Demander la permission
-            let permStatus = await PushNotifications.checkPermissions();
-            
-            if (permStatus.receive === 'prompt') {
-                permStatus = await PushNotifications.requestPermissions();
-            }
-
-            if (permStatus.receive !== 'granted') {
-                throw new Error("Permission refusée par l'utilisateur");
-            }
-
-            // 2. IMPORTANT : On prépare les écouteurs AVANT d'enregistrer
-            await PushNotifications.removeAllListeners();
-
-            // CAS SUCCÈS : On reçoit le token
-            await PushNotifications.addListener('registration', async (tokenData) => {
-                console.log('✅ Token FCM reçu:', tokenData.value);
-                // On l'envoie au backend
-                try {
-                    await apiPost('/users/device-token', { 
-                        userId: user.id, 
-                        token: tokenData.value 
-                    });
-                    toast.success("Notifications activées !");
-                } catch (err) {
-                    console.error("Erreur envoi token API:", err);
-                }
-            });
-
-            // CAS ERREUR
-            await PushNotifications.addListener('registrationError', (error) => {
-                console.error('❌ Erreur enregistrement Push:', error);
-                toast.error("Erreur technique push");
-            });
-
-            // 3. On lance l'enregistrement (ce qui va déclencher l'écouteur ci-dessus)
-            await PushNotifications.register();
-
-        } else {
-            // --- DÉSACTIVATION ---
-            // On supprime le token de la DB pour ne plus être dérangé
-            await apiPost('/users/device-token', { userId: user.id, token: '' });
-            await PushNotifications.removeAllListeners();
-            // On ne peut pas "unregister" totalement sur Android, mais on a coupé le lien DB
-            toast.success("Notifications désactivées");
+        
+        // Met à jour le contexte global pour que l'info soit partagée
+        if (setUser) {
+            setUser(prev => ({ ...prev, notifications_enabled: newStatus }));
         }
 
+        if (newStatus === true) {
+            // Activation
+            let perm = await PushNotifications.checkPermissions();
+            if (perm.receive === 'prompt') perm = await PushNotifications.requestPermissions();
+            if (perm.receive !== 'granted') throw new Error("Permission refusée");
+
+            await PushNotifications.register();
+            // L'écouteur 'registration' dans App.jsx ou ici gérera l'envoi du token
+        } else {
+            // Désactivation
+            await apiPost('/users/device-token', { userId: user.id, token: '' });
+            await PushNotifications.removeAllListeners();
+        }
     } catch (error) {
-        console.error("Erreur toggle notifs:", error);
-        setNotificationsEnabled(!newStatus); // On remet le switch comme avant
-        toast.error("Impossible d'activer les notifications");
+        console.error("Erreur notifs:", error);
+        setNotificationsEnabled(!newStatus); // Revert en cas d'erreur
     }
   };
 
@@ -526,22 +490,18 @@ export default function Profile() {
           <div className="space-y-6">
             
             {/* NOTIFICATIONS */}
-            <div className="flex items-center justify-between">
+            <div className="flex items-center justify-between md:hidden">
               <div className="flex items-center gap-3">
                 <Bell className="text-gray-500" size={20} />
-                <span className="text-gray-700 font-medium">Notifications</span>
+                <span className="text-gray-700 font-medium">Notifications Push</span>
               </div>
               <button 
                 onClick={handleNotificationToggle}
                 className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-300 focus:outline-none ${notificationsEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
               >
-                <div 
-                  className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${notificationsEnabled ? 'translate-x-5' : 'translate-x-0'}`}
-                ></div>
+                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${notificationsEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
               </button>
             </div>
-
-            
 
             {/* RELANCER LE TOUR ONBOARDING */}
             <div className="pt-4 border-t border-gray-100">

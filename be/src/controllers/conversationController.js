@@ -1,61 +1,21 @@
 import db from '../config/db.js';
 import { getIo } from '../services/socketService.js';
-import admin from '../config/firebase.js'; // <--- AJOUT CRUCIAL ICI
 
-// --- FONCTION UTILITAIRE LOCALE (Avec Logs de Debug) ---
-async function notifyParticipants(conversationId, excludeUserId, title, body, data) {
-    console.log(`🔔 [NOTIF_CHAT] Début envoi pour ConvID: ${conversationId}`);
-    try {
-        // 1. Récupérer les tokens des autres participants
-        const query = `
-            SELECT u.fcm_token, u.name 
-            FROM participant_conversation pc
-            JOIN users u ON pc.utilisateur_id = u.id
-            WHERE pc.conversation_id = $1 
-            AND pc.utilisateur_id != $2
-            AND u.fcm_token IS NOT NULL 
-            AND u.fcm_token != ''
-        `;
-        const res = await db.query(query, [conversationId, excludeUserId]);
-        
-        // Dédoublonnage
-        const tokens = [...new Set(res.rows.map(r => r.fcm_token))];
-
-        console.log(`🔍 [NOTIF_CHAT] Destinataires trouvés: ${res.rows.length} (Tokens uniques: ${tokens.length})`);
-
-        if (tokens.length > 0) {
-            const message = {
-                notification: { title, body },
-                data: { ...data, click_action: 'FLUTTER_NOTIFICATION_CLICK' },
-                tokens: tokens
-            };
-            
-            const response = await admin.messaging().sendEachForMulticast(message);
-            console.log(`✅ [NOTIF_CHAT] Succès: ${response.successCount} | Échecs: ${response.failureCount}`);
-            
-            if (response.failureCount > 0) {
-                response.responses.forEach((resp, idx) => {
-                    if (!resp.success) console.error(`   ❌ Erreur Token ${idx}:`, resp.error);
-                });
-            }
-        } else {
-            console.log("⚠️ [NOTIF_CHAT] Aucun token valide trouvé pour envoyer la notif.");
-        }
-    } catch (e) {
-        console.error("🔥 [ERREUR CRITIQUE] notifyParticipants:", e);
-    }
-}
-
-// 1. Récupérer les membres du cercle
+// 1. Récupérer les membres du cercle (pour créer une conversation)
 export const getMembresCercle = async (req, res) => {
     try {
         const userId = req.user.id;
+        // On récupère le cercle actif de l'utilisateur
         const cercleQuery = "SELECT circle_id, role FROM user_roles WHERE user_id = $1 LIMIT 1";
         const cercleResult = await db.query(cercleQuery, [userId]);
 
-        if (cercleResult.rows.length === 0) return res.json({ circle_id: null, membres: [] });
+        if (cercleResult.rows.length === 0) {
+            return res.json({ circle_id: null, membres: [] });
+        }
 
         const { circle_id } = cercleResult.rows[0];
+        
+        // On récupère les autres membres
         const membresQuery = `
             SELECT u.id, u.name, ur.role
             FROM users u
@@ -79,7 +39,7 @@ export const creerConversation = async (req, res) => {
     if (!cercle_id) return res.status(400).json({ error: "ID du cercle manquant" });
 
     try {
-        // Check doublon PRIVE
+        // Éviter les doublons de conversation PRIVÉE
         if (type === 'PRIVE') {
             const targetUserId = participants[0];
             const existing = await db.query(`
@@ -95,14 +55,14 @@ export const creerConversation = async (req, res) => {
             }
         }
 
-        // Création
+        // Création de la conversation
         const result = await db.query(
             "INSERT INTO conversation (type, nom, cercle_id) VALUES ($1, $2, $3) RETURNING id, nom, type, date_creation",
             [type, nom || 'Nouveau message', cercle_id]
         );
         const conversation = result.rows[0];
 
-        // Ajout participants
+        // Ajout des participants
         const tousLesMembres = [...new Set([...participants, userId])];
         for (const pid of tousLesMembres) {
             await db.query(
@@ -110,31 +70,6 @@ export const creerConversation = async (req, res) => {
                 [conversation.id, pid]
             );
         }
-
-        // --- NOTIFICATION CRÉATION (AJOUTÉE) ---
-        // 1. Récup nom créateur
-        const creatorRes = await db.query("SELECT name FROM users WHERE id = $1", [userId]);
-        const creatorName = creatorRes.rows[0]?.name || 'Un membre';
-
-        // 2. Récup nom senior du cercle
-        const seniorRes = await db.query(
-            "SELECT u.name FROM care_circles c JOIN users u ON c.senior_id = u.id WHERE c.id = $1", 
-            [cercle_id]
-        );
-        const seniorName = seniorRes.rows[0]?.name || 'Cercle';
-
-        const notifTitle = type === 'GROUPE' 
-            ? `Nouveau groupe : ${nom} (Cercle de ${seniorName})` 
-            : `Nouvelle conversation (Cercle de ${seniorName})`;
-            
-        // On ne bloque pas la réponse HTTP, on lance la notif en "background"
-        notifyParticipants(
-            conversation.id,
-            userId, // Exclure le créateur
-            notifTitle,
-            `${creatorName} vous a ajouté.`,
-            { type: 'conversation_added', conversationId: conversation.id.toString() }
-        );
 
         res.status(201).json({ success: true, conversation });
 
@@ -164,7 +99,9 @@ export const getMesConversations = async (req, res) => {
             ORDER BY m.date_envoi DESC NULLS LAST, c.date_creation DESC
         `, [userId]);
         res.json(result.rows);
-    } catch (error) { res.status(500).json({ error: "Erreur serveur" }); }
+    } catch (error) {
+        res.status(500).json({ error: "Erreur serveur" });
+    }
 };
 
 // 4. Messages d'une conversation
@@ -172,6 +109,7 @@ export const getMessages = async (req, res) => {
     const { id } = req.params;
     const userId = req.user.id;
     try {
+        // Sécurité : Vérifier l'appartenance
         const verif = await db.query("SELECT 1 FROM participant_conversation WHERE conversation_id = $1 AND utilisateur_id = $2", [id, userId]);
         if (verif.rows.length === 0) return res.status(403).json({ error: "Accès interdit" });
 
@@ -186,11 +124,15 @@ export const getMessages = async (req, res) => {
         `, [id]);
 
         res.json({ messages: msgs.rows, participants: parts.rows });
-    } catch (error) { res.status(500).json({ error: "Erreur serveur" }); }
+    } catch (error) {
+        res.status(500).json({ error: "Erreur serveur" });
+    }
 };
 
 // 5. Envoyer message
 export const envoyerMessage = async (req, res) => {
+    console.log("🚀 [DEBUG] Route envoyerMessage appelée.");
+    
     const conversationId = String(req.params.id);
     const { contenu } = req.body;
     const authorId = req.user.id;
@@ -198,18 +140,18 @@ export const envoyerMessage = async (req, res) => {
     if (!contenu || !contenu.trim()) return res.status(400).json({ error: "Message vide" });
 
     try {
-        // A. Insert Message
+        // A. Sauvegarder le message
         const insertResult = await db.query(
             "INSERT INTO message (conversation_id, auteur_id, contenu) VALUES ($1, $2, $3) RETURNING id, date_envoi",
             [conversationId, authorId, contenu]
         );
         const newMessage = insertResult.rows[0];
         
-        // B. Get Author Name
+        // B. Récupérer le nom de l'auteur
         const userResult = await db.query("SELECT name FROM users WHERE id = $1", [authorId]);
         const authorName = userResult.rows[0].name;
 
-        // C. Socket
+        // C. WebSocket (Temps réel)
         const messageComplet = {
             id: newMessage.id,
             contenu,
@@ -218,53 +160,24 @@ export const envoyerMessage = async (req, res) => {
             nom_auteur: authorName,
             conversation_id: parseInt(conversationId)
         };
-        try { getIo().to(conversationId).emit('receive_message', messageComplet); } catch (e) {}
-
-        // D. Notification Push (Avec contexte Cercle)
-        try {
-            const contextRes = await db.query(`
-                SELECT c.nom, c.type, c.cercle_id, u.name as senior_name
-                FROM conversation c
-                LEFT JOIN care_circles cc ON c.cercle_id = cc.id
-                LEFT JOIN users u ON cc.senior_id = u.id
-                WHERE c.id = $1
-            `, [conversationId]);
-            
-            const context = contextRes.rows[0];
-            const seniorName = context?.senior_name || 'Inconnu';
-            
-            // TITRE : "Nom (Cercle de Senior)"
-            let titreNotif = `${authorName} (Cercle de ${seniorName})`;
-            if (context?.type === 'GROUPE') {
-                titreNotif = `${context.nom} : ${authorName} (Cercle de ${seniorName})`;
-            }
-
-            const corpsNotif = contenu.length > 50 ? contenu.substring(0, 50) + '...' : contenu;
-
-            notifyParticipants(
-                conversationId,
-                authorId, // Exclure l'expéditeur
-                titreNotif,
-                corpsNotif,
-                { 
-                    type: 'new_message', 
-                    conversationId: conversationId,
-                    senderId: authorId,
-                    circleId: context?.cercle_id?.toString()
-                }
-            );
-        } catch (notifErr) { console.error("Erreur prépa notif message:", notifErr); }
-
+        try { 
+            getIo().to(conversationId).emit('receive_message', messageComplet); 
+        } catch (e) {
+            console.warn("Socket non disponible");
+        }
         res.status(201).json(messageComplet);
     } catch (error) {
-        console.error("Erreur envoi:", error);
+        console.error("Erreur envoi message:", error);
         res.status(500).json({ error: "Erreur serveur" });
     }
 };
 
+// 6. Supprimer conversation
 export const deleteConversation = async (req, res) => {
     try {
         await db.query('DELETE FROM conversation WHERE id = $1', [req.params.id]);
         res.json({ success: true });
-    } catch (error) { res.status(500).json({ error: "Erreur" }); }
+    } catch (error) {
+        res.status(500).json({ error: "Erreur serveur" });
+    }
 };

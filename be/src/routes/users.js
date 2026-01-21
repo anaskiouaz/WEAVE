@@ -3,18 +3,16 @@ import bcrypt from 'bcryptjs';
 import db from '../config/db.js';
 import { encrypt } from '../utils/crypto.js';
 import { logAudit } from '../utils/audits.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = Router();
 
-router.get('/me', async (req, res) => {
+// GET /me (Récupérer profil)
+router.get('/me', authenticateToken, async (req, res) => { // <--- AJOUT du middleware
     try {
-        // req.user est rempli par le middleware d'auth (vérifie qu'il est bien présent dans router/index.js ou server.js)
-        if (!req.user || !req.user.id) {
-            return res.status(401).json({ success: false, error: 'Non authentifié' });
-        }
-        
+        // req.user est maintenant garanti par authenticateToken
         const result = await db.query(
-            'SELECT id, name, email, role_global, fcm_token, picture, bio FROM users WHERE id = $1', 
+            'SELECT id, name, email, role_global, fcm_token, notifications_enabled, picture, bio FROM users WHERE id = $1', 
             [req.user.id]
         );
         
@@ -24,7 +22,24 @@ router.get('/me', async (req, res) => {
         
         res.json(result.rows[0]);
     } catch (error) {
-        console.error('Erreur /me:', error);
+        console.error('Erreur GET /me:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// PUT /me (Mettre à jour les préférences)
+router.put('/me', authenticateToken, async (req, res) => { // <--- AJOUT du middleware
+    try {
+        const userId = req.user.id;
+        const { notifications_enabled } = req.body;
+
+        if (notifications_enabled !== undefined) {
+            await db.query('UPDATE users SET notifications_enabled = $1 WHERE id = $2', [notifications_enabled, userId]);
+        }
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error("Erreur PUT /me:", error);
         res.status(500).json({ success: false, error: error.message });
     }
 });

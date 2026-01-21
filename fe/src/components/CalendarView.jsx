@@ -261,14 +261,15 @@ export default function CalendarView() {
 
   const handleUnvolunteer = async (taskId) => {
     try {
-      await apiPost(`/tasks/${taskId}/unvolunteer`, { userId: user.id });
+      await apiDelete(`/tasks/${taskId}/volunteer`, { userId: user.id });
+      
       (async () => {
         try {
           const task = tasks.find(t => String(t.id) === String(taskId));
           await apiPost('/users/audit-logs', {
             userId: user.id,
             action: 'TASK_WITHDRAWN',
-            details: `${user.name || 'Utilisateur'} s'est retiré(e) de \"${task?.title || taskId}\"`,
+            details: `${user.name || 'Utilisateur'} s'est retiré(e) de "${task?.title || taskId}"`,
             circleId: task?.circle_id || circleId || null
           });
         } catch (e) { console.debug(e); }
