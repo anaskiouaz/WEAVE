@@ -10,15 +10,32 @@ import TaskDetailsModal from './ui-desktop/TaskDetailsModal';
 import AddTaskModal from './ui-desktop/AddTaskModal'; // <--- IMPORT AJOUTÉ
 
 // --- CONFIGURATION ---
-const TASK_TYPES = {
-  medical: { label: 'Médical', icon: Stethoscope, color: 'text-rose-600', bg: 'bg-rose-100' },
-  shopping: { label: 'Courses', icon: ShoppingCart, color: 'text-indigo-600', bg: 'bg-indigo-100' },
-  activity: { label: 'Activité', icon: Activity, color: 'text-emerald-600', bg: 'bg-emerald-100' },
+const getTaskTypeConfig = (taskType) => {
+  // Hardcoded types with icons
+  const PREDEFINED = {
+    medical: { label: 'Médical', icon: Stethoscope, color: 'text-rose-600', bg: 'bg-rose-100' },
+    shopping: { label: 'Courses', icon: ShoppingCart, color: 'text-indigo-600', bg: 'bg-indigo-100' },
+    activity: { label: 'Activité', icon: Activity, color: 'text-emerald-600', bg: 'bg-emerald-100' },
+  };
+  
+  if (PREDEFINED[taskType]) return PREDEFINED[taskType];
+  
+  // For custom types, use generic Activity icon with neutral colors
+  const colors = ['text-blue-600', 'text-purple-600', 'text-pink-600', 'text-cyan-600', 'text-amber-600'];
+  const bgs = ['bg-blue-100', 'bg-purple-100', 'bg-pink-100', 'bg-cyan-100', 'bg-amber-100'];
+  const index = (taskType?.charCodeAt(0) || 0) % colors.length;
+  
+  return {
+    label: taskType || 'Tâche',
+    icon: Activity,
+    color: colors[index],
+    bg: bgs[index]
+  };
 };
 
 // --- COMPOSANTS UI ---
 const TaskCard = ({ task, onClick, currentUserId, onVolunteer, viewMode = 'card' }) => {
-  const config = TASK_TYPES[task.task_type] || TASK_TYPES.activity;
+  const config = getTaskTypeConfig(task.task_type);
   const Icon = config.icon;
   const isSigned = currentUserId && task.assigned_to && task.assigned_to.includes(currentUserId);
 
@@ -41,12 +58,15 @@ const TaskCard = ({ task, onClick, currentUserId, onVolunteer, viewMode = 'card'
   }
 
   return (
-    <div onClick={() => onClick(task)} className={`relative p-3 rounded-xl bg-white border shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col gap-2 ${isSigned ? 'border-green-200 ring-1 ring-green-100' : 'border-slate-100'}`}>
+    <div onClick={() => onClick(task)} className={`relative p-3 rounded-xl bg-white border shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col gap-2 ${task.completed ? 'border-emerald-200 ring-1 ring-emerald-100 bg-emerald-50' : isSigned ? 'border-green-200 ring-1 ring-green-100' : 'border-slate-100'}`}>
       <div className="flex justify-between items-center">
         <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5 ${config.bg} ${config.color}`}>
           <Icon className="w-3 h-3" /> {config.label}
         </span>
-        {task.time && <span className="text-xs font-medium text-slate-400">{task.time.slice(0, 5)}</span>}
+        <div className="flex items-center gap-2">
+          {task.time && <span className="text-xs font-medium text-slate-400">{task.time.slice(0, 5)}</span>}
+          {task.completed && <CheckCircle className="w-4 h-4 text-emerald-600" />}
+        </div>
       </div>
       <h4 className="font-bold text-slate-800 text-sm leading-tight line-clamp-2">{task.title}</h4>
       <div className="flex items-center justify-between pt-1 mt-auto">
@@ -72,9 +92,10 @@ const DayColumn = ({ dayInfo, tasks, isToday, onTaskClick, onAddTask }) => {
         </div>
         {hasTasks && (
           <div className="flex justify-center gap-1 mt-2 h-1.5">
-            {Object.entries(summary).map(([type, count]) => (
-              <div key={type} className={`h-1.5 rounded-full ${TASK_TYPES[type]?.bg.replace('bg-', 'bg-') || 'bg-slate-300'}`} style={{ width: `${Math.min(count * 6, 24)}px` }} />
-            ))}
+            {Object.entries(summary).map(([type, count]) => {
+              const bgColor = getTaskTypeConfig(type).bg.replace('bg-', 'bg-');
+              return <div key={type} className={`h-1.5 rounded-full bg-${bgColor}`} style={{ width: `${Math.min(count * 6, 24)}px` }} />;
+            })}
           </div>
         )}
       </div>
@@ -95,6 +116,7 @@ const DayColumn = ({ dayInfo, tasks, isToday, onTaskClick, onAddTask }) => {
 export default function CalendarView() {
   const { circleId, user } = useAuth();
   const [viewMode, setViewMode] = useState('week');
+  const [now, setNow] = useState(new Date());
 
   // États Modales
   const [showAddTask, setShowAddTask] = useState(false);
@@ -106,6 +128,12 @@ export default function CalendarView() {
   const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState({ type: null, message: null });
   const [circleMemberSkills, setCircleMemberSkills] = useState([]);
+
+  // Horloge temps réel (1s)
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 1000);
+    return () => clearInterval(timer);
+  }, []);
 
   const showNotification = (type, message) => {
     setNotification({ type, message });
@@ -274,24 +302,37 @@ export default function CalendarView() {
     const roleOK = currentCircleRole === 'ADMIN' || currentCircleRole === 'HELPER';
     const assigned = Array.isArray(task?.assigned_to) ? task.assigned_to : [];
     const notYetValidated = !task?.completed; // Hide button if already completed
+    // Show validate even for future tasks if role and assignment are OK
     if (!roleOK || assigned.length === 0 || !notYetValidated) return false;
-    // Optional: ensure task is not in the future
-    try {
-      const dateStr = (task.date || '').split('T')[0];
-      const timeStr = task.time || '23:59';
-      const dt = new Date(`${dateStr}T${timeStr}:00`);
-      return new Date() >= dt;
-    } catch { return true; }
+    return true;
+  };
+
+  const canUnvalidate = (task) => {
+    const roleOK = currentCircleRole === 'ADMIN' || currentCircleRole === 'HELPER';
+    return roleOK && task?.completed === true;
   };
 
   const handleValidateTask = async (taskId) => {
     try {
       await apiPost(`/tasks/${taskId}/validate`, { validatedBy: user?.id || null });
       showNotification('success', 'Intervention validée');
+      await loadTasks();
       setSelectedTask(null);
     } catch (err) {
       console.error(err);
       showNotification('error', "Erreur lors de la validation");
+    }
+  };
+
+  const handleUnvalidateTask = async (taskId) => {
+    try {
+      await apiPost(`/tasks/${taskId}/unvalidate`, { cancelledBy: user?.id || null });
+      showNotification('success', 'Validation annulée');
+      await loadTasks();
+      setSelectedTask(null);
+    } catch (err) {
+      console.error(err);
+      showNotification('error', "Erreur lors de l'annulation de validation");
     }
   };
 
@@ -308,6 +349,10 @@ export default function CalendarView() {
               <button onClick={() => { const d = new Date(currentDate); d.setDate(d.getDate() + 7); setCurrentDate(d) }} className="p-1.5 hover:bg-white rounded-md transition"><ChevronRight className="w-5 h-5 text-slate-500" /></button>
             </div>
             <h2 className="text-xl font-bold text-slate-800 capitalize">{new Intl.DateTimeFormat('fr-FR', { month: 'long', year: 'numeric' }).format(currentDate)}</h2>
+            <div className="hidden md:flex flex-col text-sm text-slate-500 ml-4">
+              <span className="font-semibold text-slate-700">{new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }).format(now)}</span>
+              <span className="tabular-nums">{now.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' })}</span>
+            </div>
           </div>
 
           <div className="flex items-center gap-3">
@@ -395,7 +440,9 @@ export default function CalendarView() {
           onUnvolunteer={() => handleUnvolunteer(selectedTask?.id)}
           currentUserId={user?.id}
           onValidate={() => handleValidateTask(selectedTask?.id)}
+          onUnvalidate={() => handleUnvalidateTask(selectedTask?.id)}
           canValidate={selectedTask ? canValidate(selectedTask) : false}
+          canUnvalidate={selectedTask ? canUnvalidate(selectedTask) : false}
         />
 
       </div>
