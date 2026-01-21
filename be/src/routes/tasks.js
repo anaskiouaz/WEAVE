@@ -219,7 +219,7 @@ router.post('/:id/unvalidate', async (req, res) => {
         const { cancelledBy } = req.body;
 
         const taskRes = await db.query(
-            `SELECT id, title, circle_id, completed FROM tasks WHERE id = $1`,
+            `SELECT id, title, circle_id, completed, assigned_to FROM tasks WHERE id = $1`,
             [id]
         );
 

@@ -60,8 +60,12 @@ const TaskCard = ({ task, onClick, currentUserId, onVolunteer, viewMode = 'card'
   return (
     <div onClick={() => onClick(task)} className={`relative p-3 rounded-xl bg-white border shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col gap-2 ${task.completed ? 'border-emerald-200 ring-1 ring-emerald-100 bg-emerald-50' : isSigned ? 'border-green-200 ring-1 ring-green-100' : 'border-slate-100'}`}>
       <div className="flex justify-between items-center">
-        <span className={`px-2 py-0.5 rounded-md text-[10px] font-bold uppercase tracking-wide flex items-center gap-1.5 ${config.bg} ${config.color}`}>
-          <Icon className="w-3 h-3" /> {config.label}
+        <span
+          className={`p-1 rounded-md flex items-center justify-center ${config.bg} ${config.color}`}
+          title={config.label}
+          aria-label={config.label}
+        >
+          <Icon className="w-3 h-3" />
         </span>
         <div className="flex items-center gap-2">
           {task.time && <span className="text-xs font-medium text-slate-400">{task.time.slice(0, 5)}</span>}
