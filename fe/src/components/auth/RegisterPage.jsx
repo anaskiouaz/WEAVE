@@ -143,38 +143,112 @@ export default function RegisterPage() {
                 <X className="w-6 h-6" />
               </button>
             </div>
-
             <div
-              className="p-6 overflow-y-auto flex-1 text-sm text-gray-700 space-y-4 bg-gray-50/30"
+              className="p-6 overflow-y-auto flex-1 text-sm text-gray-700 space-y-4 bg-gray-50/30 text-justify leading-relaxed"
               onScroll={handleScroll}
             >
               {!hasScrolledToBottom && (
-                <div className="sticky top-0 bg-yellow-50 border-l-4 border-yellow-400 p-3 mb-4 text-xs text-yellow-800 shadow-sm">
-                  ⬇️ Veuillez faire défiler le texte jusqu'en bas pour activer le bouton.
+                <div className="sticky top-0 bg-blue-50 border-l-4 border-blue-500 p-3 mb-4 text-xs text-blue-800 shadow-sm z-10">
+                  ⬇️ Veuillez faire défiler ce document jusqu'en bas pour valider votre lecture.
                 </div>
               )}
 
-              <h4 className="font-bold text-gray-900">1. Introduction</h4>
-              <p>Bienvenue sur Weave. La protection de vos données est notre priorité...</p>
+              <h4 className="font-bold text-gray-900 text-base">1. Préambule et Responsable de Traitement</h4>
+              <p>
+                La présente Politique de Confidentialité a pour but de vous informer sur la manière dont <strong>Weave</strong> collecte et traite vos données personnelles.
+                En créant un compte, vous nous confiez des informations qui peuvent être sensibles. Nous nous engageons à les protéger conformément au Règlement Général sur la Protection des Données (RGPD) et à la Loi Informatique et Libertés.
+              </p>
 
-              <h4 className="font-bold text-gray-900">2. Données collectées</h4>
-              <p>Nous collectons vos nom, prénom, email, téléphone et date de naissance. Dans le cadre de l'aide à la personne, nous traitons des données de santé (humeur, incidents) avec votre consentement explicite.</p>
+              <h4 className="font-bold text-gray-900 text-base">2. Nature des données collectées</h4>
+              <p>
+                Pour assurer le bon fonctionnement du service de coordination d'aide à domicile, nous collectons deux types de données :
+              </p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li><strong>Données administratives :</strong> Votre identité (Nom, Prénom), vos coordonnées (Email, Téléphone) et votre date de naissance (pour vérifier votre majorité).</li>
+                <li><strong>Données de santé et de vie (Sensibles) :</strong> Dans le cadre du "Cercle de soins", des informations concernant l'humeur, les incidents de santé, les rendez-vous médicaux ou le suivi quotidien de la personne aidée peuvent être traitées.</li>
+              </ul>
+              <p className="bg-yellow-50 p-2 border border-yellow-200 rounded text-xs text-yellow-800 mt-2">
+                ⚠️ <strong>Consentement Explicite :</strong> Conformément à l'article 9 du RGPD, le traitement de ces données sensibles ne se fait qu'avec votre consentement explicite, recueilli via la case à cocher lors de cette inscription.
+              </p>
 
-              <h4 className="font-bold text-gray-900">3. Hébergement HDS</h4>
-              <p>Toutes les données sensibles sont stockées chez un Hébergeur de Données de Santé certifié.</p>
+              <h4 className="font-bold text-gray-900 text-base">3. Finalités du traitement</h4>
+              <p>
+                Vos données ne sont utilisées que pour les objectifs suivants :
+              </p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Coordination des aidants familiaux et professionnels autour de la personne aidée.</li>
+                <li>Envoi de notifications importantes (alertes, rappels de rendez-vous).</li>
+                <li>Gestion technique de votre compte et sécurité de l'accès.</li>
+              </ul>
+              <p>
+                <strong>Nous ne revendons jamais vos données personnelles à des tiers.</strong> Elles ne sont utilisées à aucune fin publicitaire ou commerciale externe.
+              </p>
 
-              {/* Paragraphes de remplissage pour forcer le scroll */}
-              <p>Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>
-              <p>Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur.</p>
-              <p>Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum.</p>
-              <p>Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium.</p>
+              <h4 className="font-bold text-gray-900 text-base">4. Hébergement et Sécurité (HDS)</h4>
+              <p>
+                La sécurité de vos données est notre priorité absolue. Compte tenu de la nature sensible des informations traitées (santé), Weave s'engage à héberger l'ensemble des bases de données sur des serveurs certifiés <strong>Hébergement de Données de Santé (HDS)</strong>, situés physiquement en France ou dans l'Union Européenne.
+              </p>
+              <p className="text-xs text-gray-500 italic">
+                la messagerie interne (chat) n'est pas chiffrée de bout en bout. Il est donc recommandé de ne pas y échanger de documents strictement confidentiels.
+                le chiffrement de bout en bout sera implémenté dans une future mise à jour.
+              </p>
+              <p className="mt-2">
+                <strong>Toutes les informations médicales et données de santé sont chiffrées</strong> dans nos bases de données pour garantir leur confidentialité totale. Les échanges avec le serveur sont également sécurisés (SSL/TLS).
+              </p>
+              <p>
+                Toutes les communications entre votre appareil et nos serveurs sont chiffrées (protocole SSL/TLS).
+              </p>
 
-              <h4 className="font-bold text-gray-900">4. Contact DPO</h4>
-              <p>Pour exercer vos droits : dpo@weave.app</p>
+              <h4 className="font-bold text-gray-900 text-base">5. Partage des données</h4>
+              <p>
+                Vos données sont strictement confidentielles. Elles ne sont accessibles qu'aux :
+              </p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Membres de votre "Cercle de soins" que vous avez invité ou rejoint volontairement.</li>
+                <li>Équipes techniques de Weave (uniquement à des fins de maintenance et de sécurité, avec accès restreint et journalisé).</li>
+              </ul>
 
-              <div className="pt-8 pb-4 text-center text-gray-400 text-xs uppercase tracking-widest">--- Fin du document ---</div>
+              <h4 className="font-bold text-gray-900 text-base">6. Durée de conservation</h4>
+              <p>
+                Vos données sont conservées pendant toute la durée d'activité de votre compte.
+                En cas de suppression de compte ou d'inactivité supérieure à 24 mois, vos données seront intégralement supprimées ou anonymisées de manière irréversible, sauf obligation légale contraire.
+              </p>
+
+              <h4 className="font-bold text-gray-900 text-base">7. Vos droits (Informatique et Libertés)</h4>
+              <p>
+                Conformément à la réglementation en vigueur, vous disposez des droits suivants sur vos données :
+              </p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Droit d'accès et de rectification.</li>
+                <li>Droit à l'effacement ("Droit à l'oubli").</li>
+                <li>Droit à la limitation du traitement.</li>
+                <li>Droit à la portabilité de vos données.</li>
+                <li>Droit de retirer votre consentement à tout moment.</li>
+              </ul>
+              <p>
+                Pour exercer ces droits, vous pouvez nous contacter à l'adresse dédiée à la protection des données : <a href="mailto:weave.entreprise@gmail.com" className="text-blue-600 hover:underline">weave.entreprise@gmail.com@g
+                </a>.
+              </p>
+
+              <h4 className="font-bold text-gray-900 text-base">8. Vos droits (Informatique et Libertés)</h4>
+              <p>
+                Conformément à la réglementation en vigueur, vous disposez des droits suivants sur vos données :
+              </p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Droit d'accès et de rectification.</li>
+                <li>Droit à l'effacement ("Droit à l'oubli").</li>
+                <li>Droit à la limitation du traitement.</li>
+                <li>Droit à la portabilité de vos données.</li>
+                <li>Droit de retirer votre consentement à tout moment.</li>
+              </ul>
+              <p>
+                Pour exercer ces droits, vous pouvez nous contacter à l'adresse dédiée à la protection des données : <a href="mailto:weave.entreprise@gmail.com " className="text-blue-600 hover:underline">weave.entreprise@gmail.com</a>.
+              </p>
+
+              <div className="pt-8 pb-4 text-center text-gray-400 text-xs uppercase tracking-widest border-t mt-6">
+                --- Fin du document ---
+              </div>
             </div>
-
             <div className="p-4 border-t bg-white rounded-b-xl flex justify-end gap-3">
               <Button variant="outline" onClick={() => setShowPrivacyModal(false)}>Annuler</Button>
               <Button
