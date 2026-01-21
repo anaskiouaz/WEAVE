@@ -1,22 +1,22 @@
 import { useState, useEffect, useRef } from 'react';
-import { Send, Plus, Users, MessageSquare, Settings, X, Trash2, UserPlus } from 'lucide-react'; 
+import { Send, Plus, Users, MessageSquare, Settings, X, Trash2, UserPlus } from 'lucide-react';
 import { apiGet, apiPost, apiDelete, apiPut } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { io } from 'socket.io-client';
 
 const Messages = () => {
-  const { user } = useAuth();
+  const { user, circleId } = useAuth();
   const [conversations, setConversations] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
   const [messages, setMessages] = useState([]);
   const [newMessage, setNewMessage] = useState('');
-  
+
   // États modale Création
   const [showNewConvModal, setShowNewConvModal] = useState(false);
   const [availableMembers, setAvailableMembers] = useState([]);
   const [selectedMembers, setSelectedMembers] = useState([]);
   const [newConvName, setNewConvName] = useState('');
-  
+
   // États modale Info (Gestion groupe)
   const [showInfo, setShowInfo] = useState(false);
   const [currentParticipants, setCurrentParticipants] = useState([]);
@@ -37,14 +37,14 @@ const Messages = () => {
     // Si on est en mode dev (npm run dev), on utilise localhost:4000
     // Sinon (sur Vercel), on utilise l'URL Azure.
     // REMPLACE L'URL CI-DESSOUS PAR TON LIEN AZURE EXACT (sans le / à la fin)
-    const SOCKET_URL = import.meta.env.MODE === 'development' 
-        ? 'http://localhost:4000' 
-        : 'https://weave-be-server-d8badmaafzdvc8aq.swedencentral-01.azurewebsites.net'; 
+    const SOCKET_URL = import.meta.env.MODE === 'development'
+      ? 'http://localhost:4000'
+      : 'https://weave-be-server-d8badmaafzdvc8aq.swedencentral-01.azurewebsites.net';
 
-    socketRef.current = io(SOCKET_URL, { 
+    socketRef.current = io(SOCKET_URL, {
       path: '/socket.io',
-      transports: ['websocket', 'polling'], 
-      auth: { token } 
+      transports: ['websocket', 'polling'],
+      auth: { token }
     });
 
     socketRef.current.on('connect', () => console.log("✅ Socket connecté sur", SOCKET_URL));
@@ -52,8 +52,8 @@ const Messages = () => {
     loadConversations();
     loadMembers();
 
-    return () => { 
-        if (socketRef.current) socketRef.current.disconnect(); 
+    return () => {
+      if (socketRef.current) socketRef.current.disconnect();
     };
   }, [user]);
 
@@ -80,34 +80,34 @@ const Messages = () => {
 
         // 1. Si c'est MON message, on ignore (on l'a déjà affiché localement via handleSendMessage)
         if (message.auteur_id === user?.id) {
-             loadConversations(); 
-             return;
+          loadConversations();
+          return;
         }
 
         // 2. Si je suis SUR la conversation active (comparaison String vs String)
         if (String(message.conversation_id) === String(activeConversation.id)) {
           setMessages((prev) => [...prev, message]);
           scrollToBottom();
-          markAsRead(activeConversation.id); 
-        } 
-        
+          markAsRead(activeConversation.id);
+        }
+
         // 3. Dans tous les cas, on recharge la liste (pour les compteurs non lus)
-        loadConversations(); 
+        loadConversations();
       };
 
       socketRef.current.on('receive_message', handleReceiveMessage);
 
     } else {
-        // Mode "Global" (aucune conv ouverte)
-        const handleGlobalMessage = (message) => {
-             if (message.auteur_id !== user?.id) {
-                 console.log("🔔 Notif globale reçue");
-                 loadConversations();
-             }
-        };
-        socketRef.current.on('receive_message', handleGlobalMessage);
+      // Mode "Global" (aucune conv ouverte)
+      const handleGlobalMessage = (message) => {
+        if (message.auteur_id !== user?.id) {
+          console.log("🔔 Notif globale reçue");
+          loadConversations();
+        }
+      };
+      socketRef.current.on('receive_message', handleGlobalMessage);
     }
-  }, [activeConversation, user]); 
+  }, [activeConversation, user]);
 
   const scrollToBottom = () => setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
 
@@ -116,29 +116,29 @@ const Messages = () => {
   const loadConversations = async () => {
     try {
       const data = await apiGet('/conversations');
-      setConversations(data);
+      const list = Array.isArray(data) ? data : [];
+      setConversations(list);
+      return list;
     } catch (err) { console.error("Erreur chargement conversations:", err); }
   };
 
   const markAsRead = async (convId) => {
-      try {
-          await apiPut(`/conversations/${convId}/read`, {});
-          setConversations(prev => prev.map(c => 
-              c.id === convId ? { ...c, unread_count: 0 } : c
-          ));
-      } catch (e) { console.error("Erreur lecture", e); }
+    try {
+      await apiPut(`/conversations/${convId}/read`, {});
+      setConversations(prev => prev.map(c =>
+        c.id === convId ? { ...c, unread_count: 0 } : c
+      ));
+    } catch (e) { console.error("Erreur lecture", e); }
   };
 
   const loadMembers = async () => {
     try {
-      let targetCircleId = null;
-      if (user && user.circles && user.circles.length > 0) targetCircleId = user.circles[0].id;
-      else targetCircleId = localStorage.getItem('circle_id');
+      // Prioritise `circleId` from AuthContext, fallback to user's first circle
+      const resolved = circleId || (user && user.circles && user.circles.length > 0 ? user.circles[0].id : null);
+      if (!resolved) return;
+      setCurrentCircleId(resolved);
 
-      if (!targetCircleId) return;
-      setCurrentCircleId(targetCircleId);
-
-      const data = await apiGet(`/circles/${targetCircleId}/members`);
+      const data = await apiGet(`/circles/${resolved}/members`);
       const others = Array.isArray(data) ? data.filter(m => m.id !== user?.id) : [];
       setAvailableMembers(others);
     } catch (err) { console.error("Erreur chargement membres:", err); }
@@ -152,10 +152,10 @@ const Messages = () => {
   };
 
   const loadParticipants = async (convId) => {
-      try {
-          const parts = await apiGet(`/conversations/${convId}/participants`);
-          setCurrentParticipants(parts);
-      } catch (err) { console.error("Erreur participants:", err); }
+    try {
+      const parts = await apiGet(`/conversations/${convId}/participants`);
+      setCurrentParticipants(parts);
+    } catch (err) { console.error("Erreur participants:", err); }
   };
 
   // --- ACTIONS ---
@@ -169,10 +169,10 @@ const Messages = () => {
       setMessages(prev => [...prev, tempMsg]);
       scrollToBottom();
       setNewMessage('');
-      
+
       await apiPost(`/conversations/${activeConversation.id}/messages`, { content: newMessage });
       await markAsRead(activeConversation.id);
-      loadConversations(); 
+      loadConversations();
     } catch (err) { console.error("Erreur envoi:", err); }
   };
 
@@ -186,54 +186,51 @@ const Messages = () => {
       const res = await apiPost('/conversations', {
         type,
         nom: nomFinal,
-        userIds: selectedMembers, 
+        userIds: selectedMembers,
         cercleId: currentCircleId
       });
-      
+
       if (res.success) {
         await loadConversations();
         setShowNewConvModal(false);
         setSelectedMembers([]);
         setNewConvName('');
-        
+
         if (res.existing || res.conversationId) {
-            setTimeout(() => {
-                const existing = conversations.find(c => c.id === res.conversationId);
-                if (existing) setActiveConversation(existing);
-                else loadConversations().then(data => {
-                     const found = data.find(c => c.id === res.conversationId);
-                     if(found) setActiveConversation(found);
-                });
-            }, 300);
+          setTimeout(async () => {
+            const data = await loadConversations();
+            const found = Array.isArray(data) ? data.find(c => c.id === res.conversationId) : null;
+            if (found) setActiveConversation(found);
+          }, 300);
         }
       }
     } catch (err) { alert("Erreur: " + err.message); }
   };
 
   const handleAddMemberToGroup = async (memberId) => {
-      try {
-          await apiPost(`/conversations/${activeConversation.id}/participants`, { userId: memberId });
-          loadParticipants(activeConversation.id);
-          setIsAddingMember(false);
-      } catch (e) { alert("Erreur ajout membre"); }
+    try {
+      await apiPost(`/conversations/${activeConversation.id}/participants`, { userId: memberId });
+      loadParticipants(activeConversation.id);
+      setIsAddingMember(false);
+    } catch (e) { alert("Erreur ajout membre"); }
   };
 
   const handleRemoveMember = async (memberId) => {
-      if(!confirm("Retirer ce membre ?")) return;
-      try {
-          await apiDelete(`/conversations/${activeConversation.id}/participants/${memberId}`);
-          loadParticipants(activeConversation.id);
-      } catch (e) { alert("Erreur suppression membre"); }
+    if (!confirm("Retirer ce membre ?")) return;
+    try {
+      await apiDelete(`/conversations/${activeConversation.id}/participants/${memberId}`);
+      loadParticipants(activeConversation.id);
+    } catch (e) { alert("Erreur suppression membre"); }
   };
 
   const handleDeleteConversation = async () => {
-      if(!confirm("Supprimer définitivement cette conversation ?")) return;
-      try {
-          await apiDelete(`/conversations/${activeConversation.id}`);
-          setActiveConversation(null);
-          loadConversations();
-          setShowInfo(false);
-      } catch (e) { alert("Erreur suppression conversation"); }
+    if (!confirm("Supprimer définitivement cette conversation ?")) return;
+    try {
+      await apiDelete(`/conversations/${activeConversation.id}`);
+      setActiveConversation(null);
+      loadConversations();
+      setShowInfo(false);
+    } catch (e) { alert("Erreur suppression conversation"); }
   };
 
   const toggleMemberSelection = (id) => {
@@ -244,7 +241,7 @@ const Messages = () => {
   // --- RENDER ---
   return (
     <div className="flex h-[calc(100vh-100px)] bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 relative">
-      
+
       {/* GAUCHE : LISTE */}
       <div className="w-1/3 border-r bg-gray-50 flex flex-col">
         <div className="p-4 border-b flex justify-between items-center bg-white">
@@ -253,33 +250,32 @@ const Messages = () => {
             <Plus className="w-5 h-5" />
           </button>
         </div>
-        
+
         <div className="flex-1 overflow-y-auto">
           {conversations.map((conv) => (
             <div
               key={conv.id}
               onClick={() => setActiveConversation(conv)}
-              className={`p-4 border-b cursor-pointer hover:bg-gray-100 transition-colors ${
-                activeConversation?.id === conv.id ? 'bg-blue-50 border-l-4 border-blue-600' : 'border-l-4 border-transparent'
-              }`}
+              className={`p-4 border-b cursor-pointer hover:bg-gray-100 transition-colors ${activeConversation?.id === conv.id ? 'bg-blue-50 border-l-4 border-blue-600' : 'border-l-4 border-transparent'
+                }`}
             >
               <div className="flex justify-between items-start">
-                  <h3 className={`font-semibold truncate ${conv.unread_count > 0 ? 'text-gray-900' : 'text-gray-800'}`}>
-                      {conv.nom || "Discussion"}
-                  </h3>
-                  <span className="text-[10px] text-gray-400 whitespace-nowrap ml-2">
-                     {conv.date_dernier_message ? new Date(conv.date_dernier_message).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'}) : ''}
-                  </span>
+                <h3 className={`font-semibold truncate ${conv.unread_count > 0 ? 'text-gray-900' : 'text-gray-800'}`}>
+                  {conv.nom || "Discussion"}
+                </h3>
+                <span className="text-[10px] text-gray-400 whitespace-nowrap ml-2">
+                  {conv.date_dernier_message ? new Date(conv.date_dernier_message).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : ''}
+                </span>
               </div>
-              
+
               <div className="mt-1 truncate text-xs">
-                 {conv.unread_count > 0 ? (
-                     <span className="text-blue-600 font-bold">
-                        {conv.unread_count} Nouveau{conv.unread_count > 1 ? 'x' : ''} message{conv.unread_count > 1 ? 's' : ''}
-                     </span>
-                 ) : (
-                     <span className="text-gray-500">{conv.dernier_message || <i>Aucun message</i>}</span>
-                 )}
+                {conv.unread_count > 0 ? (
+                  <span className="text-blue-600 font-bold">
+                    {conv.unread_count} Nouveau{conv.unread_count > 1 ? 'x' : ''} message{conv.unread_count > 1 ? 's' : ''}
+                  </span>
+                ) : (
+                  <span className="text-gray-500">{conv.dernier_message || <i>Aucun message</i>}</span>
+                )}
               </div>
             </div>
           ))}
@@ -307,9 +303,8 @@ const Messages = () => {
                 const isMe = msg.auteur_id === user?.id;
                 return (
                   <div key={idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
-                    <div className={`max-w-[70%] px-4 py-2 rounded-2xl shadow-sm ${
-                      isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
-                    }`}>
+                    <div className={`max-w-[70%] px-4 py-2 rounded-2xl shadow-sm ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'
+                      }`}>
                       {!isMe && activeConversation.type === 'GROUPE' && <p className="text-[10px] font-bold mb-1 text-orange-500">{msg.sender_name}</p>}
                       <p className="text-sm leading-relaxed">{msg.contenu}</p>
                     </div>
@@ -337,19 +332,19 @@ const Messages = () => {
         <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
           <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 animate-in zoom-in-95">
             <div className="flex justify-between mb-4">
-                <h3 className="font-bold text-lg">Nouvelle discussion</h3>
-                <button onClick={() => setShowNewConvModal(false)}><X/></button>
+              <h3 className="font-bold text-lg">Nouvelle discussion</h3>
+              <button onClick={() => setShowNewConvModal(false)}><X /></button>
             </div>
             {selectedMembers.length > 1 && (
               <input type="text" placeholder="Nom du groupe" value={newConvName} onChange={e => setNewConvName(e.target.value)} className="w-full border p-2 rounded mb-4" />
             )}
             <div className="max-h-60 overflow-y-auto mb-4 border rounded p-2">
-                {availableMembers.map(m => (
-                    <div key={m.id} onClick={() => toggleMemberSelection(m.id)} className={`flex items-center gap-2 p-2 cursor-pointer hover:bg-gray-50 ${selectedMembers.includes(m.id) ? 'bg-blue-50' : ''}`}>
-                        <div className={`w-4 h-4 border rounded ${selectedMembers.includes(m.id) ? 'bg-blue-500' : ''}`}></div>
-                        <span>{m.name}</span>
-                    </div>
-                ))}
+              {availableMembers.map(m => (
+                <div key={m.id} onClick={() => toggleMemberSelection(m.id)} className={`flex items-center gap-2 p-2 cursor-pointer hover:bg-gray-50 ${selectedMembers.includes(m.id) ? 'bg-blue-50' : ''}`}>
+                  <div className={`w-4 h-4 border rounded ${selectedMembers.includes(m.id) ? 'bg-blue-500' : ''}`}></div>
+                  <span>{m.name}</span>
+                </div>
+              ))}
             </div>
             <button onClick={handleCreateConversation} disabled={selectedMembers.length === 0} className="w-full bg-blue-600 text-white py-2 rounded-lg font-bold">Créer / Ouvrir</button>
           </div>
@@ -359,62 +354,62 @@ const Messages = () => {
       {/* --- MODALE INFO GROUPE (SETTINGS) --- */}
       {showInfo && activeConversation && (
         <div className="absolute inset-0 bg-black/50 z-50 flex justify-end">
-            <div className="w-80 bg-white h-full shadow-2xl p-6 overflow-y-auto animate-in slide-in-from-right">
-                <div className="flex justify-between items-center mb-6">
-                    <h3 className="font-bold text-lg">Paramètres</h3>
-                    <button onClick={() => setShowInfo(false)}><X/></button>
-                </div>
-
-                <div className="mb-6 text-center">
-                    <div className="w-20 h-20 bg-gray-200 rounded-full mx-auto mb-2 flex items-center justify-center text-2xl font-bold text-gray-500">
-                        {activeConversation.nom?.charAt(0)}
-                    </div>
-                    <h2 className="font-bold text-xl">{activeConversation.nom}</h2>
-                    <p className="text-sm text-gray-500">{activeConversation.type}</p>
-                </div>
-
-                <div className="mb-6">
-                    <div className="flex justify-between items-center mb-2">
-                        <h4 className="font-bold text-gray-700">Membres ({currentParticipants.length})</h4>
-                        {activeConversation.type === 'GROUPE' && (
-                            <button onClick={() => setIsAddingMember(!isAddingMember)} className="text-blue-600 text-sm hover:underline">
-                                {isAddingMember ? 'Annuler' : 'Ajouter'}
-                            </button>
-                        )}
-                    </div>
-                    
-                    {isAddingMember && (
-                        <div className="mb-4 bg-gray-50 p-2 rounded border">
-                            <p className="text-xs text-gray-500 mb-2">Sélectionnez pour ajouter :</p>
-                            {availableMembers.filter(am => !currentParticipants.find(cp => cp.id === am.id)).map(m => (
-                                <div key={m.id} onClick={() => handleAddMemberToGroup(m.id)} className="flex items-center gap-2 p-1 hover:bg-white cursor-pointer rounded">
-                                    <Plus size={14}/> <span>{m.name}</span>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-
-                    <ul className="space-y-3">
-                        {currentParticipants.map(p => (
-                            <li key={p.id} className="flex justify-between items-center">
-                                <span className="text-sm text-gray-700">{p.name} {p.id === user.id && '(Moi)'}</span>
-                                {(user.role_global === 'ADMIN' || user.role_global === 'SUPERADMIN' || user.onboarding_role === 'ADMIN') && p.id !== user.id && (
-                                    <button onClick={() => handleRemoveMember(p.id)} className="text-red-400 hover:text-red-600">
-                                        <Trash2 size={16} /> 
-                                    </button>
-                                )}
-                            </li>
-                        ))}
-                    </ul>
-                </div>
-
-                <div className="border-t pt-6 mt-6">
-                    <button onClick={handleDeleteConversation} className="flex items-center gap-2 text-red-600 hover:bg-red-50 w-full p-3 rounded-lg transition">
-                        <Trash2 size={20} />
-                        <span className="font-bold">Supprimer la conversation</span>
-                    </button>
-                </div>
+          <div className="w-80 bg-white h-full shadow-2xl p-6 overflow-y-auto animate-in slide-in-from-right">
+            <div className="flex justify-between items-center mb-6">
+              <h3 className="font-bold text-lg">Paramètres</h3>
+              <button onClick={() => setShowInfo(false)}><X /></button>
             </div>
+
+            <div className="mb-6 text-center">
+              <div className="w-20 h-20 bg-gray-200 rounded-full mx-auto mb-2 flex items-center justify-center text-2xl font-bold text-gray-500">
+                {activeConversation.nom?.charAt(0)}
+              </div>
+              <h2 className="font-bold text-xl">{activeConversation.nom}</h2>
+              <p className="text-sm text-gray-500">{activeConversation.type}</p>
+            </div>
+
+            <div className="mb-6">
+              <div className="flex justify-between items-center mb-2">
+                <h4 className="font-bold text-gray-700">Membres ({currentParticipants.length})</h4>
+                {activeConversation.type === 'GROUPE' && (
+                  <button onClick={() => setIsAddingMember(!isAddingMember)} className="text-blue-600 text-sm hover:underline">
+                    {isAddingMember ? 'Annuler' : 'Ajouter'}
+                  </button>
+                )}
+              </div>
+
+              {isAddingMember && (
+                <div className="mb-4 bg-gray-50 p-2 rounded border">
+                  <p className="text-xs text-gray-500 mb-2">Sélectionnez pour ajouter :</p>
+                  {availableMembers.filter(am => !currentParticipants.find(cp => cp.id === am.id)).map(m => (
+                    <div key={m.id} onClick={() => handleAddMemberToGroup(m.id)} className="flex items-center gap-2 p-1 hover:bg-white cursor-pointer rounded">
+                      <Plus size={14} /> <span>{m.name}</span>
+                    </div>
+                  ))}
+                </div>
+              )}
+
+              <ul className="space-y-3">
+                {currentParticipants.map(p => (
+                  <li key={p.id} className="flex justify-between items-center">
+                    <span className="text-sm text-gray-700">{p.name} {p.id === user.id && '(Moi)'}</span>
+                    {(user.role_global === 'ADMIN' || user.role_global === 'SUPERADMIN' || user.onboarding_role === 'ADMIN') && p.id !== user.id && (
+                      <button onClick={() => handleRemoveMember(p.id)} className="text-red-400 hover:text-red-600">
+                        <Trash2 size={16} />
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="border-t pt-6 mt-6">
+              <button onClick={handleDeleteConversation} className="flex items-center gap-2 text-red-600 hover:bg-red-50 w-full p-3 rounded-lg transition">
+                <Trash2 size={20} />
+                <span className="font-bold">Supprimer la conversation</span>
+              </button>
+            </div>
+          </div>
         </div>
       )}
 

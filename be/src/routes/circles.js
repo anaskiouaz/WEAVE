@@ -18,6 +18,7 @@ router.get('/:id/members', authenticateToken, async (req, res) => {
   const { id } = req.params; // circleId
 
   try {
+
     const result = await pool.query(`
       SELECT u.id, u.name, u.email, u.phone, u.profile_photo, u.onboarding_role, ur.role, u.created_at
       FROM user_roles ur
@@ -25,7 +26,9 @@ router.get('/:id/members', authenticateToken, async (req, res) => {
       WHERE ur.circle_id = $1
       ORDER BY ur.role ASC, u.name ASC
     `, [id]);
-
+    console.log("Récupération des membres du cercle :", id);
+    
+    console.log("Membres récupérés :", result.rows);
     res.json(result.rows);
   } catch (error) {
     console.error('Erreur récupération membres:', error);
