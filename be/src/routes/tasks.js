@@ -211,3 +211,54 @@ router.post('/:id/validate', async (req, res) => {
         res.status(500).json({ status: 'error', message: err.message });
     }
 });
+
+// Unvalidate a task: revert completion flag
+router.post('/:id/unvalidate', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { cancelledBy } = req.body;
+
+        const taskRes = await db.query(
+            `SELECT id, title, circle_id, completed, assigned_to FROM tasks WHERE id = $1`,
+            [id]
+        );
+
+        if (taskRes.rows.length === 0) {
+            return res.status(404).json({ status: 'error', message: 'Task not found' });
+        }
+
+        const task = taskRes.rows[0];
+
+        if (!task.completed) {
+            return res.status(400).json({ status: 'error', message: 'Task not validated yet' });
+        }
+
+        // Get assigned users before marking as incomplete
+        const assigned = Array.isArray(task.assigned_to) ? task.assigned_to : [];
+
+        await db.query(`UPDATE tasks SET completed = false WHERE id = $1`, [id]);
+
+        // Remove TASK_PASSED audits for each assigned helper to decrement their counter
+        if (assigned.length > 0) {
+            for (const uid of assigned) {
+                // Find and delete the most recent TASK_PASSED audit for this user on this task
+                const auditRes = await db.query(
+                    `SELECT id FROM audit_logs WHERE user_id = $1 AND action = $2 AND details ILIKE $3 AND circle_id = $4 ORDER BY created_at DESC LIMIT 1`,
+                    [uid, 'TASK_PASSED', `%${task.title}%`, task.circle_id]
+                );
+                if (auditRes.rows.length > 0) {
+                    await db.query(`DELETE FROM audit_logs WHERE id = $1`, [auditRes.rows[0].id]);
+                }
+            }
+        }
+
+        if (cancelledBy) {
+            await logAudit(cancelledBy, 'TASK_UNVALIDATED', `Validation annulée: "${task.title}"`, task.circle_id);
+        }
+
+        res.json({ status: 'ok', message: 'Task validation cancelled', data: { id: task.id } });
+    } catch (err) {
+        console.error('Error unvalidating task:', err);
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+});

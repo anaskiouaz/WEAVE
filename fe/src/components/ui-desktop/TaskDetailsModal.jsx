@@ -1,4 +1,11 @@
-import { X, Calendar, Clock, MapPin, User, CheckCircle, AlertCircle, Trash2 } from 'lucide-react';
+import { X, Calendar, Clock, MapPin, User, CheckCircle, AlertCircle, Trash2, Stethoscope, ShoppingCart, Activity } from 'lucide-react';
+
+// Config des types de tâches avec icônes
+const TASK_TYPES_CONFIG = {
+  medical: { icon: Stethoscope, label: 'Médical' },
+  shopping: { icon: ShoppingCart, label: 'Courses' },
+  activity: { icon: Activity, label: 'Activité' },
+};
 
 // On reprend la config pour que les couleurs matchent le calendrier
 const MODAL_THEME = {
@@ -7,7 +14,7 @@ const MODAL_THEME = {
     activity: { header: 'bg-emerald-500', iconBg: 'bg-emerald-600', text: 'text-emerald-600', light: 'bg-emerald-50' },
 };
 
-const TaskDetailsModal = ({ task, onClose, onDelete, onVolunteer, onUnvolunteer, onValidate, canValidate, currentUserId }) => {
+const TaskDetailsModal = ({ task, onClose, onDelete, onVolunteer, onUnvolunteer, onValidate, onUnvalidate, canValidate, canUnvalidate, currentUserId }) => {
     if (!task) return null;
 
     const theme = MODAL_THEME[task.task_type] || MODAL_THEME.activity;
@@ -40,8 +47,10 @@ const TaskDetailsModal = ({ task, onClose, onDelete, onVolunteer, onUnvolunteer,
 
                     {/* Icône flottante (Chevauche le header et le body) */}
                     <div className={`absolute -bottom-8 left-8 w-16 h-16 rounded-2xl shadow-lg flex items-center justify-center text-white ${theme.iconBg}`}>
-                        {/* On réutilise l'icône de ton objet TASK_TYPES si passé, sinon une par défaut */}
-                        <Calendar className="w-8 h-8" />
+                        {(() => {
+                            const IconComponent = TASK_TYPES_CONFIG[task.task_type]?.icon || Activity;
+                            return <IconComponent className="w-8 h-8" />;
+                        })()}
                     </div>
                 </div>
 
@@ -50,7 +59,7 @@ const TaskDetailsModal = ({ task, onClose, onDelete, onVolunteer, onUnvolunteer,
                     {/* Titre et Type */}
                     <div className="mb-6">
                         <span className={`text-xs font-bold uppercase tracking-wider mb-2 block ${theme.text}`}>
-                            {task.task_type === 'shopping' ? 'Courses' : task.task_type === 'medical' ? 'Médical' : 'Activité'}
+                            {task.task_type}
                         </span>
                         <h2 className="text-2xl font-bold text-slate-800 leading-tight">
                             {task.title}
@@ -120,6 +129,15 @@ const TaskDetailsModal = ({ task, onClose, onDelete, onVolunteer, onUnvolunteer,
                                 className="flex-1 bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 py-3 px-4 rounded-xl font-bold transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
                             >
                                 <CheckCircle className="w-5 h-5" /> Valider
+                            </button>
+                        )}
+
+                        {canUnvalidate && (
+                            <button
+                                onClick={() => onUnvalidate(task.id)}
+                                className="flex-1 bg-amber-600 text-white hover:bg-amber-700 shadow-lg shadow-amber-600/20 py-3 px-4 rounded-xl font-bold transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                            >
+                                <AlertCircle className="w-5 h-5" /> Annuler la validation
                             </button>
                         )}
                     </div>
