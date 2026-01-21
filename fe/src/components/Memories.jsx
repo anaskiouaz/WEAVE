@@ -79,15 +79,19 @@ export default function Memories() {
         const formData = new FormData();
         formData.append('image', newPhotoFile);
 
-        // 1. On définit l'URL de base de l'API (Port 4000)
-        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+        // Helpers locaux pour construire proprement les URLs (évite /api/api)
+        const buildApiUrl = (p) => {
+          const raw = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+          let host = raw.replace(/\/$/, '');
+          if (host.endsWith('/api')) host = host.slice(0, -4);
+          const path = p.startsWith('/') ? p.slice(1) : p;
+          return `${host}/api/${path}`;
+        };
 
         // 2. On fait l'appel vers la bonne route (avec /api)
-        const uploadResponse = await fetch(`${API_BASE_URL}/api/upload/image`, {
+        const uploadResponse = await fetch(buildApiUrl('/upload/image'), {
           method: 'POST',
           body: formData,
-          // Note : Ne JAMAIS mettre de header 'Content-Type' manuellement avec FormData
-          // Le navigateur le fait tout seul avec le "boundary" correct.
         });
 
         if (!uploadResponse.ok) {
