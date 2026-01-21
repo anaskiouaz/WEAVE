@@ -1,28 +1,75 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
 
 // Props reçues depuis Messagerie.jsx :
-const Sidebar = ({ 
-    roleUtilisateur, 
-    membresDuCercle = [], 
-    conversations = [], 
-    onStartChat, 
-    onSelectConversation, 
+const Sidebar = ({
+    roleUtilisateur,
+    membresDuCercle = [],
+    conversations = [],
+    onStartChat,
+    onSelectConversation,
     activeId,
     onDeleteConversation // <--- 1. ON RÉCUPÈRE LA FONCTION ICI
 }) => {
+    const { user, circleId } = useAuth();
+    console.log('Sidebar init user:', user, 'auth.circleId:', circleId);
     const [showModal, setShowModal] = useState(false);
     const [nomGroupe, setNomGroupe] = useState("");
     const [selection, setSelection] = useState([]);
+    const [members, setMembers] = useState([]);
+    const [loadingMembers, setLoadingMembers] = useState(true);
+
+    const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
+
+    // Exclure l'utilisateur courant de la liste affichée
+    const sourceMembers = (Array.isArray(members) && members.length > 0) ? members : (Array.isArray(membresDuCercle) ? membresDuCercle : []);
+    const filteredMembers = Array.isArray(sourceMembers) ? sourceMembers.filter(m => m.id !== user?.id) : [];
+
+    // Fetch members (same pattern as Admin.jsx)
+    const fetchMembers = async (circleId) => {
+        console.log('Sidebar.fetchMembers start for circleId=', circleId);
+        try {
+            const token = localStorage.getItem('weave_token');
+            const res = await fetch(`${API_BASE_URL}/circles/${circleId}/members`, {
+                headers: { 'Authorization': `Bearer ${token}` }
+            });
+            if (res.ok) {
+                const data = await res.json();
+                console.log('Sidebar.fetchMembers success, count=', Array.isArray(data) ? data.length : 0);
+                setMembers(Array.isArray(data) ? data : []);
+            } else {
+                console.warn('Sidebar.fetchMembers non-ok response', res.status);
+            }
+        } catch (err) {
+            console.error("Erreur chargement membres", err);
+        } finally {
+            setLoadingMembers(false);
+            console.log('Sidebar.fetchMembers finished');
+        }
+    };
+
+    // Charger les membres quand on ouvre la modale
+    useEffect(() => {
+        if (!showModal) return;
+        console.log('Sidebar: modal opened; user.circles=', user?.circles, 'auth.circleId=', circleId);
+        const resolved = circleId || (user && user.circles && user.circles.length > 0 ? user.circles[0].id : localStorage.getItem('circle_id'));
+        const targetCircleId = resolved;
+        console.log('Sidebar: resolved targetCircleId=', targetCircleId);
+        if (!targetCircleId) { setLoadingMembers(false); return; }
+        setLoadingMembers(true);
+        fetchMembers(targetCircleId);
+    }, [showModal, user]);
 
     // Gestion de la sélection des membres dans la modale
     const toggleMembre = (id) => {
-        setSelection(prev => 
+        setSelection(prev =>
             prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
         );
     };
 
     // Validation de la création de groupe
     const handleValiderGroupe = () => {
+        console.log('Sidebar: handleValiderGroupe', { nomGroupe, selection });
         if (!nomGroupe || selection.length === 0) return;
         onStartChat('GROUPE', selection, nomGroupe);
         setShowModal(false);
@@ -34,7 +81,7 @@ const Sidebar = ({
         <div className="w-64 bg-white border-r h-full flex flex-col">
             {/* Bouton "Nouvelle Discussion" */}
             <div className="p-4 border-b">
-                <button 
+                <button
                     onClick={() => setShowModal(true)}
                     className="w-full bg-blue-600 text-white p-2 rounded hover:bg-blue-700 shadow-sm transition-colors"
                 >
@@ -51,20 +98,19 @@ const Sidebar = ({
                     {conversations.length === 0 && (
                         <li className="p-4 text-sm text-gray-400 italic">Aucune conversation</li>
                     )}
-                    
+
                     {conversations.map(conv => (
-                        <li 
-                            key={conv.id} 
+                        <li
+                            key={conv.id}
                             onClick={() => onSelectConversation && onSelectConversation(conv)}
                             // 2. MODIF CSS : On ajoute 'group' et 'relative' pour gérer le bouton poubelle
-                            className={`group relative p-4 cursor-pointer border-b border-gray-50 transition-colors border-l-4 ${
-                                activeId === conv.id 
-                                ? 'bg-blue-50 border-l-blue-600' 
+                            className={`group relative p-4 cursor-pointer border-b border-gray-50 transition-colors border-l-4 ${activeId === conv.id
+                                ? 'bg-blue-50 border-l-blue-600'
                                 : 'hover:bg-gray-100 border-l-transparent'
-                            }`}
+                                }`}
                         >
                             <div className="font-medium text-gray-800 pr-6"> {/* pr-6 pour laisser place à la poubelle */}
-                                {conv.nom || "Discussion sans nom"} 
+                                {conv.nom || "Discussion sans nom"}
                             </div>
                             <div className="text-xs text-gray-500 mt-1 flex justify-between">
                                 <span>{conv.type === 'GROUPE' ? 'Groupe' : 'Privé'}</span>
@@ -92,12 +138,12 @@ const Sidebar = ({
                 <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-6 rounded shadow-lg w-96">
                         <h3 className="font-bold mb-4">Créer une conversation</h3>
-                        
+
                         {(roleUtilisateur === 'ADMIN' || roleUtilisateur === 'AIDANT_PRINCIPAL') && (
                             <div className="mb-4 border-b pb-4">
                                 <h4 className="text-sm font-semibold mb-2 text-blue-600">Nouveau Groupe</h4>
-                                <input 
-                                    type="text" 
+                                <input
+                                    type="text"
                                     placeholder="Nom du groupe (ex: Anniversaire)"
                                     className="w-full border p-2 mb-2 rounded focus:outline-blue-500"
                                     value={nomGroupe}
@@ -105,13 +151,13 @@ const Sidebar = ({
                                 />
                                 <label className="block text-xs text-gray-500 mb-1">Participants :</label>
                                 <div className="max-h-32 overflow-y-auto border p-2 mb-2 rounded bg-gray-50">
-                                    {membresDuCercle.length === 0 ? (
+                                    {filteredMembers.length === 0 ? (
                                         <p className="text-xs text-red-500">Aucun autre membre dans le cercle.</p>
                                     ) : (
-                                        membresDuCercle.map(m => (
+                                        filteredMembers.map(m => (
                                             <div key={m.id} className="flex items-center mb-1">
-                                                <input 
-                                                    type="checkbox" 
+                                                <input
+                                                    type="checkbox"
                                                     checked={selection.includes(m.id)}
                                                     onChange={() => toggleMembre(m.id)}
                                                     className="mr-2"
@@ -130,10 +176,10 @@ const Sidebar = ({
                         <div>
                             <h4 className="text-sm font-semibold mb-2 text-green-600">Message Privé</h4>
                             <ul className="space-y-1 max-h-32 overflow-y-auto">
-                                {membresDuCercle.length === 0 && <li className="text-xs text-gray-400">Personne à contacter</li>}
-                                {membresDuCercle.map(m => (
-                                    <li 
-                                        key={m.id} 
+                                {filteredMembers.length === 0 && <li className="text-xs text-gray-400">Personne à contacter</li>}
+                                {filteredMembers.map(m => (
+                                    <li
+                                        key={m.id}
                                         onClick={() => {
                                             onStartChat('PRIVE', [m.id], null);
                                             setShowModal(false);
@@ -146,7 +192,7 @@ const Sidebar = ({
                                 ))}
                             </ul>
                         </div>
-                        
+
                         <button onClick={() => setShowModal(false)} className="w-full text-gray-500 text-sm mt-4 underline hover:text-gray-700">
                             Annuler
                         </button>
