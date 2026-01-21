@@ -118,7 +118,7 @@ export default function OnboardingTour() {
         back: '← Précédent',
         close: '✕',
         last: 'Terminer',
-        next: 'Suivant →',
+        next: 'Étape suivante →',
         skip: 'Passer le tour',
       }}
       callback={handleJoyrideCallback}
