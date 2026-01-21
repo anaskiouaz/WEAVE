@@ -74,8 +74,20 @@ export async function apiDelete(path, data = null) {
 
 // Normalize certain legacy/alternate paths to current backend routes.
 function normalizePath(path) {
-  if (!path) return path;
-  // If frontend calls /users/me but backend exposes /auth/me, map it here.
+  if (!path) return '';
+
+  // Keep legacy mapping if present
   if (path === '/users/me') return '/auth/me';
-  return path;
+
+  // Ensure we work with a leading slash
+  let p = path.startsWith('/') ? path : `/${path}`;
+
+  // If the requested path already contains a leading /api (causing /api/api),
+  // remove the first /api occurrence so final url becomes /api/whatever (single api).
+  if (p === '/api') return '';
+  if (p.startsWith('/api/')) {
+    p = p.replace(/^\/api/, '');
+  }
+
+  return p;
 }
