@@ -16,8 +16,18 @@ const generateInviteCode = () => {
 // Note : J'ai adapté l'URL pour qu'elle corresponde à ce que ton Frontend appelle (/api/circles/:id/members)
 router.get('/:id/members', authenticateToken, async (req, res) => {
   const { id } = req.params; // circleId
+  const requesterId = req.user?.id;
 
   try {
+    // Autoriser tous les membres du cercle (pas uniquement les admins)
+    const membership = await pool.query(
+      `SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2 LIMIT 1`,
+      [requesterId, id]
+    );
+    if (membership.rows.length === 0) {
+      return res.status(403).json({ error: "Accès refusé : vous n'appartenez pas à ce cercle." });
+    }
+
     const result = await pool.query(`
       SELECT u.id, u.name, u.email, u.phone, u.profile_photo, u.onboarding_role, ur.role, u.created_at
       FROM user_roles ur
@@ -25,7 +35,7 @@ router.get('/:id/members', authenticateToken, async (req, res) => {
       WHERE ur.circle_id = $1
       ORDER BY ur.role ASC, u.name ASC
     `, [id]);
-
+    console.log("Récupération des membres du cercle :", id);
     res.json(result.rows);
   } catch (error) {
     console.error('Erreur récupération membres:', error);
@@ -74,11 +84,14 @@ router.post('/', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Le nom du bénéficiaire est requis." });
     }
 
+    // Exiger un email pour le bénéficiaire
+    if (!senior_info.email || !senior_info.email.trim()) {
+      return res.status(400).json({ error: "L'email du bénéficiaire est requis." });
+    }
+
     await client.query('BEGIN');
 
     // A. CRÉER LE COMPTE SENIOR
-    const fakeEmail = `senior.${Date.now()}@weave.local`;
-    const emailToUse = senior_info.email || fakeEmail;
     const dummyPassword = await bcrypt.hash("WeaveSeniorInit!", 10);
 
     const userRes = await client.query(
@@ -87,7 +100,7 @@ router.post('/', authenticateToken, async (req, res) => {
        RETURNING id`,
       [
         senior_info.name,
-        emailToUse,
+        senior_info.email,
         dummyPassword,
         senior_info.birth_date || null,
         senior_info.phone || null,

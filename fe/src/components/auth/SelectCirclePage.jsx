@@ -5,8 +5,8 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
-import { Users, UserPlus, ArrowRight, Loader2, ArrowLeft, Calendar, Phone, Stethoscope, Check, LogIn } from 'lucide-react';
 import { apiPost, apiGet } from '../../api/client';
+import { Users, UserPlus, ArrowRight, Loader2, ArrowLeft, Calendar, Phone, Stethoscope, Check, LogIn, Mail } from 'lucide-react';
 
 const MEDICAL_OPTIONS = [
     "Risque d'Escarres", "Phlébite / Thrombose", "Fonte musculaire",
@@ -102,6 +102,9 @@ export default function SelectCirclePage() {
         e.preventDefault();
         if (loading) return; 
         if (!seniorData.name.trim()) return setError("Le nom est requis.");
+        if (!seniorData.email?.trim()) return setError("L'email du bénéficiaire est requis.");
+        const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(seniorData.email.trim());
+        if (!emailValid) return setError("Email invalide.");
 
         const payloadInfo = {
             ...seniorData,
@@ -265,6 +268,13 @@ export default function SelectCirclePage() {
                                     </div>
                                 </div>
                             </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="email">Email du Bénéficiaire *</Label>
+                                <div className="relative">
+                                    <Mail className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                                    <Input id="email" name="email" type="email" placeholder="ex: jeanne@example.com" className="pl-10 h-12 bg-white" value={seniorData.email} onChange={handleSeniorChange} required />
+                                </div>
+                            </div>
                             <div className="space-y-3 pt-2">
                                 <Label className="flex items-center gap-2"><Stethoscope className="w-4 h-4 text-blue-600" /> Pathologies / Risques</Label>
                                 <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
@@ -292,7 +302,7 @@ export default function SelectCirclePage() {
                                 <Label htmlFor="inviteCode">Code d'invitation</Label>
                                 <Input id="inviteCode" placeholder="ex: W-7X9B2" className="h-14 text-lg bg-white text-center font-mono tracking-widest uppercase" value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} autoFocus />
                             </div>
-                            <Button type="submit" size="lg" disabled={loading} className="w-full h-14 bg-blue-700 hover:bg-blue-800 shadow-md">
+                            <Button type="submit" size="lg" disabled={loading} className="w-full h-14 bg-blue-700 hover:bg-blue-800 shadow-md text-white">
                                 {loading ? <Loader2 className="animate-spin mr-2" /> : "Rejoindre"}
                             </Button>
                         </form>

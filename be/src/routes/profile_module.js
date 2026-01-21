@@ -157,21 +157,43 @@ router.get('/stats', async (req, res) => {
     if (!userId) return res.status(400).json({ success: false, error: 'ID manquant' });
 
     try {
-        // Compter les interventions (tasks assignées à l'utilisateur)
-        // Note: assigned_to est un tableau UUID[], donc on utilise l'opérateur @> ou ANY
-        // assigned_to is a uuid[]; use ANY(...) to check membership
-        const tasksResult = await db.query(
-            'SELECT COUNT(*) as count FROM tasks WHERE $1 = ANY(assigned_to) AND completed = true',
+        // Interventions: compter seulement les tâches passées (journalisées via TASK_PASSED)
+        const passedRes = await db.query(
+            "SELECT COUNT(*) AS count FROM audit_logs WHERE user_id = $1 AND action = 'TASK_PASSED'",
             [userId]
         );
-        const interventions = parseInt(tasksResult.rows[0].count) || 0;
+        const interventions = parseInt(passedRes.rows[0]?.count || 0);
 
-        // Compter les souvenirs/moments (journal entries créés par l'utilisateur)
-        const journalResult = await db.query(
-            'SELECT COUNT(*) as count FROM journal_entries WHERE author_id = $1',
+        // Compter les souvenirs/moments postés par l'utilisateur via les logs d'audit
+        // Objectif: ne pas diminuer le compteur si un cercle est supprimé (cascade),
+        // mais déduire uniquement les suppressions manuelles.
+        const createdRes = await db.query(
+            "SELECT COUNT(*) AS count FROM audit_logs WHERE user_id = $1 AND action = 'SOUVENIR_CREATED'",
             [userId]
         );
-        const moments = parseInt(journalResult.rows[0].count) || 0;
+        const deletedRes = await db.query(
+            "SELECT COUNT(*) AS count FROM audit_logs WHERE user_id = $1 AND action = 'SOUVENIR_DELETED'",
+            [userId]
+        );
+        const createdCount = parseInt(createdRes.rows[0]?.count || 0);
+        const deletedCount = parseInt(deletedRes.rows[0]?.count || 0);
+        const moments = Math.max(0, createdCount - deletedCount);
+
+        // Compter les messages envoyés (persistant, ne diminue jamais)
+        const messagesRes = await db.query(
+            "SELECT COUNT(*) AS count FROM audit_logs WHERE user_id = $1 AND action = 'MESSAGE_SENT'",
+            [userId]
+        );
+        const messagesSent = parseInt(messagesRes.rows[0]?.count || 0);
+
+        // Calculer la moyenne des notations reçues par l'utilisateur (toutes circles confondues)
+        const ratingRes = await db.query(
+            `SELECT ROUND(AVG(rating)::numeric, 2) AS average_rating 
+             FROM helper_ratings 
+             WHERE rated_user_id = $1`,
+            [userId]
+        );
+        const rating = parseFloat(ratingRes.rows[0]?.average_rating || 0);
 
         // Calculer les années/mois/jours depuis la création du compte
         const userResult = await db.query(
@@ -205,8 +227,9 @@ router.get('/stats', async (req, res) => {
             stats: {
                 interventions,
                 moments,
+                messagesSent,
                 yearsActiveText,
-                rating: 4.8  // À faire dynamique plus tard
+                rating
             }
         });
     } catch (error) {
