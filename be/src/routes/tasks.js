@@ -19,6 +19,7 @@ router.get('/', async (req, res) => {
           t.helper_name,
           t.assigned_to,
           t.required_helpers,
+          t.completed,
           u.name AS senior_name
          FROM tasks t
          LEFT JOIN care_circles c ON c.id = t.circle_id
@@ -57,9 +58,9 @@ router.post('/', async (req, res) => {
         const quota = required_helpers ? parseInt(required_helpers, 10) : 1;
 
         const result = await db.query(
-            `INSERT INTO tasks (circle_id, title, task_type, date, time, required_helpers, helper_name)
-           VALUES ($1, $2, $3, $4, $5, $6, $7)
-           RETURNING id, circle_id, title, task_type, date, time, required_helpers, helper_name, assigned_to`,
+            `INSERT INTO tasks (circle_id, title, task_type, date, time, required_helpers, helper_name, completed)
+           VALUES ($1, $2, $3, $4, $5, $6, $7, false)
+           RETURNING id, circle_id, title, task_type, date, time, required_helpers, helper_name, assigned_to, completed`,
             [resolvedCircle.id, title, task_type, date, time, quota, helperName]
         );
 
@@ -165,3 +166,48 @@ router.delete('/:id', async (req, res) => {
 });
 
 export default router;
+ 
+// Validate a task: increment interventions for assigned users via audit logs (one-time only)
+router.post('/:id/validate', async (req, res) => {
+    try {
+        const { id } = req.params;
+        const { validatedBy } = req.body;
+
+        const taskRes = await db.query(
+            `SELECT id, title, circle_id, assigned_to, completed FROM tasks WHERE id = $1`,
+            [id]
+        );
+        if (taskRes.rows.length === 0) {
+            return res.status(404).json({ status: 'error', message: 'Task not found' });
+        }
+
+        const task = taskRes.rows[0];
+
+        // Prevent double validation
+        if (task.completed) {
+            return res.status(400).json({ status: 'error', message: 'Task already validated' });
+        }
+
+        const assigned = Array.isArray(task.assigned_to) ? task.assigned_to : [];
+
+        // Log one TASK_PASSED per assigned helper to increment their personal counter
+        await Promise.all(
+            assigned.map(uid =>
+                logAudit(uid, AUDIT_ACTIONS.TASK_PASSED, `Intervention validée: "${task.title}"`, task.circle_id)
+            )
+        );
+
+        // Optionally audit the validation action itself
+        if (validatedBy) {
+            await logAudit(validatedBy, 'TASK_VALIDATED', `Tâche validée: "${task.title}"`, task.circle_id);
+        }
+
+        // Mark task as completed to prevent re-validation
+        await db.query(`UPDATE tasks SET completed = true WHERE id = $1`, [id]);
+
+        res.json({ status: 'ok', message: 'Task validated', data: { id: task.id, validated_count: assigned.length } });
+    } catch (err) {
+        console.error('Error validating task:', err);
+        res.status(500).json({ status: 'error', message: err.message });
+    }
+});

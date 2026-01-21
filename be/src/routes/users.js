@@ -185,13 +185,37 @@ router.post('/:id/rating', async (req, res) => {
     // Prevent self-rating
     if (ratedUserId === raterId) return res.status(400).json({ success: false, error: 'Cannot rate yourself' });
 
-    // Prevent rating beneficiary (PC role)
-    const ratedUserCheck = await db.query(
-      `SELECT ur.role FROM user_roles ur WHERE ur.user_id = $1 AND ur.circle_id = $2 LIMIT 1`,
+    // Ensure rater belongs to the circle
+    const raterMembership = await db.query(
+      `SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2 LIMIT 1`,
+      [raterId, circleId]
+    );
+    if (raterMembership.rows.length === 0) {
+      return res.status(403).json({ success: false, error: 'Rater must belong to the circle' });
+    }
+    // Only admins and helpers can rate
+    const raterRole = raterMembership.rows[0]?.role;
+    if (raterRole !== 'ADMIN' && raterRole !== 'HELPER') {
+      return res.status(403).json({ success: false, error: 'Only admins and helpers can rate' });
+    }
+
+    // Ensure rated user also belongs to the same circle
+    const ratedMembership = await db.query(
+      `SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2 LIMIT 1`,
       [ratedUserId, circleId]
     );
-    if (ratedUserCheck.rows.length > 0 && ratedUserCheck.rows[0].role === 'PC') {
+    if (ratedMembership.rows.length === 0) {
+      return res.status(403).json({ success: false, error: 'Rated user must belong to the circle' });
+    }
+
+    // Prevent rating beneficiary (PC role)
+    const ratedRole = ratedMembership.rows[0]?.role;
+    if (ratedRole === 'PC') {
       return res.status(400).json({ success: false, error: 'Cannot rate beneficiary' });
+    }
+    // Rated must be admin or helper
+    if (ratedRole !== 'ADMIN' && ratedRole !== 'HELPER') {
+      return res.status(400).json({ success: false, error: 'You can only rate admins or helpers' });
     }
 
     const upsert = await db.query(

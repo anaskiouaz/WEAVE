@@ -17,7 +17,6 @@ import LandingPage from './components/LandingPage';
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
 import SelectCirclePage from './components/auth/SelectCirclePage';
-import AdminGuard from './components/auth/AdminGuard'; // J'ai ajouté l'import du Guard
 import { useAuth } from './context/AuthContext';
 
 // RGPD - Gestion des cookies
@@ -147,11 +146,7 @@ export default function App() {
             <Route path="/profile" element={<Profile />} />
 
             {/* Route Admin protégée par le Guard */}
-            <Route path="/admin" element={
-              <AdminGuard>
-                <Admin />
-              </AdminGuard>
-            } />
+            <Route path="/admin" element={<Admin />} />
 
             <Route path="/select-circle" element={<SelectCirclePage />} />
           </Route>
