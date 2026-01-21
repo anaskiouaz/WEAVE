@@ -128,7 +128,7 @@ export default function SelectCirclePage() {
             const finalName = data.circle_name || data.circle?.senior_name || data.data?.senior_name || seniorData.name;
 
             if (finalId) {
-                handleSuccessRedirect(finalId, finalName);
+                handleSuccessRedirect(finalId, finalName, 'ADMIN');
             } else {
                 setLoading(false);
                 throw new Error("ID du cercle manquant dans la réponse");
