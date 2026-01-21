@@ -5,7 +5,7 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
-import { Users, UserPlus, ArrowRight, Loader2, ArrowLeft, Calendar, Phone, Stethoscope, Check, LogIn } from 'lucide-react';
+import { Users, UserPlus, ArrowRight, Loader2, ArrowLeft, Calendar, Phone, Stethoscope, Check, LogIn, Mail } from 'lucide-react';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
 // On garde ta liste d'options médicales qui est très bien
@@ -124,6 +124,9 @@ export default function SelectCirclePage() {
     const handleCreate = async (e) => {
         e.preventDefault();
         if (!seniorData.name.trim()) return setError("Le nom est requis.");
+        if (!seniorData.email?.trim()) return setError("L'email du bénéficiaire est requis.");
+        const emailValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(seniorData.email.trim());
+        if (!emailValid) return setError("Email invalide.");
 
         const payloadInfo = {
             ...seniorData,
@@ -300,6 +303,13 @@ export default function SelectCirclePage() {
                                         <Phone className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                                         <Input id="phone" name="phone" placeholder="06..." className="pl-10 h-12 bg-white" value={seniorData.phone} onChange={handleSeniorChange} />
                                     </div>
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="email">Email du Bénéficiaire *</Label>
+                                <div className="relative">
+                                    <Mail className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
+                                    <Input id="email" name="email" type="email" placeholder="ex: jeanne@example.com" className="pl-10 h-12 bg-white" value={seniorData.email} onChange={handleSeniorChange} required />
                                 </div>
                             </div>
                             <div className="space-y-3 pt-2">

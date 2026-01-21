@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, LogOut, Camera, Cookie, Heart, ChevronDown, ChevronUp } from 'lucide-react';
+import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, LogOut, Camera, Cookie } from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useCookieConsent } from '../context/CookieContext';
@@ -25,14 +25,12 @@ export default function Profile() {
   
   const [userInfo, setUserInfo] = useState({ name: '', email: '', phone: '', address: '', joinDate: '', yearsActive: '0 jour', photoUrl: null });
   const [availability, setAvailability] = useState([]);
-  const [stats, setStats] = useState({ interventions: 0, moments: 0, rating: 0 });
+  const [stats, setStats] = useState({ interventions: 0, moments: 0, messagesSent: 0, rating: 0 });
   const [skills, setSkills] = useState([]);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
   
   // --- UI ETATS ---
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const [showAssistedPeople, setShowAssistedPeople] = useState(false);
-  const [assistedPeopleList] = useState(['Grand-Père Michel']); 
 
   const [profileForm, setProfileForm] = useState({});
   const [availForm, setAvailForm] = useState([]);
@@ -109,7 +107,7 @@ export default function Profile() {
             }
         } catch (statsError) {
             console.log("⚠️ API Stats non disponible ou vide, utilisation valeurs par défaut.");
-            setStats({ interventions: 0, moments: 0, rating: 5.0 });
+            setStats({ interventions: 0, moments: 0, messagesSent: 0, rating: 5.0 });
         }
       }
     } catch (error) {
@@ -342,14 +340,18 @@ export default function Profile() {
       <div className="max-w-4xl mx-auto px-8 -mt-24 space-y-6">
 
         {/* STATS */}
-        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100 transform hover:-translate-y-1 transition-transform duration-200">
             <span className="text-3xl font-bold text-gray-800">{stats.interventions}</span>
             <span className="text-gray-500 text-sm font-bold uppercase tracking-wide mt-1">Interventions</span>
           </div>
           <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100 transform hover:-translate-y-1 transition-transform duration-200">
             <span className="text-3xl font-bold text-gray-800">{stats.moments}</span>
-            <span className="text-gray-500 text-sm font-bold uppercase tracking-wide mt-1">Moments partagés</span>
+            <span className="text-gray-500 text-sm font-bold uppercase tracking-wide mt-1">Souvenirs postés</span>
+          </div>
+          <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100 transform hover:-translate-y-1 transition-transform duration-200">
+            <span className="text-3xl font-bold text-gray-800">{stats.messagesSent || 0}</span>
+            <span className="text-gray-500 text-sm font-bold uppercase tracking-wide mt-1">Messages envoyés</span>
           </div>
           <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100 transform hover:-translate-y-1 transition-transform duration-200">
             <div className="flex items-center gap-1 text-3xl font-bold text-gray-800">
@@ -506,29 +508,7 @@ export default function Profile() {
               </button>
             </div>
 
-            {/* PERSONNES AIDÉES */}
-            <div className="border-t border-gray-100 pt-4">
-              <button 
-                onClick={() => setShowAssistedPeople(!showAssistedPeople)}
-                className="w-full flex items-center justify-between group"
-              >
-                <div className="flex items-center gap-3">
-                  <Heart className="text-gray-500 group-hover:text-red-500 transition-colors" size={20} />
-                  <span className="text-gray-700 font-medium group-hover:text-gray-900">Personnes aidées</span>
-                </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-blue-600 font-bold bg-blue-50 px-2 py-0.5 rounded text-sm">{assistedPeopleList.length}</span>
-                  {showAssistedPeople ? <ChevronUp size={16} className="text-gray-400"/> : <ChevronDown size={16} className="text-gray-400"/>}
-                </div>
-              </button>
-              {showAssistedPeople && (
-                <div className="mt-3 pl-8 text-gray-600 text-sm">
-                  {assistedPeopleList.map((person, index) => (
-                    <div key={index} className="py-1">• {person}</div>
-                  ))}
-                </div>
-              )}
-            </div>
+            
 
             {/* RELANCER LE TOUR ONBOARDING */}
             <div className="pt-4 border-t border-gray-100">
