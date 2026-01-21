@@ -186,6 +186,15 @@ router.get('/stats', async (req, res) => {
         );
         const messagesSent = parseInt(messagesRes.rows[0]?.count || 0);
 
+        // Calculer la moyenne des notations reçues par l'utilisateur (toutes circles confondues)
+        const ratingRes = await db.query(
+            `SELECT ROUND(AVG(rating)::numeric, 2) AS average_rating 
+             FROM helper_ratings 
+             WHERE rated_user_id = $1`,
+            [userId]
+        );
+        const rating = parseFloat(ratingRes.rows[0]?.average_rating || 0);
+
         // Calculer les années/mois/jours depuis la création du compte
         const userResult = await db.query(
             'SELECT created_at FROM users WHERE id = $1',
@@ -220,7 +229,7 @@ router.get('/stats', async (req, res) => {
                 moments,
                 messagesSent,
                 yearsActiveText,
-                rating: 4.8  // À faire dynamique plus tard
+                rating
             }
         });
     } catch (error) {

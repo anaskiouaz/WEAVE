@@ -142,4 +142,72 @@ router.post('/device-token', async (req, res) => {
     }
 });
 
+// 5. RATINGS: Get a member rating summary (per circle) and current rater rating
+router.get('/:id/rating', async (req, res) => {
+  try {
+    const ratedUserId = req.params.id;
+    const { circleId, raterId } = req.query;
+    if (!ratedUserId || !circleId) return res.status(400).json({ success: false, error: 'Missing rated user or circleId' });
+
+    const avgRes = await db.query(
+      `SELECT ROUND(AVG(rating)::numeric,2) AS average_rating, COUNT(*) AS total_ratings
+       FROM helper_ratings WHERE rated_user_id = $1 AND circle_id = $2`,
+      [ratedUserId, circleId]
+    );
+    const avg = avgRes.rows[0] || { average_rating: null, total_ratings: 0 };
+
+    let my = null;
+    if (raterId) {
+      const myRes = await db.query(
+        `SELECT rating, comment FROM helper_ratings WHERE rated_user_id = $1 AND rater_user_id = $2 AND circle_id = $3 LIMIT 1`,
+        [ratedUserId, raterId, circleId]
+      );
+      my = myRes.rows[0] || null;
+    }
+
+    // Also return skills of the rated user
+    const skillsRes = await db.query(`SELECT skills FROM users WHERE id = $1`, [ratedUserId]);
+
+    res.json({ success: true, average: Number(avg.average_rating) || 0, total: Number(avg.total_ratings) || 0, my, skills: skillsRes.rows[0]?.skills || [] });
+  } catch (error) {
+    console.error('GET rating error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// 6. RATINGS: Upsert (create/update) a rating
+router.post('/:id/rating', async (req, res) => {
+  try {
+    const ratedUserId = req.params.id;
+    const { raterId, circleId, rating } = req.body;
+    if (!ratedUserId || !raterId || !circleId || !rating) return res.status(400).json({ success: false, error: 'Missing fields' });
+
+    // Prevent self-rating
+    if (ratedUserId === raterId) return res.status(400).json({ success: false, error: 'Cannot rate yourself' });
+
+    // Prevent rating beneficiary (PC role)
+    const ratedUserCheck = await db.query(
+      `SELECT ur.role FROM user_roles ur WHERE ur.user_id = $1 AND ur.circle_id = $2 LIMIT 1`,
+      [ratedUserId, circleId]
+    );
+    if (ratedUserCheck.rows.length > 0 && ratedUserCheck.rows[0].role === 'PC') {
+      return res.status(400).json({ success: false, error: 'Cannot rate beneficiary' });
+    }
+
+    const upsert = await db.query(
+      `INSERT INTO helper_ratings (rated_user_id, rater_user_id, circle_id, rating, comment)
+       VALUES ($1,$2,$3,$4,NULL)
+       ON CONFLICT (rated_user_id, rater_user_id, circle_id)
+       DO UPDATE SET rating = EXCLUDED.rating, comment = NULL, updated_at = NOW()
+       RETURNING id, rating`,
+      [ratedUserId, raterId, circleId, Math.max(1, Math.min(5, parseInt(rating,10)))]
+    );
+
+    res.json({ success: true, data: upsert.rows[0] });
+  } catch (error) {
+    console.error('POST rating error:', error);
+    res.status(500).json({ success: false, error: error.message });
+  }
+});
+
 export default router;

@@ -340,7 +340,7 @@ export default function SelectCirclePage() {
                                 <Label htmlFor="inviteCode">Code d'invitation</Label>
                                 <Input id="inviteCode" placeholder="ex: W-7X9B2" className="h-14 text-lg bg-white text-center font-mono tracking-widest uppercase" value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} autoFocus />
                             </div>
-                            <Button type="submit" size="lg" disabled={loading} className="w-full h-14 bg-blue-700 hover:bg-blue-800 shadow-md">
+                            <Button type="submit" size="lg" disabled={loading} className="w-full h-14 bg-blue-700 hover:bg-blue-800 shadow-md text-white">
                                 {loading ? <Loader2 className="animate-spin mr-2" /> : "Rejoindre"}
                             </Button>
                         </form>
