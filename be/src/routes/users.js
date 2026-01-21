@@ -3,6 +3,7 @@ import bcrypt from 'bcryptjs';
 import db from '../config/db.js';
 import { encrypt } from '../utils/crypto.js';
 import { logAudit } from '../utils/audits.js';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = Router();
 
@@ -53,6 +54,59 @@ router.patch('/:id/consent', async (req, res) => {
             res.json({ success: true, message: "Consentement enregistré." });
         }
     } catch (error) { res.status(500).json({ success: false, error: error.message }); }
+});
+
+// ============================================================
+// DELETE user and all related data (protected)
+// ============================================================
+router.delete('/:id', authenticateToken, async (req, res) => {
+  const { id } = req.params;
+  try {
+    // Only allow owner or ADMIN to delete
+    if (!req.user || (String(req.user.id) !== String(id) && req.user.role !== 'ADMIN')) {
+      return res.status(403).json({ success: false, error: 'Forbidden' });
+    }
+
+    // Log the deletion attempt (by the requester)
+    try { await logAudit(req.user.id || null, 'USER_DELETE_REQUEST', `Suppression du compte ${id}`); } catch (e) { console.warn('Audit log failed', e); }
+
+    // Transactional deletion of related records
+    await db.query('BEGIN');
+
+    // Ratings (as rater or rated)
+    await db.query('DELETE FROM helper_ratings WHERE rated_user_id = $1 OR rater_user_id = $1', [id]);
+
+    // User roles (memberships)
+    await db.query('DELETE FROM user_roles WHERE user_id = $1', [id]);
+
+    // Availability
+    await db.query('DELETE FROM user_availability WHERE user_id = $1', [id]);
+
+    // Audit logs authored by user
+    await db.query('DELETE FROM audit_logs WHERE user_id = $1', [id]);
+
+    // Journal entries / souvenirs authored by user
+    await db.query('DELETE FROM journal_entries WHERE author_id = $1', [id]);
+
+    // Any other tables that reference users should be cleaned here as needed.
+
+    // Finally delete the user row
+    const delRes = await db.query('DELETE FROM users WHERE id = $1 RETURNING id', [id]);
+    if (delRes.rowCount === 0) {
+      await db.query('ROLLBACK');
+      return res.status(404).json({ success: false, error: 'User not found' });
+    }
+
+    await db.query('COMMIT');
+
+    try { await logAudit(req.user.id || null, 'USER_DELETED', `Compte ${id} supprimé`); } catch (e) { console.warn('Audit log failed', e); }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('Erreur suppression utilisateur:', error);
+    try { await db.query('ROLLBACK'); } catch (e) { console.error('Rollback failed', e); }
+    res.status(500).json({ success: false, error: error.message });
+  }
 });
 
 // --- ENREGISTREMENT DU TOKEN ---
