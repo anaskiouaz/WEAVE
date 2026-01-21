@@ -44,4 +44,6 @@ export const AUDIT_ACTIONS = {
     
     // Messages
     MESSAGE_SENT: 'MESSAGE_SENT',
+    TASKS_CREATED: 'TASKS_CREATED',
+    TASKS_DELETED: 'TASKS_DELETED',
 };
