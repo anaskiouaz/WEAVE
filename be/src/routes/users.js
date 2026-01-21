@@ -6,11 +6,29 @@ import { logAudit } from '../utils/audits.js';
 
 const router = Router();
 
-// =============================================================================
-// ⚠️ ZONE 1 : ROUTES SPÉCIFIQUES (DOIVENT ÊTRE EN PREMIER)
-// =============================================================================
+router.get('/me', async (req, res) => {
+    try {
+        // req.user est rempli par le middleware d'auth (vérifie qu'il est bien présent dans router/index.js ou server.js)
+        if (!req.user || !req.user.id) {
+            return res.status(401).json({ success: false, error: 'Non authentifié' });
+        }
+        
+        const result = await db.query(
+            'SELECT id, name, email, role_global, fcm_token, picture, bio FROM users WHERE id = $1', 
+            [req.user.id]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Utilisateur introuvable' });
+        }
+        
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Erreur /me:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 
-// 2. AUDIT LOGS (GET)
 router.get('/audit-logs', async (req, res) => {
     try {
         const { userId } = req.query; 

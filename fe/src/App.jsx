@@ -1,6 +1,8 @@
 import { BrowserRouter, Routes, Route, Link, useLocation, Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { Home, Calendar, Heart, MessageSquare, User, Settings, AlertCircle, LogOut } from 'lucide-react';
-import { useState } from 'react';
+import { useState, useEffect } from 'react'; // Ajout de useEffect
+import { Capacitor } from '@capacitor/core'; // Ajout pour les notifs
+import { PushNotifications } from '@capacitor/push-notifications'; // Ajout pour les notifs
 
 // Composants
 import Dashboard from './components/Dashboard';
@@ -18,6 +20,7 @@ import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
 import SelectCirclePage from './components/auth/SelectCirclePage';
 import { useAuth } from './context/AuthContext';
+import { apiPost } from './api/client'; // Ajout pour envoyer le token
 
 // RGPD - Gestion des cookies
 import { CookieProvider } from './context/CookieContext';
@@ -35,17 +38,52 @@ function ProtectedLayout() {
   const { token, logout, user } = useAuth();
   const navigate = useNavigate();
 
+  // --- INITIALISATION DES NOTIFICATIONS (Déplacé ici pour être actif partout) ---
+  useEffect(() => {
+    const initNotifications = async () => {
+        // Ne rien faire si on est sur le web
+        if (Capacitor.getPlatform() === 'web') return; 
+        
+        try {
+            const userId = user?.id;
+            if (!userId) return;
+
+            // Nettoyage des listeners existants pour éviter les doublons
+            await PushNotifications.removeAllListeners(); 
+
+            // Enregistrement du token auprès du backend
+            await PushNotifications.addListener('registration', async (token) => {
+                console.log('📱 Token FCM reçu:', token.value);
+                await apiPost('/users/device-token', { userId, token: token.value });
+            });
+
+            // Réception d'une notif quand l'app est ouverte (foreground)
+            await PushNotifications.addListener('pushNotificationReceived', (n) => {
+                console.log('🔔 Notif reçue:', n);
+                // Optionnel: Afficher un toast/alerte ici si voulu
+                // alert(`${n.title}\n${n.body}`);
+            });
+            
+            // Demande de permission
+            let perm = await PushNotifications.checkPermissions();
+            if (perm.receive === 'prompt') perm = await PushNotifications.requestPermissions();
+            if (perm.receive === 'granted') await PushNotifications.register();
+
+        } catch (e) { console.error(`Erreur Notifs: ${e.message}`); }
+    };
+
+    if (user) {
+        initNotifications();
+    }
+  }, [user]);
+  // --------------------------------------------------------------------------
+
   const handleLogout = () => {
     logout();
     navigate('/login');
   };
 
   if (!token) return <Navigate to="/" replace />;
-
-  // --- LOGIQUE DE SÉCURITÉ ADMIN ---
-  // Déterminer le rôle via `role_global` ou via les rôles présents dans `user.circles`
-  const globalRole = user?.role_global ? user.role_global.toUpperCase() : '';
-  const hasCircleAdmin = Array.isArray(user?.circles) && user.circles.some(c => (c.role || '').toUpperCase() === 'ADMIN' || (c.role || '').toUpperCase() === 'SUPERADMIN');
 
   // 2. Liste des liens DE BASE (accessibles à tous)
   const navItems = [
@@ -117,8 +155,12 @@ function ProtectedLayout() {
         <Outlet />
       </main>
 
-      {/* NAV MOBILE (Décommenter si le fichier existe) */}
-      {/* {!hideNav && <div className="md:hidden"><Navigation /></div>} */}
+      {/* NAV MOBILE (Décommentée) */}
+      {!hideNav && (
+        <div className="md:hidden fixed bottom-0 left-0 right-0 z-50">
+            <Navigation />
+        </div>
+      )}
 
       <EmergencyDialog open={emergencyOpen} onClose={() => setEmergencyOpen(false)} />
     </div>
