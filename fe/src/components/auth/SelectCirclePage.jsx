@@ -106,12 +106,17 @@ export default function SelectCirclePage() {
 
     // 2. Sélectionner un cercle existant
     const selectExistingCircle = (circle) => {
+        // Sauvegarder dans localStorage
         localStorage.setItem('circle_id', circle.id);
         localStorage.setItem('circle_nom', circle.name);
         // Réinitialiser le tour onboarding
         localStorage.removeItem('weave_onboarding_seen');
+        
+        // Utiliser le setter du contexte pour mettre à jour les deux valeurs
         setCircleId(circle.id);
         setCircleNom(circle.name);
+        
+        // Naviguer vers le dashboard avec le circle_id en paramètre
         navigate(`/dashboard?circle_id=${circle.id}`);
     };
 

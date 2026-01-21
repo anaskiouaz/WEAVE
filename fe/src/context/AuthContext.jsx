@@ -139,11 +139,30 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider value={{
       user, token, circleId, circleNom,
       login, register, logout, loading,
-      // Expose setters which persist to localStorage via saveCircleData
-      setCircleId: (id) => saveCircleData(id, circleNom),
-      setCircleNom: (nom) => saveCircleData(circleId, nom),
-      // Also expose a convenience to set both
-      setCircle: (id, nom) => saveCircleData(id, nom),
+      // Expose a combined setter that updates both values atomically
+      setCircle: (id, nom) => {
+        if (id) {
+          setCircleId(id);
+          try { localStorage.setItem('circle_id', id); } catch { }
+        }
+        if (nom) {
+          setCircleNom(nom);
+          try { localStorage.setItem('circle_nom', nom); } catch { }
+        }
+      },
+      // Individual setters for backward compatibility
+      setCircleId: (id) => {
+        if (id) {
+          setCircleId(id);
+          try { localStorage.setItem('circle_id', id); } catch { }
+        }
+      },
+      setCircleNom: (nom) => {
+        if (nom) {
+          setCircleNom(nom);
+          try { localStorage.setItem('circle_nom', nom); } catch { }
+        }
+      },
       // Expose setUser and refresh helper so pages can update context after actions
       setUser,
       refreshUser,

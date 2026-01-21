@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { apiGet, apiPost } from '../api/client';
 import { Calendar, Heart, MessageSquare, Users, Clock, Activity, ShoppingCart, Stethoscope, RefreshCw } from 'lucide-react';
 import { PushNotifications } from '@capacitor/push-notifications';
@@ -10,9 +10,15 @@ import { useAuth } from '../context/AuthContext';
 
 export default function Dashboard() {
   const navigate = useNavigate();
-  // 2. RECUPERATION DU CIRCLE ID VIA LE CONTEXTE
+  const [searchParams] = useSearchParams();
+  
+  // 2. RECUPERATION DU CIRCLE ID VIA LE CONTEXTE ET LES PARAMETRES URL
   // Ce circleId vient directement du localStorage grâce à ton AuthProvider
-  const { circleId, user } = useAuth(); 
+  const { circleId: contextCircleId, setCircle, user } = useAuth();
+  
+  // Priorité: param URL > contexte
+  const circleIdFromUrl = searchParams.get('circle_id');
+  const activeCircleId = circleIdFromUrl || contextCircleId;
   
   const [loading, setLoading] = useState(true);
   const [upcomingTasks, setUpcomingTasks] = useState([]);
@@ -29,11 +35,11 @@ export default function Dashboard() {
       setLoading(true);
       
       // 3. ENVOI DU CIRCLE_ID AU BACKEND
-      // Si circleId existe dans le context, on l'ajoute à l'URL
+      // Si activeCircleId existe, on l'ajoute à l'URL
       // Sinon, on appelle /dashboard sans paramètre (le backend prendra celui par défaut)
-      const endpoint = circleId ? `/dashboard?circle_id=${circleId}` : '/dashboard';
+      const endpoint = activeCircleId ? `/dashboard?circle_id=${activeCircleId}` : '/dashboard';
       
-      console.log(`Chargement dashboard pour le cercle : ${circleId || 'Défaut'}`);
+      console.log(`Chargement dashboard pour le cercle : ${activeCircleId || 'Défaut'}`);
       
       const response = await apiGet(endpoint);
       
@@ -67,12 +73,22 @@ export default function Dashboard() {
     } catch (e) { console.error(`Erreur Notifs: ${e.message}`); }
   };
 
+  // Synchroniser le contexte avec l'URL quand le circleId de l'URL change
+  useEffect(() => {
+    if (circleIdFromUrl && circleIdFromUrl !== contextCircleId) {
+      console.log(`Mise à jour du contexte: ${circleIdFromUrl}`);
+      // On met le circleId à jour dans le contexte et localStorage
+      localStorage.setItem('circle_id', circleIdFromUrl);
+      setCircle(circleIdFromUrl, null); // null pour garder l'ancien nom si on le met pas
+    }
+  }, [circleIdFromUrl, contextCircleId, setCircle]);
+
   // 4. DECLENCHEMENT AUTOMATIQUE
-  // Dès que 'circleId' change dans le contexte (ou localStorage), le useEffect se relance
+  // Dès que 'activeCircleId' change, le useEffect se relance
   useEffect(() => {
     loadTasks();
     activerNotifs();
-  }, [circleId]); 
+  }, [activeCircleId]); 
 
   // --- RENDU GRAPHIQUE (inchangé) ---
   const statsDisplay = [
@@ -97,7 +113,7 @@ export default function Dashboard() {
             <div>
               <h1 className="text-gray-900 text-2xl font-bold mb-2">Tableau de bord</h1>
               <p className="text-gray-600">
-                  Vue d'ensemble {circleId && <span className="text-xs text-gray-400">(Cercle #{circleId.slice(0,8)}...)</span>}
+                  Vue d'ensemble {activeCircleId && <span className="text-xs text-gray-400">(Cercle #{activeCircleId.slice(0,8)}...)</span>}
               </p>
             </div>
             <button
