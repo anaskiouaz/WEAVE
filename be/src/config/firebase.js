@@ -1,35 +1,44 @@
 import admin from 'firebase-admin';
-import 'dotenv/config'; // Charge les variables du fichier .env
+import dotenv from 'dotenv';
 
-let serviceAccount;
+dotenv.config();
 
 try {
-  // On vérifie que la variable existe
-  if (!process.env.FIREBASE_SERVICE_ACCOUNT) {
-    throw new Error("La variable d'environnement FIREBASE_SERVICE_ACCOUNT est vide.");
-  }
+    let serviceAccount;
 
-  // On transforme la string JSON en objet JavaScript
-  serviceAccount = JSON.parse(process.env.FIREBASE_SERVICE_ACCOUNT);
+    // 1. On essaie de récupérer la variable d'environnement
+    const rawServiceAccount = process.env.FIREBASE_SERVICE_ACCOUNT;
 
-} catch (e) {
-  console.error("ERREUR CRITIQUE: Impossible de lire la configuration Firebase !");
-  console.error("Détail de l'erreur :", e.message);
-  // Vérifie bien que ton JSON est valide et sur une seule ligne dans le .env
-  process.exit(1);
-}
+    if (rawServiceAccount) {
+        // NETTOYAGE CRITIQUE : Parfois Docker ou le .env ajoute des ' autour du JSON
+        // On enlève les guillemets simples au début et à la fin si présents
+        const cleanServiceAccount = rawServiceAccount.trim().replace(/^'|'$/g, '');
 
-export const initFirebase = () => {
-  try {
-    if (!admin.apps.length) {
-      admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
-      });
-      console.log("Firebase Admin initialisé avec succès via variable d'environnement");
+        try {
+            serviceAccount = JSON.parse(cleanServiceAccount);
+            console.log("🔹 Configuration Firebase chargée depuis ENV");
+        } catch (parseError) {
+            console.error("❌ Erreur de parsing JSON Firebase:", parseError.message);
+            console.error("Début du JSON reçu:", cleanServiceAccount.substring(0, 50) + "...");
+        }
+    } else {
+        console.warn("⚠️ Variable FIREBASE_SERVICE_ACCOUNT manquante !");
     }
-  } catch (error) {
-    console.error("Erreur initialisation Firebase:", error);
-  }
-};
+
+    // 2. Initialisation (Uniquement si pas déjà fait)
+    if (!admin.apps.length) {
+        if (serviceAccount) {
+            admin.initializeApp({
+                credential: admin.credential.cert(serviceAccount)
+            });
+            console.log("✅ Firebase Admin SDK initialisé avec succès !");
+        } else {
+            console.error("❌ Impossible d'initialiser Firebase : Aucune clé valide.");
+        }
+    }
+
+} catch (error) {
+    console.error("❌ CRASH Initialisation Firebase:", error);
+}
 
 export default admin;
