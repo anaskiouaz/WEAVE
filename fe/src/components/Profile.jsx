@@ -259,42 +259,75 @@ export default function Profile() {
 
   // --- GESTION NOTIFICATIONS ---
   const handleNotificationToggle = async () => {
-    const newStatus = !notificationsEnabled;
-    const options = { headers: { 'x-user-id': USER_ID } };
+    // 1. Si on est sur le web (PC), on ne fait rien
+    if (Capacitor.getPlatform() === 'web') {
+        toast.info("Les notifications push ne marchent que sur mobile");
+        return;
+    }
 
-    // Optimistic UI Update
+    const newStatus = !notificationsEnabled;
+    
+    // On change l'UI tout de suite pour la fluidité
     setNotificationsEnabled(newStatus);
 
     try {
-        await apiPut('/module/profile/notifications', { notifications_enabled: newStatus }, options);
+        // Sauvegarde de la préférence en DB (On/Off)
+        await apiPut('/users/me', { notifications_enabled: newStatus });
 
-        if (Capacitor.getPlatform() !== 'web') {
-            if (newStatus === true) {
-                let perm = await PushNotifications.checkPermissions();
-                if (perm.receive === 'prompt') {
-                    perm = await PushNotifications.requestPermissions();
-                }
-
-                if (perm.receive === 'granted') {
-                    await PushNotifications.register();
-                    PushNotifications.addListener('registration', async (token) => {
-                        await apiPost('/users/device-token', { userId: USER_ID, token: token.value }, options);
-                        PushNotifications.removeAllListeners(); 
-                    });
-                } else {
-                    setNotificationsEnabled(false);
-                    await apiPut('/module/profile/notifications', { enabled: false }, options); 
-                    alert("Les notifications sont bloquées dans les paramètres.");
-                }
-            } else {
-                await apiPost('/users/device-token', { userId: USER_ID, token: "" }, options);
-                await PushNotifications.removeAllListeners();
-                await PushNotifications.unregister();
+        if (newStatus === true) {
+            // --- ACTIVATION ---
+            
+            // 1. Vérifier / Demander la permission
+            let permStatus = await PushNotifications.checkPermissions();
+            
+            if (permStatus.receive === 'prompt') {
+                permStatus = await PushNotifications.requestPermissions();
             }
-        } 
+
+            if (permStatus.receive !== 'granted') {
+                throw new Error("Permission refusée par l'utilisateur");
+            }
+
+            // 2. IMPORTANT : On prépare les écouteurs AVANT d'enregistrer
+            await PushNotifications.removeAllListeners();
+
+            // CAS SUCCÈS : On reçoit le token
+            await PushNotifications.addListener('registration', async (tokenData) => {
+                console.log('✅ Token FCM reçu:', tokenData.value);
+                // On l'envoie au backend
+                try {
+                    await apiPost('/users/device-token', { 
+                        userId: user.id, 
+                        token: tokenData.value 
+                    });
+                    toast.success("Notifications activées !");
+                } catch (err) {
+                    console.error("Erreur envoi token API:", err);
+                }
+            });
+
+            // CAS ERREUR
+            await PushNotifications.addListener('registrationError', (error) => {
+                console.error('❌ Erreur enregistrement Push:', error);
+                toast.error("Erreur technique push");
+            });
+
+            // 3. On lance l'enregistrement (ce qui va déclencher l'écouteur ci-dessus)
+            await PushNotifications.register();
+
+        } else {
+            // --- DÉSACTIVATION ---
+            // On supprime le token de la DB pour ne plus être dérangé
+            await apiPost('/users/device-token', { userId: user.id, token: '' });
+            await PushNotifications.removeAllListeners();
+            // On ne peut pas "unregister" totalement sur Android, mais on a coupé le lien DB
+            toast.success("Notifications désactivées");
+        }
+
     } catch (error) {
         console.error("Erreur toggle notifs:", error);
-        setNotificationsEnabled(!newStatus);
+        setNotificationsEnabled(!newStatus); // On remet le switch comme avant
+        toast.error("Impossible d'activer les notifications");
     }
   };
 

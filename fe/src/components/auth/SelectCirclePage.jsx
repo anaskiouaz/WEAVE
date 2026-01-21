@@ -1,26 +1,25 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useAuth } from '../../context/AuthContext'; // On garde ça, c'est important pour le contexte
+import { useAuth } from '../../context/AuthContext';
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '../ui/card';
 import { Users, UserPlus, ArrowRight, Loader2, ArrowLeft, Calendar, Phone, Stethoscope, Check, LogIn } from 'lucide-react';
+import { apiPost, apiGet } from '../../api/client';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || "/api";
-// On garde ta liste d'options médicales qui est très bien
 const MEDICAL_OPTIONS = [
     "Risque d'Escarres", "Phlébite / Thrombose", "Fonte musculaire",
     "Ankyloses / Raideurs", "Constipation", "Incontinence",
-    "Encombrement bronchique", "Syndrome de glissement", "Ostéoporose", "Autre"
+    "Encombrement bronchique", "Syndrome de glissement", "Ostéoporose", "Alzheimer"
 ];
 
 export default function SelectCirclePage() {
     const navigate = useNavigate();
-    // On utilise le contexte pour sauvegarder le choix de l'utilisateur
-    const { setCircleId, setCircleNom, token, refreshUser } = useAuth();
+    // On récupère setCircleId et setCircleNom depuis le contexte
+    const { setCircleId, setCircleNom, setUser } = useAuth();
 
-    const [view, setView] = useState('selection');
+    const [view, setView] = useState('selection'); 
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState('');
     const [myCircles, setMyCircles] = useState([]);
@@ -35,158 +34,124 @@ export default function SelectCirclePage() {
     const toggleMedicalOption = (option) => {
         setSeniorData(prev => {
             const isSelected = prev.medical_select.includes(option);
-            return {
-                ...prev,
-                medical_select: isSelected
-                    ? prev.medical_select.filter(item => item !== option)
-                    : [...prev.medical_select, option]
+            return { 
+                ...prev, 
+                medical_select: isSelected 
+                    ? prev.medical_select.filter(item => item !== option) 
+                    : [...prev.medical_select, option] 
             };
         });
     };
 
-    // La version améliorée de apiCall (gère les méthodes et le token)
-    const apiCall = async (endpoint, method = 'POST', body = null) => {
+    // --- CORRECTION MAJEURE ICI ---
+    const handleSuccessRedirect = async (circleId, circleName) => {
+        console.log("🚀 Sélection Cercle :", circleId, circleName);
+        
+        try {
+            // 1. Mise à jour du stockage local (Persistance)
+            localStorage.setItem('circle_id', circleId);
+            if (circleName) localStorage.setItem('circle_nom', circleName);
+
+            // 2. Mise à jour immédiate du Contexte (État React)
+            if (setCircleId) setCircleId(circleId);
+            if (setCircleNom) setCircleNom(circleName);
+
+            // 3. IMPORTANT : Mettre à jour le User dans le contexte pour qu'il sache qu'il a un cercle actif
+            if (setUser) {
+                setUser(prev => ({ ...prev, current_circle_id: circleId }));
+            }
+            
+            // 4. Redirection douce avec React Router (plus rapide et sans rechargement complet)
+            // Le AuthGuard verra que le contexte est à jour et laissera passer.
+            navigate('/dashboard', { replace: true });
+
+        } catch (e) {
+            console.error("Erreur redirection:", e);
+            // Fallback ultime si React Router échoue
+            window.location.href = '/dashboard';
+        }
+    };
+
+    const handleViewList = async () => {
         setLoading(true);
         setError('');
-
         try {
-            const config = {
-                method,
-                headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                }
-            };
-            if (body) config.body = JSON.stringify(body);
-
-            const res = await fetch(`${API_BASE_URL}/circles${endpoint}`, config);
-
-            // Lire le texte d'abord
-            const text = await res.text();
-
-            // Essayer de parser le JSON
-            let data;
-            try {
-                data = JSON.parse(text);
-            } catch (parseError) {
-                console.error('Réponse non-JSON reçue:', text.substring(0, 200));
-                throw new Error(`Le serveur n'a pas retourné de JSON valide (${res.status})`);
+            const data = await apiGet('/circles');
+            // Gestion robuste : parfois c'est data.circles, parfois data est le tableau directement
+            const circles = Array.isArray(data) ? data : (data.circles || data.data || []);
+            
+            if (!circles || circles.length === 0) {
+                setError("Aucun cercle trouvé. Créez-en un nouveau.");
+            } else {
+                setMyCircles(circles);
+                setView('list');
             }
-
-            // Vérifier si la réponse est OK
-            if (!res.ok) {
-                const errorMessage = data.error || data.message || "Une erreur est survenue";
-                throw new Error(errorMessage);
-            }
-
-            return data;
-
         } catch (err) {
-            const message = err.message || "Erreur de connexion au serveur";
-            setError(message);
-            throw err;
+            console.error(err);
+            setError("Impossible de charger les cercles");
         } finally {
             setLoading(false);
         }
     };
 
-    // --- ACTIONS ---
-
-    // 1. Charger la liste des cercles existants (Nouvelle feature !)
-    const handleViewList = async () => {
-        try {
-            const data = await apiCall('/', 'GET');
-            const circles = Array.isArray(data) ? data : (data.circles || []);
-            setMyCircles(circles);
-            setView('list');
-        } catch (err) {
-            console.error("Impossible de charger les cercles", err);
-        }
-    };
-
-    // 2. Sélectionner un cercle existant
     const selectExistingCircle = (circle) => {
-        // Sauvegarder dans localStorage
-        localStorage.setItem('circle_id', circle.id);
-        localStorage.setItem('circle_nom', circle.name);
-        // Réinitialiser le tour onboarding
-        localStorage.removeItem('weave_onboarding_seen');
-        
-        // Utiliser le setter du contexte pour mettre à jour les deux valeurs
-        setCircleId(circle.id);
-        setCircleNom(circle.name);
-        
-        // Naviguer vers le dashboard avec le circle_id en paramètre
-        navigate(`/dashboard?circle_id=${circle.id}`);
+        handleSuccessRedirect(circle.id, circle.name || circle.senior_name);
     };
 
-    // 3. Créer un nouveau cercle
     const handleCreate = async (e) => {
         e.preventDefault();
+        if (loading) return; 
         if (!seniorData.name.trim()) return setError("Le nom est requis.");
 
         const payloadInfo = {
             ...seniorData,
-            medical_info: seniorData.medical_select.length > 0
-                ? seniorData.medical_select.join(', ')
-                : null
+            medical_info: seniorData.medical_select.length > 0 ? seniorData.medical_select.join(', ') : null
         };
         delete payloadInfo.medical_select;
 
+        setLoading(true);
+        setError('');
+
         try {
-            const data = await apiCall('/', 'POST', { senior_info: payloadInfo });
+            const data = await apiPost('/circles', { senior_info: payloadInfo });
+            
+            const finalId = data.circle_id || data.circle?.id || data.data?.id;
+            const finalName = data.circle_name || data.circle?.senior_name || data.data?.senior_name || seniorData.name;
 
-            if (data.circle_id || data.circle?.id) {
-                const finalId = data.circle_id || data.circle.id;
-                const finalName = data.circle_name || data.circle.senior_id || seniorData.name; // Fallback nom
-                const inviteCodeFromApi = data.invite_code || '';
-
-                localStorage.setItem('circle_id', finalId);
-                localStorage.setItem('circle_nom', finalName);
-                // Réinitialiser le tour onboarding
-                localStorage.removeItem('weave_onboarding_seen');
-                setCircleId(finalId);
-                setCircleNom(finalName);
-
-                // Mettre à jour l'utilisateur en local (pour que les rôles soient à jour)
-                try { await refreshUser(); } catch (e) { /* ignore */ }
-
-                // Redirige directement vers le dashboard du cercle créé
-                navigate(`/dashboard?circle_id=${finalId}`);
+            if (finalId) {
+                handleSuccessRedirect(finalId, finalName);
+            } else {
+                setLoading(false);
+                throw new Error("ID du cercle manquant dans la réponse");
             }
         } catch (err) {
-            // Erreur gérée dans apiCall
+            setLoading(false);
+            setError(err.message || "Erreur création");
         }
     };
 
-    // 4. Rejoindre un cercle via code
     const handleJoin = async (e) => {
         e.preventDefault();
+        if (loading) return;
         if (!inviteCode.trim()) return setError("Le code est requis.");
-
+        
+        setLoading(true);
+        setError('');
         try {
-            const data = await apiCall('/join', 'POST', { invite_code: inviteCode });
+            const data = await apiPost('/circles/join', { invite_code: inviteCode });
+            
+            const finalId = data.circle_id || data.circle?.id || data.data?.id;
+            const finalName = data.circle_name || data.circle?.senior_name || data.data?.senior_name || "Nouveau Cercle";
 
-            if (data.circle_id || data.circle?.id) {
-                const finalId = data.circle_id || data.circle.id;
-                // On essaie de récupérer le nom, sinon "Nouveau Cercle"
-                const finalName = data.circle_name || data.circle?.senior_name || "Mon Cercle";
-
-                localStorage.setItem('circle_id', finalId);
-                localStorage.setItem('circle_nom', finalName);
-                // Réinitialiser le tour onboarding
-                localStorage.removeItem('weave_onboarding_seen');
-                setCircleId(finalId);
-                setCircleNom(finalName);
-
-                // Mettre à jour l'utilisateur en local (pour que les rôles soient à jour)
-                try { await refreshUser(); } catch (e) { /* ignore */ }
-
-                // Redirige directement vers le dashboard du cercle rejoint
-                navigate(`/dashboard?circle_id=${finalId}`);
+            if (finalId) {
+                handleSuccessRedirect(finalId, finalName);
+            } else {
+                setLoading(false);
+                throw new Error("Erreur ID cercle");
             }
         } catch (err) {
-            // Erreur gérée
+            setLoading(false);
+            setError(err.message || "Code invalide");
         }
     };
 
@@ -196,7 +161,7 @@ export default function SelectCirclePage() {
 
                 <CardHeader className="text-center pb-6 space-y-2">
                     {view !== 'selection' && (
-                        <Button variant="ghost" onClick={() => setView('selection')} className="mb-2">
+                        <Button variant="ghost" onClick={() => { setView('selection'); setError(''); }} className="mb-2 self-start">
                             <ArrowLeft className="w-4 h-4 mr-2" /> Retour
                         </Button>
                     )}
@@ -211,7 +176,7 @@ export default function SelectCirclePage() {
                         {view === 'list' && "Sélectionnez le senior dont vous voulez voir le suivi."}
                     </CardDescription>
                 </CardHeader>
-
+                
                 <CardContent className="px-8 pb-10">
                     {error && (
                         <div className="mb-6 p-4 text-red-700 bg-red-100 rounded-lg text-sm font-medium border border-red-200 flex items-center">
@@ -221,16 +186,14 @@ export default function SelectCirclePage() {
 
                     {view === 'selection' && (
                         <div className="grid md:grid-cols-3 gap-4">
-                            {/* Option 1 : Voir mes cercles existants */}
                             <button onClick={handleViewList} className="flex flex-col items-center justify-center p-6 border-2 border-blue-100 rounded-xl bg-white hover:border-blue-500 hover:shadow-lg hover:-translate-y-1 transition-all group">
                                 <div className="p-3 bg-blue-50 rounded-full text-blue-600 mb-3 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                                     <LogIn className="w-8 h-8" />
                                 </div>
                                 <h3 className="text-lg font-bold text-gray-800 mb-1">Continuer</h3>
-                                <p className="text-center text-xs text-gray-500">Accéder à mes cercles existants.</p>
+                                <p className="text-center text-xs text-gray-500">Mes cercles existants.</p>
                             </button>
 
-                            {/* Option 2 : Créer */}
                             <button onClick={() => setView('create')} className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:border-green-500 hover:bg-green-50 hover:shadow-lg hover:-translate-y-1 transition-all group">
                                 <div className="p-3 bg-white rounded-full text-gray-500 mb-3 border border-gray-200 group-hover:border-green-500 group-hover:bg-green-500 group-hover:text-white transition-colors">
                                     <UserPlus className="w-8 h-8" />
@@ -239,13 +202,12 @@ export default function SelectCirclePage() {
                                 <p className="text-center text-xs text-gray-500">Je crée un dossier pour un proche.</p>
                             </button>
 
-                            {/* Option 3 : Rejoindre */}
                             <button onClick={() => setView('join')} className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:border-purple-500 hover:bg-purple-50 hover:shadow-lg hover:-translate-y-1 transition-all group">
                                 <div className="p-3 bg-white rounded-full text-gray-500 mb-3 border border-gray-200 group-hover:border-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-colors">
                                     <Users className="w-8 h-8" />
                                 </div>
                                 <h3 className="text-lg font-bold text-gray-800 mb-1">Invité</h3>
-                                <p className="text-center text-xs text-gray-500">J'ai reçu un code d'invitation.</p>
+                                <p className="text-center text-xs text-gray-500">J'ai un code.</p>
                             </button>
                         </div>
                     )}
@@ -255,13 +217,13 @@ export default function SelectCirclePage() {
                             {loading ? (
                                 <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-600 w-8 h-8" /></div>
                             ) : myCircles.length === 0 ? (
-                                <div className="text-center py-8 text-gray-500">Aucun cercle trouvé. Créez-en un ou rejoignez une équipe.</div>
+                                <div className="text-center py-8 text-gray-500">Aucun cercle trouvé.</div>
                             ) : (
-                                <div className="grid gap-3">
+                                <div className="grid gap-3 max-h-[400px] overflow-y-auto pr-2">
                                     {myCircles.map((circle) => (
-                                        <div key={circle.id} onClick={() => selectExistingCircle(circle)} className="flex items-center justify-between p-4 border rounded-lg hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-all bg-white shadow-sm">
+                                        <div key={circle.id} onClick={() => selectExistingCircle(circle)} className="flex items-center justify-between p-4 border rounded-lg hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-all bg-white shadow-sm group">
                                             <div className="flex items-center gap-3">
-                                                <div className="bg-blue-100 p-2 rounded-full text-blue-700">
+                                                <div className="bg-blue-100 p-2 rounded-full text-blue-700 group-hover:bg-blue-600 group-hover:text-white transition-colors">
                                                     <Users className="w-5 h-5" />
                                                 </div>
                                                 <div>
@@ -269,7 +231,7 @@ export default function SelectCirclePage() {
                                                     <p className="text-xs text-gray-500">Rôle: {circle.role || 'Membre'}</p>
                                                 </div>
                                             </div>
-                                            <ArrowRight className="w-5 h-5 text-gray-400" />
+                                            <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
                                         </div>
                                     ))}
                                 </div>
@@ -280,12 +242,13 @@ export default function SelectCirclePage() {
                     {view === 'create' && (
                         <form onSubmit={handleCreate} className="space-y-4 max-w-lg mx-auto">
                             <div className="space-y-2">
-                                <Label htmlFor="name">Nom complet du Bénéficiaire *</Label>
+                                <Label htmlFor="name">Nom du Bénéficiaire *</Label>
                                 <div className="relative">
                                     <Users className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
                                     <Input id="name" name="name" placeholder="ex: Mamie Jeanne" className="pl-10 h-12 bg-white" value={seniorData.name} onChange={handleSeniorChange} required autoFocus />
                                 </div>
                             </div>
+                            {/* ... (Reste du formulaire identique) ... */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="birth_date">Date de naissance</Label>
@@ -303,8 +266,7 @@ export default function SelectCirclePage() {
                                 </div>
                             </div>
                             <div className="space-y-3 pt-2">
-                                <Label className="flex items-center gap-2"><Stethoscope className="w-4 h-4 text-blue-600" /> Pathologies / Risques <span className="text-xs text-gray-500 font-normal">(optionnel)</span></Label>
-                                <p className="text-xs text-gray-500">Ces informations ne sont pas obligatoires.</p>
+                                <Label className="flex items-center gap-2"><Stethoscope className="w-4 h-4 text-blue-600" /> Pathologies / Risques</Label>
                                 <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                                     <div className="flex flex-wrap gap-2">
                                         {MEDICAL_OPTIONS.map((option) => {

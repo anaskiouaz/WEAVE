@@ -1,57 +1,45 @@
-import { useLocation, Link } from 'react-router-dom';
-import { Home, Calendar, Heart, MessageSquare, User, Settings } from 'lucide-react';
-import { useAuth } from '../../context/AuthContext'; 
+import { Link, useLocation } from 'react-router-dom';
+import { Home, Calendar, ClipboardList, MessageSquare, User } from 'lucide-react';
 
-export default function Navigation() {
-    const location = useLocation();
-    const { user } = useAuth(); 
+export default function MobileNavigation() {
+  const location = useLocation();
+  const currentPath = location.pathname;
 
-    // Bouton Admin affiché dans tous les cas
-    // (suppression de la vérification de rôle)
+  const isActive = (path) => currentPath === path;
 
-    // Liste de base
-    const navItems = [
-        { path: '/dashboard', label: 'Accueil', icon: Home },
-        { path: '/calendar', label: 'Calendrier', icon: Calendar },
-        { path: '/memories', label: 'Souvenirs', icon: Heart },
-        { path: '/messages', label: 'Messages', icon: MessageSquare },
-        { path: '/profile', label: 'Profil', icon: User },
-    ];
+  const navItems = [
+    { path: '/dashboard', icon: Home, label: 'Accueil' },
+    { path: '/tasks', icon: ClipboardList, label: 'Tâches' },
+    { path: '/calendar', icon: Calendar, label: 'Agenda' },
+    { path: '/messages', icon: MessageSquare, label: 'Messages' },
+    { path: '/profile', icon: User, label: 'Profil' },
+  ];
 
-    // Ajout inconditionnel du bouton Admin
-    navItems.push({ path: '/admin', label: 'Admin', icon: Settings });
-
-    return (
-        <div className="fixed bottom-6 left-0 right-0 px-4 flex justify-center z-50 pointer-events-none">
-            <div className="bg-white pointer-events-auto rounded-3xl shadow-xl px-2 py-2 flex items-center gap-1 sm:gap-2 border border-gray-100 max-w-fit overflow-x-auto no-scrollbar">
-                {navItems.map((item) => {
-                    const Icon = item.icon;
-                    const isActive = location.pathname === item.path;
-
-                    return (
-                        <Link
-                            key={item.path}
-                            to={item.path}
-                            className={`
-                                flex flex-col items-center justify-center
-                                px-3 py-2 rounded-xl transition-all duration-200
-                                min-w-[70px] sm:min-w-[80px]
-                                ${isActive
-                                    ? 'bg-blue-50 text-blue-600 border border-blue-200 shadow-sm'
-                                    : 'text-gray-500 hover:bg-gray-50 border border-transparent'
-                                }
-                            `}
-                        >
-                            <Icon
-                                className={`w-5 h-5 mb-1 ${isActive ? 'stroke-2' : 'stroke-[1.5]'}`}
-                            />
-                            <span className={`text-xs ${isActive ? 'font-semibold' : 'font-medium'}`}>
-                                {item.label}
-                            </span>
-                        </Link>
-                    );
-                })}
-            </div>
-        </div>
-    );
+  return (
+    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-50 pb-[env(safe-area-inset-bottom)] shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+      <div className="flex justify-around items-center h-16 px-2">
+        {navItems.map((item) => {
+          const active = isActive(item.path);
+          return (
+            <Link
+              key={item.path}
+              to={item.path}
+              className={`flex flex-col items-center justify-center w-full h-full space-y-1 transition-colors duration-200 ${
+                active ? 'text-blue-600' : 'text-gray-400 hover:text-gray-600'
+              }`}
+            >
+              <div className={`p-1.5 rounded-xl transition-all ${active ? 'bg-blue-50' : 'bg-transparent'}`}>
+                <item.icon 
+                  className={`w-6 h-6 ${active ? 'fill-blue-600/20 stroke-[2.5px]' : 'stroke-2'}`} 
+                />
+              </div>
+              <span className={`text-[10px] font-medium ${active ? 'font-bold' : ''}`}>
+                {item.label}
+              </span>
+            </Link>
+          );
+        })}
+      </div>
+    </nav>
+  );
 }
