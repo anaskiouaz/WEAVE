@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Copy, Check, Share2, Crown, Mail, Phone, Trash2, Shield, Clock, UserPlus, UserMinus, Image, MessageSquare, Calendar, Activity, AlertTriangle } from 'lucide-react';
+import { Users, Copy, Check, Share2, Crown, Mail, Phone, Trash2, Shield, Clock, UserPlus, UserMinus, Image, MessageSquare, Calendar, Activity, AlertTriangle, Star } from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
@@ -27,6 +27,12 @@ export default function Admin() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
+
+  // Rating modal state
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [selectedMember, setSelectedMember] = useState(null);
+  const [ratingData, setRatingData] = useState({ average: 0, total: 0, my: null, skills: [] });
+  const [pendingRating, setPendingRating] = useState(0);
 
   // Déterminer le cercle courant :
   // - si un `circleId` est sélectionné dans le contexte, on l'utilise
@@ -298,6 +304,42 @@ export default function Admin() {
                             <Phone className="w-3.5 h-3.5" /> {member.phone}
                           </div>
                         )}
+                        {/* Skills preview */}
+                        {Array.isArray(member.skills) && member.skills.length > 0 && (
+                          <div className="flex flex-wrap gap-1 pt-1">
+                            {member.skills.slice(0,4).map(s => (
+                              <span key={s} className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full border border-gray-200">{s}</span>
+                            ))}
+                            {member.skills.length > 4 && <span className="text-xs text-gray-400">+{member.skills.length-4}</span>}
+                          </div>
+                        )}
+                        {/* Only show rating button for helpers (not PC/beneficiary) and not for self */}
+                        {member.role === 'HELPER' && member.id !== user.id && (
+                          <button
+                            onClick={async () => {
+                              setSelectedMember(member);
+                              setShowRatingModal(true);
+                              try {
+                                const token = localStorage.getItem('weave_token');
+                                const res = await fetch(`${API_BASE_URL}/users/${member.id}/rating?circleId=${currentCircle.id}&raterId=${user.id}`, {
+                                  headers: { 'Authorization': `Bearer ${token}` }
+                                });
+                                if (res.ok) {
+                                  const data = await res.json();
+                                  setRatingData(data);
+                                  setPendingRating(data.my?.rating || 0);
+                                } else {
+                                  setRatingData({ average: 0, total: 0, my: null, skills: member.skills || [] });
+                                }
+                              } catch (e) {
+                                setRatingData({ average: 0, total: 0, my: null, skills: member.skills || [] });
+                              }
+                            }}
+                            className="mt-2 inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs font-medium"
+                          >
+                            <Star className="w-3.5 h-3.5" /> Voir compétences & noter
+                          </button>
+                        )}
                       </div>
                     </div>
                   </div>
@@ -478,6 +520,84 @@ export default function Admin() {
                     Supprimer définitivement
                   </>
                 )}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL NOTE MEMBRE --- */}
+      {showRatingModal && selectedMember && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-gray-100">
+              <h3 className="text-lg font-bold text-gray-900">Compétences & appréciation</h3>
+              <p className="text-sm text-gray-500">{selectedMember.name}</p>
+            </div>
+            <div className="p-6 space-y-4">
+              {/* Skills */}
+              {Array.isArray(ratingData.skills) && ratingData.skills.length > 0 ? (
+                <div className="flex flex-wrap gap-2">
+                  {ratingData.skills.map(s => (
+                    <span key={s} className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full border border-gray-200">{s}</span>
+                  ))}
+                </div>
+              ) : (
+                <div className="text-sm text-gray-400">Aucune compétence renseignée</div>
+              )}
+
+              {/* Average */}
+              <div className="flex items-center gap-2 text-sm text-gray-700">
+                <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
+                <span className="font-medium">{ratingData.average?.toFixed ? ratingData.average.toFixed(1) : ratingData.average} / 5</span>
+                <span className="text-gray-400">({ratingData.total} avis)</span>
+              </div>
+
+              {/* Your rating */}
+              <div>
+                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Votre note</label>
+                <div className="flex items-center gap-1">
+                  {[1,2,3,4,5].map(n => (
+                    <button key={n} onClick={() => setPendingRating(n)} className="p-1" aria-label={`Note ${n}`}>
+                      <Star className={`w-6 h-6 ${pendingRating >= n ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`} />
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="p-6 bg-gray-50 border-t border-gray-100 flex gap-3">
+              <button onClick={() => { setShowRatingModal(false); setSelectedMember(null); }} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium">Fermer</button>
+              <button
+                onClick={async () => {
+                  try {
+                    const token = localStorage.getItem('weave_token');
+                    const res = await fetch(`${API_BASE_URL}/users/${selectedMember.id}/rating`, {
+                      method: 'POST',
+                      headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ raterId: user.id, circleId: currentCircle.id, rating: pendingRating })
+                    });
+                    if (res.ok) {
+                      // Refresh average
+                      const r = await fetch(`${API_BASE_URL}/users/${selectedMember.id}/rating?circleId=${currentCircle.id}&raterId=${user.id}`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                      });
+                      if (r.ok) {
+                        const data = await r.json();
+                        setRatingData(data);
+                      }
+                      setShowRatingModal(false);
+                      setSelectedMember(null);
+                    } else {
+                      alert('Erreur lors de l\'enregistrement de la note');
+                    }
+                  } catch (e) {
+                    alert('Erreur réseau lors de la note');
+                  }
+                }}
+                disabled={!pendingRating}
+                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                Enregistrer
               </button>
             </div>
           </div>
