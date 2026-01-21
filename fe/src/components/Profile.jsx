@@ -350,6 +350,40 @@ export default function Profile() {
     navigate('/login');
   };
 
+  // --- SUPPRESSION COMPTE ---
+  const handleDeleteAccount = async () => {
+    if (!USER_ID) { alert('Utilisateur non connecté'); return; }
+    const ok = window.confirm("Confirmez-vous la suppression définitive de votre compte et de toutes vos données ? Cette action est irréversible.");
+    if (!ok) return;
+    setIsLoading(true);
+    try {
+      // Essaye d'appeler l'endpoint de consentement pour effacer les données (fallback utile si DELETE account non disponible)
+      const token = localStorage.getItem('weave_token');
+      const res = await fetch(buildApiUrl(`/users/${USER_ID}/consent`), {
+        method: 'PATCH',
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
+        },
+        body: JSON.stringify({ consent: false })
+      });
+
+      if (!res.ok) {
+        const err = await res.json().catch(() => null);
+        throw new Error(err?.error || 'Erreur serveur lors de la suppression');
+      }
+
+      alert('Votre compte et vos données personnelles ont été effacés. Vous allez être déconnecté.');
+      logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Erreur suppression compte:', error);
+      alert(`Impossible de supprimer le compte : ${error.message}`);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
   if (isLoading) return <div className="p-10 flex justify-center h-screen items-center"><Loader2 className="animate-spin text-blue-600 w-10 h-10"/></div>;
 
   return (
@@ -574,6 +608,14 @@ export default function Profile() {
             </button>
 
             {/* DÉCONNEXION */}
+            <button 
+              onClick={handleDeleteAccount}
+              className="flex items-center gap-3 text-red-600 hover:text-red-700 hover:bg-red-50 p-2 rounded-lg transition-colors w-full text-left pt-4 border-t border-gray-100 mt-2"
+            >
+              <Trash2 size={20} />
+              <span className="font-medium text-lg">Supprimer mon compte et toutes mes données</span>
+            </button>
+
             <button 
               onClick={handleLogout}
               className="flex items-center gap-3 text-orange-600 hover:text-orange-700 hover:bg-orange-50 p-2 rounded-lg transition-colors w-full text-left pt-4 border-t border-gray-100 mt-2"
