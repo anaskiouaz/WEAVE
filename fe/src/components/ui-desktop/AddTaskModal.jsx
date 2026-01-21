@@ -1,16 +1,11 @@
 import { useState, useEffect } from 'react';
-import { X, ShoppingCart, Stethoscope, Activity, Calendar, Clock, Users } from 'lucide-react';
+import { X, Calendar, Clock, Users } from 'lucide-react';
+import { SKILL_OPTIONS } from '../../constants/skills';
 
-const TASK_TYPES = {
-    medical: { label: 'Médical', icon: Stethoscope, color: 'text-rose-600', bg: 'bg-rose-50', border: 'border-rose-200', activeRing: 'ring-rose-500' },
-    shopping: { label: 'Courses', icon: ShoppingCart, color: 'text-indigo-600', bg: 'bg-indigo-50', border: 'border-indigo-200', activeRing: 'ring-indigo-500' },
-    activity: { label: 'Activité', icon: Activity, color: 'text-emerald-600', bg: 'bg-emerald-50', border: 'border-emerald-200', activeRing: 'ring-emerald-500' },
-};
-
-export default function AddTaskModal({ isOpen, onClose, onSave, prefillDate }) {
+export default function AddTaskModal({ isOpen, onClose, onSave, prefillDate, skills = [] }) {
     const [formData, setFormData] = useState({
         title: '',
-        type: 'activity',
+        type: '',
         date: new Date().toISOString().split('T')[0],
         time: '',
         required_helpers: 1,
@@ -23,6 +18,21 @@ export default function AddTaskModal({ isOpen, onClose, onSave, prefillDate }) {
             setFormData(prev => ({ ...prev, date: prefillDate }));
         }
     }, [isOpen, prefillDate]);
+
+    // Définir la compétence par défaut quand la modale s'ouvre ou que la liste change
+    useEffect(() => {
+        if (!isOpen) return;
+        // Merge master list with dynamic backend list and dedupe
+        const merged = Array.from(new Set([...(Array.isArray(skills) ? skills : []), ...SKILL_OPTIONS]
+          .map(s => (typeof s === 'string' ? s.trim() : ''))
+          .filter(Boolean)
+        ));
+        const defaultList = merged.length > 0 ? merged : ['Autre'];
+        const current = formData.type;
+        if (!current || ![...defaultList, 'Autre'].includes(current)) {
+            setFormData(prev => ({ ...prev, type: defaultList[0] || 'Autre' }));
+        }
+    }, [isOpen, skills]);
 
     const handleSubmit = (e) => {
         e.preventDefault();
@@ -64,30 +74,27 @@ export default function AddTaskModal({ isOpen, onClose, onSave, prefillDate }) {
                         />
                     </div>
 
-                    {/* 2. Type de tâche (Sélecteur visuel) */}
+                    {/* 2. Type de tâche (liste de compétences) */}
                     <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-2">Type</label>
-                        <div className="grid grid-cols-3 gap-3">
-                            {Object.entries(TASK_TYPES).map(([key, conf]) => {
-                                const Icon = conf.icon;
-                                const isActive = formData.type === key;
-                                return (
-                                    <button
-                                        key={key}
-                                        type="button"
-                                        onClick={() => setFormData({ ...formData, type: key })}
-                                        className={`flex flex-col items-center gap-2 p-3 rounded-xl border transition-all duration-200
-                      ${isActive
-                                                ? `${conf.bg} ${conf.border} ${conf.color} ring-2 ${conf.activeRing} ring-offset-1`
-                                                : 'bg-white border-slate-200 text-slate-500 hover:bg-slate-50 hover:border-slate-300'
-                                            }`}
-                                    >
-                                        <Icon className="w-6 h-6" />
-                                        <span className="text-xs font-bold">{conf.label}</span>
-                                    </button>
-                                );
-                            })}
-                        </div>
+                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Type (Compétence)</label>
+                        {(() => {
+                            const merged = Array.from(new Set([...(Array.isArray(skills) ? skills : []), ...SKILL_OPTIONS]
+                              .map(s => (typeof s === 'string' ? s.trim() : ''))
+                              .filter(Boolean)
+                            ));
+                            const withOther = merged.includes('Autre') ? merged : [...merged, 'Autre'];
+                            return (
+                        <select
+                            className="w-full p-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50"
+                            value={formData.type}
+                            onChange={e => setFormData({ ...formData, type: e.target.value })}
+                        >
+                            {withOther.map((opt) => (
+                                <option key={opt} value={opt}>{opt}</option>
+                            ))}
+                        </select>
+                            );
+                        })()}
                     </div>
 
                     {/* 3. Date et Heure */}
@@ -106,11 +113,12 @@ export default function AddTaskModal({ isOpen, onClose, onSave, prefillDate }) {
                             </div>
                         </div>
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Heure (Optionnel)</label>
+                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-wide mb-1.5">Heure</label>
                             <div className="relative">
                                 <Clock className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
                                 <input
                                     type="time"
+                                    required
                                     className="w-full pl-10 p-3 bg-white border border-slate-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500/50"
                                     value={formData.time}
                                     onChange={e => setFormData({ ...formData, time: e.target.value })}

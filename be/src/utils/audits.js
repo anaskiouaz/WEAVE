@@ -40,4 +40,8 @@ export const AUDIT_ACTIONS = {
     // Tâches/Activités
     TASK_VOLUNTEERED: 'TASK_VOLUNTEERED',
     TASK_WITHDRAWN: 'TASK_WITHDRAWN',
+    TASK_PASSED: 'TASK_PASSED',
+    
+    // Messages
+    MESSAGE_SENT: 'MESSAGE_SENT',
 };

@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import { pool } from '../config/db.js';
 import { authenticateToken } from '../middleware/auth.js';
+import { logAudit, AUDIT_ACTIONS } from '../utils/audits.js';
 
 const router = Router();
 
@@ -58,6 +59,20 @@ router.post('/:id/messages', async (req, res) => {
         sender_name: authorInfo.name,
         profile_photo: authorInfo.profile_photo
     };
+
+    // B bis. LOG AUDIT (non bloquant)
+    try {
+        const convInfo = await pool.query('SELECT cercle_id FROM conversation WHERE id = $1', [id]);
+        const circleId = convInfo.rows[0]?.cercle_id || null;
+        await logAudit(
+            authorId,
+            AUDIT_ACTIONS.MESSAGE_SENT,
+            `${authorInfo.name} a envoyé un message`,
+            circleId
+        );
+    } catch (auditErr) {
+        console.error('Erreur audit message:', auditErr);
+    }
 
     // C. SOCKET.IO - LA PARTIE CRITIQUE
     // On récupère l'instance stockée dans server.js

@@ -74,11 +74,14 @@ router.post('/', authenticateToken, async (req, res) => {
       return res.status(400).json({ error: "Le nom du bénéficiaire est requis." });
     }
 
+    // Exiger un email pour le bénéficiaire
+    if (!senior_info.email || !senior_info.email.trim()) {
+      return res.status(400).json({ error: "L'email du bénéficiaire est requis." });
+    }
+
     await client.query('BEGIN');
 
     // A. CRÉER LE COMPTE SENIOR
-    const fakeEmail = `senior.${Date.now()}@weave.local`;
-    const emailToUse = senior_info.email || fakeEmail;
     const dummyPassword = await bcrypt.hash("WeaveSeniorInit!", 10);
 
     const userRes = await client.query(
@@ -87,7 +90,7 @@ router.post('/', authenticateToken, async (req, res) => {
        RETURNING id`,
       [
         senior_info.name,
-        emailToUse,
+        senior_info.email,
         dummyPassword,
         senior_info.birth_date || null,
         senior_info.phone || null,

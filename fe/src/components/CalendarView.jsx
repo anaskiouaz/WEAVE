@@ -105,10 +105,21 @@ export default function CalendarView() {
   const [tasks, setTasks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [notification, setNotification] = useState({ type: null, message: null });
+  const [circleMemberSkills, setCircleMemberSkills] = useState([]);
 
   const showNotification = (type, message) => {
     setNotification({ type, message });
     setTimeout(() => setNotification({ type: null, message: null }), 4000);
+  };
+
+  // Charger la liste de toutes les compétences possibles pour alimenter la liste des types de tâches
+  const loadCircleSkills = async () => {
+    try {
+      const allSkills = await apiGet(`/skills`);
+      setCircleMemberSkills(Array.isArray(allSkills) ? allSkills : []);
+    } catch (e) {
+      console.error('Erreur chargement compétences', e);
+    }
   };
 
   const loadTasks = async () => {
@@ -122,7 +133,10 @@ export default function CalendarView() {
     finally { setLoading(false); }
   };
 
-  useEffect(() => { loadTasks(); }, [circleId]);
+  useEffect(() => { 
+    loadTasks(); 
+    loadCircleSkills();
+  }, [circleId]);
 
   const weekDays = useMemo(() => {
     const d = new Date(currentDate);
@@ -143,9 +157,15 @@ export default function CalendarView() {
   // Grouper les tâches par date (YYYY-MM-DD) et trier par date+heure
   const groupedTasks = useMemo(() => {
     const sorted = tasks.slice().sort((a, b) => {
-      const da = new Date(a.date).getTime() + (a.time ? (parseInt(a.time.slice(0,2), 10) * 3600000 + parseInt(a.time.slice(3,5), 10) * 60000) : 0);
-      const db = new Date(b.date).getTime() + (b.time ? (parseInt(b.time.slice(0,2), 10) * 3600000 + parseInt(b.time.slice(3,5), 10) * 60000) : 0);
-      return da - db;
+      // Utiliser directement les strings de date sans conversion Date() pour éviter les décalages timezone
+      const dateA = a.date.split('T')[0];
+      const dateB = b.date.split('T')[0];
+      const timeA = a.time || '00:00';
+      const timeB = b.time || '00:00';
+      
+      // Comparer d'abord par date, puis par heure
+      if (dateA !== dateB) return dateA.localeCompare(dateB);
+      return timeA.localeCompare(timeB);
     });
     return sorted.reduce((acc, t) => {
       const d = (t.date || '').split('T')[0];
@@ -286,7 +306,10 @@ export default function CalendarView() {
               {weekDays.map(day => (
                 <DayColumn
                   key={day.dateISO} dayInfo={day}
-                  tasks={tasks.filter(t => t.date.split('T')[0] === day.dateISO)}
+                  tasks={tasks.filter(t => {
+                    const taskDate = t.date.split('T')[0];
+                    return taskDate === day.dateISO;
+                  })}
                   isToday={day.dateISO === new Date().toISOString().split('T')[0]}
                   onTaskClick={setSelectedTask}
                   onAddTask={openAddModal}
@@ -302,7 +325,7 @@ export default function CalendarView() {
                   <div key={date} className="bg-white rounded-2xl shadow-sm border p-4">
                     <div className="flex items-center justify-between mb-3">
                       <div>
-                        <div className="text-sm font-bold">{new Date(date).toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
+                        <div className="text-sm font-bold">{new Date(date + 'T00:00:00').toLocaleDateString('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' })}</div>
                         <div className="text-xs text-slate-400">{date}</div>
                       </div>
                       <div>
@@ -329,6 +352,7 @@ export default function CalendarView() {
           onClose={() => setShowAddTask(false)}
           onSave={handleCreateTask}
           prefillDate={addTaskDate}
+          skills={circleMemberSkills}
         />
 
         {/* 2. Détails d'une tâche */}
