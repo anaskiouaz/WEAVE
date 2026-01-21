@@ -40,6 +40,23 @@ export default function Profile() {
   const hours = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
   const availableSkillsList = ['Courses', 'Cuisine', 'Accompagnement médical', 'Promenade', 'Lecture', 'Jardinage', 'Bricolage'];
 
+  // Helpers locaux pour construire proprement les URLs (évite /api/api)
+  const buildApiUrl = (p) => {
+    const raw = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+    let host = raw.replace(/\/$/, '');
+    if (host.endsWith('/api')) host = host.slice(0, -4);
+    const path = p.startsWith('/') ? p.slice(1) : p;
+    return `${host}/api/${path}`;
+  };
+
+  const buildFilesUrl = (p) => {
+    const raw = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+    let host = raw.replace(/\/$/, '');
+    if (host.endsWith('/api')) host = host.slice(0, -4);
+    const path = p.startsWith('/') ? p.slice(1) : p;
+    return `${host}/${path}`;
+  };
+
   useEffect(() => {
     if (USER_ID) {
         setIsLoading(true);
@@ -78,7 +95,7 @@ export default function Profile() {
           address: userData.address || '',
           joinDate: createdDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
           yearsActive: 0,  // Sera mis à jour par les stats
-          photoUrl: userData.profile_photo ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'}/uploads/${userData.profile_photo}` : null
+          photoUrl: userData.profile_photo ? buildFilesUrl(`/uploads/${userData.profile_photo}`) : null
         });
 
         // Formatage des disponibilités
@@ -134,9 +151,8 @@ export default function Profile() {
       const formData = new FormData();
       formData.append('image', file);
 
-      // 3. Uploader vers le backend
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
-      const uploadResponse = await fetch(`${API_BASE_URL}/api/upload/image`, {
+      // 3. Uploader vers le backend (utilise buildApiUrl pour éviter /api/api)
+      const uploadResponse = await fetch(buildApiUrl('/upload/image'), {
         method: 'POST',
         body: formData,
       });
@@ -157,8 +173,8 @@ export default function Profile() {
       }, options);
 
       if (saveResponse.success) {
-        // 5. Mettre à jour l'URL avec le blob final
-        const photoUrl = `${API_BASE_URL}/uploads/${uploadData.data.blobName}`;
+        // 5. Mettre à jour l'URL avec le blob final (fichiers servis hors /api)
+        const photoUrl = buildFilesUrl(`/uploads/${uploadData.data.blobName}`);
         setUserInfo({ ...userInfo, photoUrl });
         alert('Photo de profil mise à jour avec succès!');
       }
