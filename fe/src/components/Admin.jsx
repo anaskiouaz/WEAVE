@@ -5,7 +5,11 @@ import { useAuth } from '../context/AuthContext';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
-// Mapping des actions pour affichage
+/*
+ * Config d'affichage des logs d'activité
+ * Chaque action du backend (AUDIT_ACTIONS) a son style ici
+ * Pour ajouter une action : 1) l'ajouter dans audits.js 2) l'ajouter ici
+ */
 const ACTION_CONFIG = {
   MEMBER_JOINED: { icon: UserPlus, color: 'bg-green-100 text-green-600', label: 'Nouveau membre' },
   MEMBER_REMOVED: { icon: UserMinus, color: 'bg-red-100 text-red-600', label: 'Membre retiré' },
@@ -24,6 +28,7 @@ export default function Admin() {
   const [loading, setLoading] = useState(true);
   const [activityLogs, setActivityLogs] = useState([]);
   const [logsLoading, setLogsLoading] = useState(true);
+  
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
@@ -34,23 +39,23 @@ export default function Admin() {
   const [ratingData, setRatingData] = useState({ average: 0, total: 0, my: null, skills: [] });
   const [pendingRating, setPendingRating] = useState(0);
 
-  // Déterminer le cercle courant :
-  // - si un `circleId` est sélectionné dans le contexte, on l'utilise
-  // - sinon on prend le premier cercle où l'utilisateur est membre (peu importe le rôle)
+  /*
+   * Récupère le cercle sélectionné dans user.circles
+   * Un user peut être ADMIN dans un cercle et HELPER dans un autre
+   * On doit donc récupérer son rôle pour LE cercle actuellement affiché
+   */
   const currentCircle = (circleId && user?.circles?.find(c => String(c.id ?? c.circle_id) === String(circleId)))
     || (Array.isArray(user?.circles) ? user.circles[0] : null);
 
   const currentCircleId = currentCircle?.id ?? currentCircle?.circle_id;
   const currentCircleName = currentCircle?.senior_name || currentCircle?.name;
 
-  // Rôle courant dans le cercle (pour limiter les actions sensibles aux admins)
+  // Rôle dans ce cercle : ADMIN (créateur), HELPER (aidant), PC (bénéficiaire)
   const currentRole = (currentCircle?.role || '').toUpperCase();
-  const isAdmin = currentRole === 'ADMIN' || currentRole === 'SUPERADMIN';
-
-  // Récupérer le code d'invitation du cercle courant
+  const isAdmin = currentRole === 'ADMIN' || currentRole === 'SUPERADMIN'; // Seuls eux peuvent gérer le cercle
   const inviteCode = currentCircle?.invite_code || '...';
 
-  // 2. Récupérer la vraie liste des membres au chargement
+  // Charge membres + logs quand on change de cercle
   useEffect(() => {
     if (currentCircleId) {
       fetchMembers(currentCircleId);
@@ -78,6 +83,7 @@ export default function Admin() {
     }
   };
 
+  // Récupère les logs d'activité du cercle (GET /circles/:id/logs)
   const fetchActivityLogs = async (circleId) => {
     try {
       const token = localStorage.getItem('weave_token');
@@ -95,12 +101,11 @@ export default function Admin() {
     }
   };
 
+  // Formate la date en "Il y a X min", "Hier à 10:00", etc.
   const formatTimeAgo = (dateString) => {
     const date = new Date(dateString);
     const now = new Date();
     const diffInSeconds = Math.floor((now - date) / 1000);
-
-    // Formater l'heure
     const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
     if (diffInSeconds < 60) return `À l'instant (${timeStr})`;
