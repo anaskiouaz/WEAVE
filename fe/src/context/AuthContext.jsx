@@ -1,113 +1,91 @@
 import { createContext, useContext, useState, useEffect } from 'react';
-import { apiPost } from '../api/client';
+import { apiPost, apiGet } from '../api/client';
+import { io } from 'socket.io-client';
+
+// URL du socket (dérivée de l'API URL)
+const SOCKET_URL = import.meta.env.VITE_API_BASE_URL 
+  ? import.meta.env.VITE_API_BASE_URL.replace('/api', '') 
+  : 'http://localhost:4000';
 
 export const AuthContext = createContext(null);
 
 export const AuthProvider = ({ children }) => {
-  // 1. INITIALISATION DIRECTE (Plus simple & plus rapide)
-  // On regarde directement dans le localStorage au démarrage. 
-  // Si c'est là, on le met dans le state tout de suite.
+  // 1. CHARGEMENT IMMÉDIAT (Synchrone)
+  // On lit le localStorage tout de suite pour que l'app mobile ne clignote pas sur "Login"
   const [token, setToken] = useState(() => localStorage.getItem('weave_token'));
   const [user, setUser] = useState(() => {
-    const saved = localStorage.getItem('weave_user');
-    return saved ? JSON.parse(saved) : null;
+    try {
+        const saved = localStorage.getItem('weave_user');
+        return saved ? JSON.parse(saved) : null;
+    } catch { return null; }
   });
-  // `circleId` and `circleNom` are normally set when the user selects a circle
-  // (via `SelectCirclePage`). Read them from localStorage on init so the
-  // context is usable after a full page reload. Keep localStorage in sync
-  // whenever the app updates the circle.
-  const [circleId, setCircleId] = useState(() => {
-    try { return localStorage.getItem('circle_id') || null; } catch { return null; }
-  });
-  const [circleNom, setCircleNom] = useState(() => {
-    try { return localStorage.getItem('circle_nom') || null; } catch { return null; }
-  });
-  // si local storage est vide, ce sera null par défaut
-
+  
+  // États du cercle
+  const [circleId, setCircleIdState] = useState(() => localStorage.getItem('circle_id'));
+  const [circleNom, setCircleNomState] = useState(() => localStorage.getItem('circle_nom')); // AJOUTÉ
+  
   const [loading, setLoading] = useState(false);
 
-  // 2. FONCTION UTILITAIRE (Pour éviter de répéter le code)
-  // Sert à sauvegarder les infos du cercle partout en même temps
-  const saveCircleData = (id, nom) => {
+  // Setters avec persistance localStorage
+  const setCircleId = (id) => {
     if (id) {
-      setCircleId(id);
-      try { localStorage.setItem('circle_id', id); } catch { }
-    }
-    if (nom) {
-      setCircleNom(nom);
-      try { localStorage.setItem('circle_nom', nom); } catch { }
+        localStorage.setItem('circle_id', id);
+        setCircleIdState(id);
+    } else {
+        localStorage.removeItem('circle_id');
+        setCircleIdState(null);
     }
   };
 
-  // 3. LOGIN
+  // --- FONCTION MANQUANTE AJOUTÉE ---
+  const setCircleNom = (nom) => {
+    if (nom) {
+        localStorage.setItem('circle_nom', nom);
+        setCircleNomState(nom);
+    } else {
+        localStorage.removeItem('circle_nom');
+        setCircleNomState(null);
+    }
+  };
+
+  // --- ACTIONS ---
   const login = async (email, password) => {
     setLoading(true);
     try {
-      const data = await apiPost('/auth/login', { email, password });
+      const data = await apiPost('/auth/login', { email, password });      
       if (data.success) {
-        // Mise à jour du Token et User
-        setToken(data.token);
-        setUser(data.user);
         localStorage.setItem('weave_token', data.token);
         localStorage.setItem('weave_user', JSON.stringify(data.user));
-
-        // Le cercle n'est pas initialisé ici : la sélection doit se faire
-        // uniquement depuis la page de sélection.
-
+        
+        setToken(data.token);
+        setUser(data.user);
+        
+        // Si le backend renvoie déjà les infos du cercle
+        if (data.circle_id) setCircleId(data.circle_id);
+        if (data.circle_nom) setCircleNom(data.circle_nom);
+        
         return { success: true };
       }
     } catch (error) {
-      console.error("Erreur auth:", error);
       return { success: false, error: error.message };
     } finally {
       setLoading(false);
     }
   };
 
-  // 6. Rafraîchir les données utilisateur depuis le backend
-  const refreshUser = async () => {
-    const t = localStorage.getItem('weave_token') || token;
-    if (!t) return null;
-    try {
-      const API_BASE = import.meta.env.VITE_API_BASE_URL || '/api';
-      const res = await fetch(`${API_BASE}/auth/me`, {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${t}` }
-      });
-      if (!res.ok) return null;
-      const data = await res.json();
-      if (data && data.user) {
-        setUser(data.user);
-        try { localStorage.setItem('weave_user', JSON.stringify(data.user)); } catch { }
-        return data.user;
-      }
-    } catch (err) {
-      console.error('refreshUser failed', err);
-      return null;
-    }
-    return null;
-  };
-
-  // 4. LOGOUT (Nettoyage complet)
   const logout = () => {
-    // Remove only auth-related keys to avoid deleting unrelated data
-    try {
-      localStorage.removeItem('weave_token');
-      localStorage.removeItem('weave_user');
-      localStorage.removeItem('circle_id');
-      localStorage.removeItem('circle_nom');
-    } catch { }
+    console.log("Déconnexion demandée");
+    localStorage.clear();
     setToken(null);
     setUser(null);
     setCircleId(null);
     setCircleNom(null);
   };
 
-  // 5. FONCTION D'INSCRIPTION (Register)
   const register = async (userData) => {
     setLoading(true);
     try {
-      const data = await apiPost('/users', userData);
+      const data = await apiPost('/auth/register', userData);
       return { success: data.success };
     } catch (error) {
       return { success: false, error: error.message };
@@ -116,56 +94,55 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  // NOTE: Synchronisation automatique supprimée — le cercle doit être choisi
-  // explicitement par l'utilisateur depuis `SelectCirclePage`.
-
-  // Keep in sync across tabs: if another tab changes localStorage, reflect it here.
+  // --- RESTAURATION DE SESSION ---
   useEffect(() => {
-    const onStorage = (e) => {
-      if (!e.key) return;
-      if (e.key === 'circle_id') {
-        setCircleId(e.newValue || null);
-      }
-      if (e.key === 'circle_nom') {
-        setCircleNom(e.newValue || null);
-      }
+    const verifySession = async () => {
+        if (!token) return;
+
+        try {
+            const res = await apiGet('/users/me');
+            if (res.success) {
+                setUser(res.user);
+                localStorage.setItem('weave_user', JSON.stringify(res.user));
+                
+                // Mise à jour si le user a un cercle actif dans la DB
+                if (res.user.current_circle_id) {
+                    setCircleId(res.user.current_circle_id);
+                }
+            }
+        } catch (err) {
+            console.warn("⚠️ Vérification session échouée :", err.message);
+            if (err.message.includes('401') || err.message.includes('403')) {
+                logout();
+            }
+        }
     };
 
-    window.addEventListener('storage', onStorage);
-    return () => window.removeEventListener('storage', onStorage);
-  }, []);
+    verifySession();
+  }, [token]);
+
+  // --- SOCKET.IO ---
+  useEffect(() => {
+    if (!token || !circleId) return;
+
+    const socket = io(SOCKET_URL);
+    socket.emit('join_circle', circleId);
+
+    socket.on('notification', (data) => {
+        console.log("🔔 Notif reçue:", data);
+        // Ici tu peux ajouter une logique pour afficher un badge ou autre
+    });
+
+    return () => {
+        socket.disconnect();
+    };
+  }, [token, circleId]);
 
   return (
     <AuthContext.Provider value={{
-      user, token, circleId, circleNom,
+      user, token, circleId, circleNom, // On expose circleNom
       login, register, logout, loading,
-      // Expose a combined setter that updates both values atomically
-      setCircle: (id, nom) => {
-        if (id) {
-          setCircleId(id);
-          try { localStorage.setItem('circle_id', id); } catch { }
-        }
-        if (nom) {
-          setCircleNom(nom);
-          try { localStorage.setItem('circle_nom', nom); } catch { }
-        }
-      },
-      // Individual setters for backward compatibility
-      setCircleId: (id) => {
-        if (id) {
-          setCircleId(id);
-          try { localStorage.setItem('circle_id', id); } catch { }
-        }
-      },
-      setCircleNom: (nom) => {
-        if (nom) {
-          setCircleNom(nom);
-          try { localStorage.setItem('circle_nom', nom); } catch { }
-        }
-      },
-      // Expose setUser and refresh helper so pages can update context after actions
-      setUser,
-      refreshUser,
+      setUser, setCircleId, setCircleNom // On expose setCircleNom (C'EST ÇA QUI MANQUAIT)
     }}>
       {children}
     </AuthContext.Provider>

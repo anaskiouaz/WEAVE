@@ -2,27 +2,15 @@ import { Router } from 'express';
 import bcrypt from 'bcryptjs';
 import db from '../config/db.js';
 import { encrypt } from '../utils/crypto.js';
-import checkRole from '../middleware/checkRole.js'; // Peut ne pas exister, pas grave
 import { logAudit } from '../utils/audits.js';
-
 
 const router = Router();
 
-// 1. GET ALL USERS
-router.get('/', async (req, res) => {
-  try {
-    const currentUserId = req.headers['x-user-id'] || 'ANONYMOUS';
-    if (typeof logAudit === 'function') await logAudit(currentUserId, 'ACCESS_ALL_USERS', 'Consultation liste');
-    
-        const result = await db.query('SELECT id, name, email, role_global, created_at, privacy_consent FROM users ORDER BY created_at DESC');
-    res.json({ success: true, count: result.rows.length, users: result.rows });
-  } catch (error) {
-    console.error('❌ Erreur GET users:', error);
-    res.status(500).json({ success: false, error: error.message });
-  }
-});
+// =============================================================================
+// ⚠️ ZONE 1 : ROUTES SPÉCIFIQUES (DOIVENT ÊTRE EN PREMIER)
+// =============================================================================
 
-// 2. AUDIT LOGS
+// 2. AUDIT LOGS (GET)
 router.get('/audit-logs', async (req, res) => {
     try {
         const { userId } = req.query; 
@@ -37,11 +25,10 @@ router.get('/audit-logs', async (req, res) => {
     }
 });
 
-// 2bis. ENREGISTRER UN LOG D'AUDIT (utilisé par le front pour poster des événements)
+// 3. AUDIT LOGS (POST)
 router.post('/audit-logs', async (req, res) => {
     try {
         const { userId, action, details, circleId } = req.body;
-        // appel non bloquant — on renvoie OK même si le log échoue
         try {
             if (typeof logAudit === 'function') await logAudit(userId || null, action || 'UNKNOWN', details || '', circleId || null);
         } catch (err) {
@@ -53,38 +40,7 @@ router.post('/audit-logs', async (req, res) => {
     }
 });
 
-// 3. INSCRIPTION (FUSIONNÉE)
-router.post('/', async (req, res) => {
-    const { name, email, password, phone, birth_date, medical_info, consent } = req.body;
-  if (!name || !email || !password) return res.status(400).json({ success: false, error: "Champs manquants" });
-
-  try {
-    const salt = await bcrypt.genSalt(10);
-    const passwordHash = await bcrypt.hash(password, salt);
-
-    let finalMedicalInfo = null;
-    let finalConsent = consent === true;
-    if (medical_info) {
-        try { finalMedicalInfo = encrypt(medical_info); } catch (e) { console.error(e); }
-    }
-
-        const query = `
-            INSERT INTO users (name, email, password_hash, phone, birth_date, medical_info, privacy_consent) 
-            VALUES ($1, $2, $3, $4, $5, $6, $7) 
-            RETURNING id, name, email, role_global, created_at
-        `;
-        const result = await db.query(query, [name, email, passwordHash, phone, birth_date, finalMedicalInfo, finalConsent]);
-    
-    if (typeof logAudit === 'function') await logAudit(result.rows[0].id, 'USER_REGISTERED', 'Nouvelle inscription');
-    res.status(201).json({ success: true, user: result.rows[0] });
-
-  } catch (error) {
-    if (error.code === '23505') return res.status(409).json({ success: false, error: "Email déjà utilisé." });
-    res.status(500).json({ success: false, error: error.message });
-    }
-});
-
-// 4. CONSENTEMENT
+// 4. CONSENTEMENT (PATCH)
 router.patch('/:id/consent', async (req, res) => {
     try {
         const { id } = req.params;
@@ -99,7 +55,6 @@ router.patch('/:id/consent', async (req, res) => {
     } catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 
-//
 // --- ENREGISTREMENT DU TOKEN ---
 router.post('/device-token', async (req, res) => {
     const { userId, token } = req.body;

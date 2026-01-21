@@ -52,7 +52,7 @@ const Sidebar = ({
     useEffect(() => {
         if (!showModal) return;
         console.log('Sidebar: modal opened; user.circles=', user?.circles, 'auth.circleId=', circleId);
-        const resolved = circleId || (user && user.circles && user.circles.length > 0 ? user.circles[0].id : localStorage.getItem('circle_id'));
+        const resolved = circleId || (user && user.circles && user.circles.length > 0 ? user.circles[0].id : null);
         const targetCircleId = resolved;
         console.log('Sidebar: resolved targetCircleId=', targetCircleId);
         if (!targetCircleId) { setLoadingMembers(false); return; }

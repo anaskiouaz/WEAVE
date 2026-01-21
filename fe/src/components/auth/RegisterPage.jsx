@@ -5,126 +5,266 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Loader2, Eye, EyeOff, ShieldCheck, X, FileText } from 'lucide-react';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
   const { register, login, loading } = useAuth();
   const [error, setError] = useState('');
+
+  // --- ÉTATS ---
   const [showPassword, setShowPassword] = useState(false);
   const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
-  // Ajout du champ confirmPassword dans l'état
+  // État du formulaire avec Nom et Prénom séparés
   const [formData, setFormData] = useState({
-    name: '',
+    firstname: '',
+    lastname: '',
     email: '',
-    password: '',
-    confirmPassword: '',
     phone: '',
     birth_date: '',
-    // onboarding_role removed: role is assigned via circles/user_roles
+    password: '',
+    confirmPassword: '',
   });
 
+  // États pour le RGPD (Modale & Consentements)
+  const [showPrivacyModal, setShowPrivacyModal] = useState(false);
+  const [hasScrolledToBottom, setHasScrolledToBottom] = useState(false);
+  const [consents, setConsents] = useState({
+    acceptCGU: false,
+    acknowledgePrivacy: false,
+    consentSensitive: false,
+    acceptNotifications: false, // Optionnel
+    acceptCommunications: false // Optionnel
+  });
+
+  // --- LOGIQUE FORMULAIRE ---
   const handleChange = (e) => {
     const { name, value } = e.target;
-    
-    // Formatage automatique du numéro de téléphone
+
+    // Formatage automatique du téléphone (06 12 34 56 78)
     if (name === 'phone') {
-      // Retirer tous les caractères non-numériques
-      const onlyNums = value.replace(/\D/g, '');
-      
-      // Limiter à 10 chiffres
-      const limited = onlyNums.slice(0, 10);
-      
-      // Formater : XX XX XX XX XX
-      let formatted = '';
-      for (let i = 0; i < limited.length; i++) {
-        if (i > 0 && i % 2 === 0) formatted += ' ';
-        formatted += limited[i];
-      }
-      
+      const formatted = value
+        .replace(/\D/g, '')             // Enlève ce qui n'est pas un chiffre
+        .slice(0, 10)                   // Limite à 10 chiffres
+        .replace(/(\d{2})(?=\d)/g, '$1 ') // Ajoute les espaces
+        .trim();
       setFormData({ ...formData, phone: formatted });
     } else {
       setFormData({ ...formData, [name]: value });
     }
   };
-  // handleSelectChange removed (no role selection at registration)
 
-  // Fonction de validation du mot de passe
-  const validatePassword = (password) => {
-    const minLength = 8;
-    const hasUpperCase = /[A-Z]/.test(password);
-    const hasNumber = /[0-9]/.test(password);
-    // Regex pour caractères spéciaux (ajustable selon vos besoins)
-    const hasSpecialChar = /[!@#$%^&*(),.?":{}|<>\-_]/.test(password);
-
-    if (password.length < minLength) return "Le mot de passe doit contenir au moins 8 caractères.";
-    if (!hasUpperCase) return "Le mot de passe doit contenir au moins une majuscule.";
-    if (!hasNumber) return "Le mot de passe doit contenir au moins un chiffre.";
-    if (!hasSpecialChar) return "Le mot de passe doit contenir au moins un caractère spécial.";
-    return null;
+  const handleConsentChange = (e) => {
+    const { name, checked } = e.target;
+    if (name === 'acknowledgePrivacy') return; // Bloqué, géré par la modale
+    setConsents({ ...consents, [name]: checked });
   };
 
-
-  // Validation du numéro de téléphone (exemple France : 10 chiffres)
-  const validatePhone = (phone) => {
-    if (!phone) return "Le numéro de téléphone est obligatoire.";
-    // Retirer les espaces pour la validation
-    const onlyDigits = phone.replace(/\s/g, '');
-    if (!/^\d+$/.test(onlyDigits)) return "Le numéro de téléphone doit contenir uniquement des chiffres.";
-    if (onlyDigits.length !== 10) return "Le numéro de téléphone doit contenir exactement 10 chiffres.";
-    return null;
+  // --- LOGIQUE RGPD (SCROLL) ---
+  const handleScroll = (e) => {
+    const { scrollTop, scrollHeight, clientHeight } = e.target;
+    // Tolérance de 5px pour détecter le bas
+    if (scrollHeight - scrollTop <= clientHeight + 5) {
+      setHasScrolledToBottom(true);
+    }
   };
 
+  const handleAcceptPrivacy = () => {
+    if (hasScrolledToBottom) {
+      setConsents({ ...consents, acknowledgePrivacy: true });
+      setShowPrivacyModal(false);
+    }
+  };
+
+  // --- SOUMISSION ---
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError('');
 
-    // 1. Vérification : Les mots de passe correspondent
-    if (formData.password !== formData.confirmPassword) {
-      setError("Les mots de passe ne correspondent pas.");
-      return;
-    }
+    // 1. Validations Bloquantes RGPD
+    if (!consents.acceptCGU) return setError("Vous devez accepter les CGU.");
+    if (!consents.acknowledgePrivacy) return setError("Vous devez lire et valider la politique de confidentialité.");
+    if (!consents.consentSensitive) return setError("Le consentement aux données de santé est obligatoire pour utiliser Weave.");
 
-    // 2. Vérification : Complexité du mot de passe
-    const passwordError = validatePassword(formData.password);
-    if (passwordError) {
-      setError(passwordError);
-      return;
-    }
+    // 2. Validations Formulaire
+    if (formData.password !== formData.confirmPassword) return setError("Les mots de passe ne correspondent pas.");
+    if (formData.phone.replace(/\s/g, '').length !== 10) return setError("Le numéro de téléphone est invalide.");
 
-    // 3. Vérification : Numéro de téléphone
-    const phoneError = validatePhone(formData.phone);
-    if (phoneError) {
-      setError(phoneError);
-      return;
-    }
+    // 3. Préparation des données
+    // On combine Prénom + Nom si votre backend attend un champ "name" unique, 
+    // sinon on envoie firstname/lastname tels quels.
+    const { confirmPassword, ...dataFields } = formData;
 
-    // Préparation des données (on retire confirmPassword avant l'envoi)
-    const { confirmPassword, ...payload } = formData;
+    const payload = {
+      ...dataFields,
+      // Si le backend veut un champ "name" complet :
+      name: `${formData.firstname} ${formData.lastname}`,
+      preferences: {
+        notifications: consents.acceptNotifications,
+        marketing: consents.acceptCommunications,
+      },
+      legal: {
+        cgu_accepted: true,
+        privacy_accepted: true,
+        sensitive_data_consent: true,
+        accepted_at: new Date().toISOString()
+      }
+    };
 
-    // 3. Inscription
+    // 4. Appel API
     const resRegister = await register(payload);
 
     if (resRegister.success) {
-      // Réinitialiser le flag du tour pour les nouveaux utilisateurs
       localStorage.removeItem('weave_onboarding_seen');
-      
-      // 4. Connexion automatique après inscription
       const resLogin = await login(formData.email, formData.password);
       if (resLogin.success) {
         navigate('/select-circle');
       } else {
-        navigate('/login'); // Fallback si le login auto échoue
+        navigate('/login');
       }
     } else {
-      setError(resRegister.error || "Une erreur est survenue.");
+      setError(resRegister.error || "Une erreur est survenue lors de l'inscription.");
     }
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 py-8">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 py-8 relative">
+
+      {/* ================= MODALE RGPD (Privacy Policy) ================= */}
+      {showPrivacyModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl flex flex-col max-h-[85vh]">
+            <div className="p-4 border-b flex justify-between items-center bg-blue-50 rounded-t-xl">
+              <h3 className="font-bold text-blue-900 flex items-center gap-2">
+                <FileText className="w-5 h-5" /> Politique de confidentialité
+              </h3>
+              <button onClick={() => setShowPrivacyModal(false)} className="text-gray-500 hover:text-gray-700">
+                <X className="w-6 h-6" />
+              </button>
+            </div>
+            <div
+              className="p-6 overflow-y-auto flex-1 text-sm text-gray-700 space-y-4 bg-gray-50/30 text-justify leading-relaxed"
+              onScroll={handleScroll}
+            >
+              {!hasScrolledToBottom && (
+                <div className="sticky top-0 bg-blue-50 border-l-4 border-blue-500 p-3 mb-4 text-xs text-blue-800 shadow-sm z-10">
+                  ⬇️ Veuillez faire défiler ce document jusqu'en bas pour valider votre lecture.
+                </div>
+              )}
+
+              <h4 className="font-bold text-gray-900 text-base">1. Préambule et Responsable de Traitement</h4>
+              <p>
+                La présente Politique de Confidentialité a pour but de vous informer sur la manière dont <strong>Weave</strong> collecte et traite vos données personnelles.
+                En créant un compte, vous nous confiez des informations qui peuvent être sensibles. Nous nous engageons à les protéger conformément au Règlement Général sur la Protection des Données (RGPD) et à la Loi Informatique et Libertés.
+              </p>
+
+              <h4 className="font-bold text-gray-900 text-base">2. Nature des données collectées</h4>
+              <p>
+                Pour assurer le bon fonctionnement du service de coordination d'aide à domicile, nous collectons deux types de données :
+              </p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li><strong>Données administratives :</strong> Votre identité (Nom, Prénom), vos coordonnées (Email, Téléphone) et votre date de naissance (pour vérifier votre majorité).</li>
+                <li><strong>Données de santé et de vie (Sensibles) :</strong> Dans le cadre du "Cercle de soins", des informations concernant l'humeur, les incidents de santé, les rendez-vous médicaux ou le suivi quotidien de la personne aidée peuvent être traitées.</li>
+              </ul>
+              <p className="bg-yellow-50 p-2 border border-yellow-200 rounded text-xs text-yellow-800 mt-2">
+                ⚠️ <strong>Consentement Explicite :</strong> Conformément à l'article 9 du RGPD, le traitement de ces données sensibles ne se fait qu'avec votre consentement explicite, recueilli via la case à cocher lors de cette inscription.
+              </p>
+
+              <h4 className="font-bold text-gray-900 text-base">3. Finalités du traitement</h4>
+              <p>
+                Vos données ne sont utilisées que pour les objectifs suivants :
+              </p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Coordination des aidants familiaux et professionnels autour de la personne aidée.</li>
+                <li>Envoi de notifications importantes (alertes, rappels de rendez-vous).</li>
+                <li>Gestion technique de votre compte et sécurité de l'accès.</li>
+              </ul>
+              <p>
+                <strong>Nous ne revendons jamais vos données personnelles à des tiers.</strong> Elles ne sont utilisées à aucune fin publicitaire ou commerciale externe.
+              </p>
+
+              <h4 className="font-bold text-gray-900 text-base">4. Hébergement et Sécurité (HDS)</h4>
+              <p>
+                La sécurité de vos données est notre priorité absolue. Compte tenu de la nature sensible des informations traitées (santé), Weave s'engage à héberger l'ensemble des bases de données sur des serveurs certifiés <strong>Hébergement de Données de Santé (HDS)</strong>, situés physiquement en France ou dans l'Union Européenne.
+              </p>
+              <p className="text-xs text-gray-500 italic">
+                la messagerie interne (chat) n'est pas chiffrée de bout en bout. Il est donc recommandé de ne pas y échanger de documents strictement confidentiels.
+                le chiffrement de bout en bout sera implémenté dans une future mise à jour.
+              </p>
+              <p className="mt-2">
+                <strong>Toutes les informations médicales et données de santé sont chiffrées</strong> dans nos bases de données pour garantir leur confidentialité totale. Les échanges avec le serveur sont également sécurisés (SSL/TLS).
+              </p>
+              <p>
+                Toutes les communications entre votre appareil et nos serveurs sont chiffrées (protocole SSL/TLS).
+              </p>
+
+              <h4 className="font-bold text-gray-900 text-base">5. Partage des données</h4>
+              <p>
+                Vos données sont strictement confidentielles. Elles ne sont accessibles qu'aux :
+              </p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Membres de votre "Cercle de soins" que vous avez invité ou rejoint volontairement.</li>
+                <li>Équipes techniques de Weave (uniquement à des fins de maintenance et de sécurité, avec accès restreint et journalisé).</li>
+              </ul>
+
+              <h4 className="font-bold text-gray-900 text-base">6. Durée de conservation</h4>
+              <p>
+                Vos données sont conservées pendant toute la durée d'activité de votre compte.
+                En cas de suppression de compte ou d'inactivité supérieure à 24 mois, vos données seront intégralement supprimées ou anonymisées de manière irréversible, sauf obligation légale contraire.
+              </p>
+
+              <h4 className="font-bold text-gray-900 text-base">7. Vos droits (Informatique et Libertés)</h4>
+              <p>
+                Conformément à la réglementation en vigueur, vous disposez des droits suivants sur vos données :
+              </p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Droit d'accès et de rectification.</li>
+                <li>Droit à l'effacement ("Droit à l'oubli").</li>
+                <li>Droit à la limitation du traitement.</li>
+                <li>Droit à la portabilité de vos données.</li>
+                <li>Droit de retirer votre consentement à tout moment.</li>
+              </ul>
+              <p>
+                Pour exercer ces droits, vous pouvez nous contacter à l'adresse dédiée à la protection des données : <a href="mailto:weave.entreprise@gmail.com" className="text-blue-600 hover:underline">weave.entreprise@gmail.com@g
+                </a>.
+              </p>
+
+              <h4 className="font-bold text-gray-900 text-base">8. Vos droits (Informatique et Libertés)</h4>
+              <p>
+                Conformément à la réglementation en vigueur, vous disposez des droits suivants sur vos données :
+              </p>
+              <ul className="list-disc pl-5 space-y-1">
+                <li>Droit d'accès et de rectification.</li>
+                <li>Droit à l'effacement ("Droit à l'oubli").</li>
+                <li>Droit à la limitation du traitement.</li>
+                <li>Droit à la portabilité de vos données.</li>
+                <li>Droit de retirer votre consentement à tout moment.</li>
+              </ul>
+              <p>
+                Pour exercer ces droits, vous pouvez nous contacter à l'adresse dédiée à la protection des données : <a href="mailto:weave.entreprise@gmail.com " className="text-blue-600 hover:underline">weave.entreprise@gmail.com</a>.
+              </p>
+
+              <div className="pt-8 pb-4 text-center text-gray-400 text-xs uppercase tracking-widest border-t mt-6">
+                --- Fin du document ---
+              </div>
+            </div>
+            <div className="p-4 border-t bg-white rounded-b-xl flex justify-end gap-3">
+              <Button variant="outline" onClick={() => setShowPrivacyModal(false)}>Annuler</Button>
+              <Button
+                onClick={handleAcceptPrivacy}
+                disabled={!hasScrolledToBottom}
+                className={`transition-all duration-300 ${hasScrolledToBottom ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+              >
+                {hasScrolledToBottom ? "J'accepte la politique" : "Lisez jusqu'en bas..."}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+
+      {/* ================= CARTE D'INSCRIPTION ================= */}
       <Card className="w-full max-w-lg shadow-xl border-t-6 border-blue-600">
         <CardHeader className="space-y-2 pb-6">
           <Link to="/" className="flex items-center text-lg text-gray-600 hover:text-blue-700 mb-4">
@@ -134,7 +274,7 @@ export default function RegisterPage() {
         </CardHeader>
 
         <CardContent>
-          <form onSubmit={handleSubmit} className="space-y-6">
+          <form onSubmit={handleSubmit} className="space-y-5">
 
             {error && (
               <div className="p-3 text-red-700 bg-red-100 rounded-md text-sm font-medium border border-red-200">
@@ -142,100 +282,127 @@ export default function RegisterPage() {
               </div>
             )}
 
-            <div className="space-y-2">
-              <Label htmlFor="name" className="text-lg font-semibold text-gray-800">Nom * <span className="text-xs text-gray-500 font-normal">(choisissez un nom que votre famille reconnaitra)</span></Label>
-              <Input id="name" name="name" required className="h-14 text-lg bg-white" value={formData.name} onChange={handleChange} />
+            {/* --- CHAMPS IDENTITÉ (Prénom / Nom) --- */}
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="firstname">Prénom *</Label>
+                <Input id="firstname" name="firstname" required className="h-12 bg-white" value={formData.firstname} onChange={handleChange} />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="lastname">Nom *</Label>
+                <Input id="lastname" name="lastname" required className="h-12 bg-white" value={formData.lastname} onChange={handleChange} />
+              </div>
             </div>
 
+            {/* --- EMAIL --- */}
             <div className="space-y-2">
-              <Label htmlFor="email" className="text-lg font-semibold text-gray-800">Email *</Label>
-              <Input id="email" name="email" type="email" required className="h-14 text-lg bg-white" value={formData.email} onChange={handleChange} />
+              <Label htmlFor="email">Email *</Label>
+              <Input id="email" name="email" type="email" required className="h-12 bg-white" value={formData.email} onChange={handleChange} />
             </div>
 
+            {/* --- TÉLÉPHONE & DATE DE NAISSANCE --- */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="phone" className="text-lg font-semibold text-gray-800">Téléphone *</Label>
-                <Input 
-                  id="phone" 
-                  name="phone" 
-                  type="tel"
-                  placeholder="06 12 34 56 78"
-                  required
-                  className="h-14 text-lg bg-white" 
-                  value={formData.phone} 
-                  onChange={handleChange} 
+                <Label htmlFor="phone">Téléphone *</Label>
+                <Input
+                  id="phone" name="phone" type="tel" placeholder="06 12 34 56 78"
+                  required className="h-12 bg-white"
+                  value={formData.phone} onChange={handleChange}
                 />
               </div>
               <div className="space-y-2">
-                <Label htmlFor="birth_date" className="text-lg font-semibold text-gray-800">Date de naissance *</Label>
-                <Input 
-                  id="birth_date" 
-                  name="birth_date" 
-                  type="date" 
-                  required
-                  className="h-14 text-lg bg-white block w-full" 
-                  value={formData.birth_date} 
-                  onChange={handleChange} 
+                <Label htmlFor="birth_date">Date de naissance *</Label>
+                <Input
+                  id="birth_date" name="birth_date" type="date"
+                  required className="h-12 bg-white block w-full"
+                  value={formData.birth_date} onChange={handleChange}
                 />
               </div>
             </div>
-            {/* Role selection removed at registration — roles are managed via circles and admin assignment */}
 
-            {/* Mot de passe */}
+            {/* --- MOT DE PASSE --- */}
             <div className="space-y-2">
-              <Label htmlFor="password" className="text-lg font-semibold text-gray-800">Mot de passe *</Label>
+              <Label htmlFor="password">Mot de passe *</Label>
               <div className="relative">
                 <Input
-                  id="password"
-                  name="password"
-                  type={showPassword ? "text" : "password"}
-                  required
-                  className="h-14 text-lg bg-white pr-12"
-                  value={formData.password}
-                  onChange={handleChange}
+                  id="password" name="password" type={showPassword ? "text" : "password"}
+                  required className="h-12 bg-white pr-12"
+                  value={formData.password} onChange={handleChange}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
-                >
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
-              <p className="text-sm text-gray-500">8 caractères, 1 majuscule, 1 chiffre, 1 caractère spécial min.</p>
+              <p className="text-xs text-gray-500">Min. 8 car., 1 majuscule, 1 chiffre, 1 spécial.</p>
             </div>
 
-            {/* Confirmation du mot de passe */}
             <div className="space-y-2">
-              <Label htmlFor="confirmPassword" className="text-lg font-semibold text-gray-800">Confirmer le mot de passe *</Label>
+              <Label htmlFor="confirmPassword">Confirmer le mot de passe *</Label>
               <div className="relative">
                 <Input
-                  id="confirmPassword"
-                  name="confirmPassword"
-                  type={showConfirmPassword ? "text" : "password"}
+                  id="confirmPassword" name="confirmPassword" type={showConfirmPassword ? "text" : "password"}
                   required
-                  className={`h-14 text-lg bg-white pr-12 ${formData.confirmPassword && formData.password !== formData.confirmPassword ? "border-red-500 focus-visible:ring-red-500" : ""}`}
-                  value={formData.confirmPassword}
-                  onChange={handleChange}
+                  className={`h-12 bg-white pr-12 ${formData.confirmPassword && formData.password !== formData.confirmPassword ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                  value={formData.confirmPassword} onChange={handleChange}
                 />
-                <button
-                  type="button"
-                  onClick={() => setShowConfirmPassword(!showConfirmPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
-                >
+                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">
                   {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
             </div>
 
-            <Button type="submit" size="lg" disabled={loading} className="w-full h-16 text-xl font-bold bg-blue-700 hover:bg-blue-800 mt-6 shadow-md text-white">
-              {loading ? <Loader2 className="animate-spin mr-2" /> : "Confirmer l'inscription"}
+            <hr className="border-gray-200 my-4" />
+
+            {/* --- SECTION RGPD --- */}
+            <div className="space-y-3 bg-blue-50/50 p-4 rounded-lg border border-blue-100">
+              <h3 className="font-bold text-blue-900 text-sm flex items-center gap-2 mb-2">
+                <ShieldCheck className="w-4 h-4" /> Consentements obligatoires
+              </h3>
+
+              {/* 1. CGU */}
+              <div className="flex items-start space-x-3">
+                <input type="checkbox" id="acceptCGU" name="acceptCGU" checked={consents.acceptCGU} onChange={handleConsentChange} className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600" />
+                <label htmlFor="acceptCGU" className="text-sm text-gray-700">J'accepte les <Link to="/cgu" className="text-blue-700 underline font-medium">CGU</Link>.</label>
+              </div>
+
+              {/* 2. POLITIQUE DE CONFIDENTIALITÉ (Avec Scroll Wall) */}
+              <div className="flex items-start space-x-3 bg-white p-2.5 rounded border border-blue-200 shadow-sm relative">
+                <input
+                  type="checkbox" id="acknowledgePrivacy" name="acknowledgePrivacy"
+                  checked={consents.acknowledgePrivacy} disabled
+                  className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 disabled:opacity-50 cursor-not-allowed"
+                />
+                <div className="flex-1">
+                  <label htmlFor="acknowledgePrivacy" className="text-sm text-gray-700 block mb-1">
+                    J'ai lu la politique de confidentialité. *
+                  </label>
+                  {!consents.acknowledgePrivacy ? (
+                    <button type="button" onClick={() => setShowPrivacyModal(true)} className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded font-medium hover:bg-blue-200 flex items-center gap-1 w-fit">
+                      <Eye className="w-3 h-3" /> Lire pour valider
+                    </button>
+                  ) : (
+                    <span className="text-xs text-green-600 font-medium flex items-center gap-1"><ShieldCheck className="w-3 h-3" /> Validé</span>
+                  )}
+                </div>
+                {/* Overlay cliquable pour ouvrir la modale même si la checkbox est disabled */}
+                {!consents.acknowledgePrivacy && <div className="absolute inset-0 cursor-pointer" onClick={() => setShowPrivacyModal(true)}></div>}
+              </div>
+
+              {/* 3. Données sensibles */}
+              <div className="flex items-start space-x-3">
+                <input type="checkbox" id="consentSensitive" name="consentSensitive" checked={consents.consentSensitive} onChange={handleConsentChange} className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600" />
+                <label htmlFor="consentSensitive" className="text-sm text-gray-700">Je consens au traitement de mes <strong>données de santé</strong>.</label>
+              </div>
+            </div>
+
+            <Button type="submit" size="lg" disabled={loading} className="w-full h-14 text-lg font-bold bg-blue-700 hover:bg-blue-800 text-white shadow-md mt-4">
+              {loading ? <Loader2 className="animate-spin mr-2" /> : "Créer mon compte"}
             </Button>
 
           </form>
         </CardContent>
-        <CardFooter className="justify-center py-6 bg-gray-50/50 rounded-b-xl">
-          <p className="text-lg">Déjà inscrit ? <Link to="/login" className="font-bold text-blue-700 hover:underline">Se connecter</Link></p>
+        <CardFooter className="justify-center py-4 bg-gray-50/50 rounded-b-xl border-t border-gray-100">
+          <p className="text-base text-gray-600">Déjà inscrit ? <Link to="/login" className="font-bold text-blue-700 hover:underline">Se connecter</Link></p>
         </CardFooter>
       </Card>
     </div>
