@@ -36,23 +36,30 @@ export default function Admin() {
 
   // Déterminer le cercle courant :
   // - si un `circleId` est sélectionné dans le contexte, on l'utilise
-  // - sinon on prend le premier cercle où l'utilisateur est ADMIN/SUPERADMIN
-  const currentCircle = (circleId && user?.circles?.find(c => String(c.id) === String(circleId)))
-    || user?.circles?.find(c => c.role?.toUpperCase() === 'ADMIN' || c.role?.toUpperCase() === 'SUPERADMIN');
+  // - sinon on prend le premier cercle où l'utilisateur est membre (peu importe le rôle)
+  const currentCircle = (circleId && user?.circles?.find(c => String(c.id ?? c.circle_id) === String(circleId)))
+    || (Array.isArray(user?.circles) ? user.circles[0] : null);
+
+  const currentCircleId = currentCircle?.id ?? currentCircle?.circle_id;
+  const currentCircleName = currentCircle?.senior_name || currentCircle?.name;
+
+  // Rôle courant dans le cercle (pour limiter les actions sensibles aux admins)
+  const currentRole = (currentCircle?.role || '').toUpperCase();
+  const isAdmin = currentRole === 'ADMIN' || currentRole === 'SUPERADMIN';
 
   // Récupérer le code d'invitation du cercle courant
   const inviteCode = currentCircle?.invite_code || '...';
 
   // 2. Récupérer la vraie liste des membres au chargement
   useEffect(() => {
-    if (currentCircle?.id) {
-      fetchMembers(currentCircle.id);
-      fetchActivityLogs(currentCircle.id);
+    if (currentCircleId) {
+      fetchMembers(currentCircleId);
+      fetchActivityLogs(currentCircleId);
     } else {
       setLoading(false);
       setLogsLoading(false);
     }
-  }, [currentCircle]);
+  }, [currentCircleId]);
 
   const fetchMembers = async (circleId) => {
     try {
@@ -111,7 +118,8 @@ export default function Admin() {
   };
 
   const handleDeleteCircle = async () => {
-    if (deleteConfirmText !== currentCircle?.senior_name) {
+    if (!isAdmin) return;
+    if (deleteConfirmText !== currentCircleName) {
       alert("Le nom saisi ne correspond pas.");
       return;
     }
@@ -119,7 +127,7 @@ export default function Admin() {
     setDeleting(true);
     try {
       const token = localStorage.getItem('weave_token');
-      const res = await fetch(`${API_BASE_URL}/circles/${currentCircle.id}`, {
+      const res = await fetch(`${API_BASE_URL}/circles/${currentCircleId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
@@ -148,14 +156,14 @@ export default function Admin() {
 
     try {
       const token = localStorage.getItem('weave_token');
-      const res = await fetch(`${API_BASE_URL}/circles/${currentCircle.id}/members/${memberId}`, {
+      const res = await fetch(`${API_BASE_URL}/circles/${currentCircleId}/members/${memberId}`, {
         method: 'DELETE',
         headers: { 'Authorization': `Bearer ${token}` }
       });
 
       if (res.ok) {
         // Rafraîchir la liste des membres
-        await fetchMembers(currentCircle.id);
+        await fetchMembers(currentCircleId);
         alert(`${memberName} a été retiré du cercle.`);
       } else {
         const error = await res.json();
@@ -167,13 +175,13 @@ export default function Admin() {
     }
   };
 
-  // Si l'utilisateur n'est pas admin, on affiche un message simple
+  // Si aucun cercle sélectionné ou disponible
   if (!currentCircle) {
     return (
       <div className="p-10 flex flex-col items-center justify-center text-center h-full">
         <Shield className="w-16 h-16 text-gray-300 mb-4" />
-        <h2 className="text-xl font-bold text-gray-600">Accès restreint</h2>
-        <p className="text-gray-500">Cette page est réservée à l'administrateur du cercle.</p>
+        <h2 className="text-xl font-bold text-gray-600">Aucun cercle sélectionné</h2>
+        <p className="text-gray-500">Choisissez un cercle pour voir ses membres.</p>
       </div>
     );
   }
@@ -215,40 +223,41 @@ export default function Admin() {
         </div>
       </div>
 
-      {/* --- ZONE D'INVITATION --- */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Share2 className="w-5 h-5 text-blue-600" />
-            Inviter un nouveau membre
-          </h2>
-        </div>
+          {isAdmin && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
+                  <Share2 className="w-5 h-5 text-blue-600" />
+                  Inviter un nouveau membre
+                </h2>
+              </div>
 
-        <div className="bg-blue-50/50 rounded-xl p-6 border border-blue-100 flex flex-col md:flex-row gap-6 items-center">
-          <div className="flex-1 space-y-1">
-            <p className="text-sm font-semibold text-gray-900">Code d'accès unique</p>
-            <p className="text-sm text-gray-600">
-              Transmettez ce code à un proche ou un professionnel. Il devra le saisir lors de son inscription en cliquant sur "Rejoindre un cercle".
-            </p>
-          </div>
+              <div className="bg-blue-50/50 rounded-xl p-6 border border-blue-100 flex flex-col md:flex-row gap-6 items-center">
+                <div className="flex-1 space-y-1">
+                  <p className="text-sm font-semibold text-gray-900">Code d'accès unique</p>
+                  <p className="text-sm text-gray-600">
+                    Transmettez ce code à un proche ou un professionnel. Il devra le saisir lors de son inscription en cliquant sur "Rejoindre un cercle".
+                  </p>
+                </div>
 
-          <div className="flex gap-2 w-full md:w-auto">
-            <div className="flex-1 md:w-48 bg-white border border-gray-200 rounded-lg px-4 py-3 text-gray-900 font-mono text-xl tracking-wider text-center font-bold">
-              {inviteCode}
+                <div className="flex gap-2 w-full md:w-auto">
+                  <div className="flex-1 md:w-48 bg-white border border-gray-200 rounded-lg px-4 py-3 text-gray-900 font-mono text-xl tracking-wider text-center font-bold">
+                    {inviteCode}
+                  </div>
+                  <button
+                    onClick={handleCopyLink}
+                    className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 min-w-[110px] ${copied
+                      ? 'bg-green-100 text-green-700 border border-green-200'
+                      : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                      }`}
+                  >
+                    {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+                    {copied ? 'Copié' : 'Copier'}
+                  </button>
+                </div>
+              </div>
             </div>
-            <button
-              onClick={handleCopyLink}
-              className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 min-w-[110px] ${copied
-                ? 'bg-green-100 text-green-700 border border-green-200'
-                : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
-                }`}
-            >
-              {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
-              {copied ? 'Copié' : 'Copier'}
-            </button>
-          </div>
-        </div>
-      </div>
+          )}
 
       {/* --- LISTE DES MEMBRES --- */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
@@ -313,15 +322,15 @@ export default function Admin() {
                             {member.skills.length > 4 && <span className="text-xs text-gray-400">+{member.skills.length-4}</span>}
                           </div>
                         )}
-                        {/* Only show rating button for helpers (not PC/beneficiary) and not for self */}
-                        {member.role === 'HELPER' && member.id !== user.id && (
+                        {/* Afficher le bouton de notation uniquement si l'utilisateur courant est admin ou aidant et cible admin ou aidant, et pas pour soi-même */}
+                        {(currentRole === 'ADMIN' || currentRole === 'HELPER') && (member.role === 'ADMIN' || member.role === 'HELPER') && member.id !== user.id && (
                           <button
                             onClick={async () => {
                               setSelectedMember(member);
                               setShowRatingModal(true);
                               try {
                                 const token = localStorage.getItem('weave_token');
-                                const res = await fetch(`${API_BASE_URL}/users/${member.id}/rating?circleId=${currentCircle.id}&raterId=${user.id}`, {
+                                const res = await fetch(`${API_BASE_URL}/users/${member.id}/rating?circleId=${currentCircleId}&raterId=${user.id}`, {
                                   headers: { 'Authorization': `Bearer ${token}` }
                                 });
                                 if (res.ok) {
@@ -345,7 +354,7 @@ export default function Admin() {
                   </div>
 
                   {/* Actions (Supprimer) - Sauf pour l'admin lui-même et le senior */}
-                  {member.role === 'HELPER' && (
+                  {isAdmin && member.role === 'HELPER' && (
                     <button
                       onClick={() => handleRemoveMember(member.id, member.name)}
                       className="text-gray-300 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors"
@@ -419,38 +428,39 @@ export default function Admin() {
         )}
       </div>
 
-      {/* --- ZONE DE DANGER --- */}
-      <div className="bg-white rounded-xl shadow-sm border border-red-200 overflow-hidden">
-        <div className="p-6 border-b border-red-100 bg-red-50">
-          <h2 className="text-lg font-bold text-red-700 flex items-center gap-2">
-            <AlertTriangle className="w-5 h-5" />
-            Zone de danger
-          </h2>
-          <p className="text-sm text-red-600 mt-1">Ces actions sont irréversibles</p>
-        </div>
+      {isAdmin && (
+        <div className="bg-white rounded-xl shadow-sm border border-red-200 overflow-hidden">
+          <div className="p-6 border-b border-red-100 bg-red-50">
+            <h2 className="text-lg font-bold text-red-700 flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5" />
+              Zone de danger
+            </h2>
+            <p className="text-sm text-red-600 mt-1">Ces actions sont irréversibles</p>
+          </div>
 
-        <div className="p-6">
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-            <div>
-              <h3 className="font-semibold text-gray-900">Supprimer le cercle</h3>
-              <p className="text-sm text-gray-600 mt-1">
-                Cette action supprimera définitivement le cercle, tous ses membres, souvenirs, messages et tâches. 
-                Cette action est irréversible.
-              </p>
+          <div className="p-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+              <div>
+                <h3 className="font-semibold text-gray-900">Supprimer le cercle</h3>
+                <p className="text-sm text-gray-600 mt-1">
+                  Cette action supprimera définitivement le cercle, tous ses membres, souvenirs, messages et tâches. 
+                  Cette action est irréversible.
+                </p>
+              </div>
+              <button
+                onClick={() => setShowDeleteModal(true)}
+                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center gap-2 whitespace-nowrap"
+              >
+                <Trash2 className="w-4 h-4" />
+                Supprimer le cercle
+              </button>
             </div>
-            <button
-              onClick={() => setShowDeleteModal(true)}
-              className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center gap-2 whitespace-nowrap"
-            >
-              <Trash2 className="w-4 h-4" />
-              Supprimer le cercle
-            </button>
           </div>
         </div>
-      </div>
+      )}
 
       {/* --- MODAL DE CONFIRMATION --- */}
-      {showDeleteModal && (
+      {isAdmin && showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
             <div className="p-6 bg-red-50 border-b border-red-100">
@@ -469,7 +479,7 @@ export default function Admin() {
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <p className="text-sm text-red-800">
                   <strong>Attention :</strong> Vous êtes sur le point de supprimer définitivement le cercle 
-                  <span className="font-bold"> "{currentCircle?.senior_name}"</span>. 
+                  <span className="font-bold"> "{currentCircleName}"</span>. 
                   Toutes les données seront perdues :
                 </p>
                 <ul className="text-sm text-red-700 mt-2 list-disc list-inside space-y-1">
@@ -482,7 +492,7 @@ export default function Admin() {
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Pour confirmer, tapez <span className="font-bold text-red-600">"{currentCircle?.senior_name}"</span>
+                  Pour confirmer, tapez <span className="font-bold text-red-600">"{currentCircleName}"</span>
                 </label>
                 <input
                   type="text"
@@ -506,7 +516,7 @@ export default function Admin() {
               </button>
               <button
                 onClick={handleDeleteCircle}
-                disabled={deleteConfirmText !== currentCircle?.senior_name || deleting}
+                disabled={deleteConfirmText !== currentCircleName || deleting}
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {deleting ? (
@@ -574,11 +584,11 @@ export default function Admin() {
                     const res = await fetch(`${API_BASE_URL}/users/${selectedMember.id}/rating`, {
                       method: 'POST',
                       headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ raterId: user.id, circleId: currentCircle.id, rating: pendingRating })
+                      body: JSON.stringify({ raterId: user.id, circleId: currentCircleId, rating: pendingRating })
                     });
                     if (res.ok) {
                       // Refresh average
-                      const r = await fetch(`${API_BASE_URL}/users/${selectedMember.id}/rating?circleId=${currentCircle.id}&raterId=${user.id}`, {
+                      const r = await fetch(`${API_BASE_URL}/users/${selectedMember.id}/rating?circleId=${currentCircleId}&raterId=${user.id}`, {
                         headers: { 'Authorization': `Bearer ${token}` }
                       });
                       if (r.ok) {

@@ -264,6 +264,37 @@ export default function CalendarView() {
     }
   };
 
+  // Rôle courant dans le cercle (ADMIN/HELPER/PC)
+  const currentCircleRole = useMemo(() => {
+    const match = (user?.circles || []).find(c => String(c.id ?? c.circle_id) === String(circleId));
+    return (match?.role || '').toUpperCase();
+  }, [user?.circles, circleId]);
+
+  const canValidate = (task) => {
+    const roleOK = currentCircleRole === 'ADMIN' || currentCircleRole === 'HELPER';
+    const assigned = Array.isArray(task?.assigned_to) ? task.assigned_to : [];
+    const notYetValidated = !task?.completed; // Hide button if already completed
+    if (!roleOK || assigned.length === 0 || !notYetValidated) return false;
+    // Optional: ensure task is not in the future
+    try {
+      const dateStr = (task.date || '').split('T')[0];
+      const timeStr = task.time || '23:59';
+      const dt = new Date(`${dateStr}T${timeStr}:00`);
+      return new Date() >= dt;
+    } catch { return true; }
+  };
+
+  const handleValidateTask = async (taskId) => {
+    try {
+      await apiPost(`/tasks/${taskId}/validate`, { validatedBy: user?.id || null });
+      showNotification('success', 'Intervention validée');
+      setSelectedTask(null);
+    } catch (err) {
+      console.error(err);
+      showNotification('error', "Erreur lors de la validation");
+    }
+  };
+
   return (
     <div className="min-h-screen bg-slate-50/50 font-sans text-slate-800 p-4 md:p-6">
       <div className="max-w-[1400px] mx-auto space-y-6">
@@ -363,6 +394,8 @@ export default function CalendarView() {
           onVolunteer={() => handleVolunteer(selectedTask?.id)}
           onUnvolunteer={() => handleUnvolunteer(selectedTask?.id)}
           currentUserId={user?.id}
+          onValidate={() => handleValidateTask(selectedTask?.id)}
+          canValidate={selectedTask ? canValidate(selectedTask) : false}
         />
 
       </div>

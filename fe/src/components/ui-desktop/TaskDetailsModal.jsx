@@ -7,7 +7,7 @@ const MODAL_THEME = {
     activity: { header: 'bg-emerald-500', iconBg: 'bg-emerald-600', text: 'text-emerald-600', light: 'bg-emerald-50' },
 };
 
-const TaskDetailsModal = ({ task, onClose, onDelete, onVolunteer, onUnvolunteer, currentUserId }) => {
+const TaskDetailsModal = ({ task, onClose, onDelete, onVolunteer, onUnvolunteer, onValidate, canValidate, currentUserId }) => {
     if (!task) return null;
 
     const theme = MODAL_THEME[task.task_type] || MODAL_THEME.activity;
@@ -86,7 +86,7 @@ const TaskDetailsModal = ({ task, onClose, onDelete, onVolunteer, onUnvolunteer,
                     )}
 
                     {/* 3. Actions (Bas de page) */}
-                    <div className="flex items-center gap-3 mt-4 pt-4 border-t border-slate-100">
+                    <div className="flex items-center gap-3 mt-4 pt-4 border-t border-slate-100 flex-wrap">
                         {/* Bouton Supprimer (Discret) */}
                         <button
                             onClick={() => onDelete(task.id)}
@@ -110,6 +110,16 @@ const TaskDetailsModal = ({ task, onClose, onDelete, onVolunteer, onUnvolunteer,
                                 className="flex-1 bg-blue-600 text-white hover:bg-blue-700 shadow-lg shadow-blue-600/20 py-3 px-4 rounded-xl font-bold transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
                             >
                                 <CheckCircle className="w-5 h-5" /> Je m'en occupe
+                            </button>
+                        )}
+
+                        {/* Bouton Valider (si autorisé) */}
+                        {canValidate && (
+                            <button
+                                onClick={() => onValidate(task.id)}
+                                className="flex-1 bg-emerald-600 text-white hover:bg-emerald-700 shadow-lg shadow-emerald-600/20 py-3 px-4 rounded-xl font-bold transition-all hover:-translate-y-0.5 flex items-center justify-center gap-2"
+                            >
+                                <CheckCircle className="w-5 h-5" /> Valider
                             </button>
                         )}
                     </div>
