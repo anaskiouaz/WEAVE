@@ -95,7 +95,7 @@ export default function Profile() {
           address: userData.address || '',
           joinDate: createdDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
           yearsActive: 0,  // Sera mis à jour par les stats
-          photoUrl: userData.profile_photo ? buildFilesUrl(`/uploads/${userData.profile_photo}`) : null
+          photoUrl: userData.profile_photo ? buildApiUrl(`/upload/blob/${userData.profile_photo}`) : null
         });
 
         // Formatage des disponibilités
@@ -173,8 +173,8 @@ export default function Profile() {
       }, options);
 
       if (saveResponse.success) {
-        // 5. Mettre à jour l'URL avec le blob final (fichiers servis hors /api)
-        const photoUrl = buildFilesUrl(`/uploads/${uploadData.data.blobName}`);
+        // 5. Mettre à jour l'URL avec le blob final (via proxy backend pour Azure blobs)
+        const photoUrl = buildApiUrl(`/upload/blob/${uploadData.data.blobName}`);
         setUserInfo({ ...userInfo, photoUrl });
         alert('Photo de profil mise à jour avec succès!');
       }
