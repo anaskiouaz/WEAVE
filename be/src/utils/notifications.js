@@ -144,3 +144,66 @@ export async function notifyCircle(circleId, title, body, data, excludeUserId, t
         console.error('❌ Erreur notifyCircle:', e);
     }
 }
+
+export async function notifyConversation(conversationId, senderId, senderName, messageContent) {
+    try {
+        // 1. Récupérer les infos de la conversation (pour le titre)
+        const convRes = await db.query(
+            `SELECT type, nom FROM conversation WHERE id = $1`,
+            [conversationId]
+        );
+        
+        if (convRes.rows.length === 0) return;
+        const conv = convRes.rows[0];
+
+        // 2. Construire le titre et le corps
+        let notifTitle = `Message de ${senderName}`;
+        if (conv.type === 'GROUPE') {
+            notifTitle = `${conv.nom} (Message de ${senderName})`;
+        }
+
+        const notifBody = messageContent.length > 100 
+            ? messageContent.substring(0, 100) + '...' 
+            : messageContent;
+
+        console.log(`💬 [NOTIF MSG] Conversation ${conversationId} | De: ${senderName}`);
+
+        // 3. Récupérer les tokens des participants (SAUF l'expéditeur)
+        const recipientsRes = await db.query(
+            `SELECT u.fcm_token 
+             FROM participant_conversation pc
+             JOIN users u ON pc.utilisateur_id = u.id
+             WHERE pc.conversation_id = $1
+             AND pc.utilisateur_id != $2
+             AND u.fcm_token IS NOT NULL 
+             AND u.fcm_token != ''`,
+            [conversationId, senderId]
+        );
+
+        const tokens = recipientsRes.rows.map(r => r.fcm_token);
+        const uniqueTokens = [...new Set(tokens)]; // Anti-doublon
+
+        if (uniqueTokens.length > 0) {
+            const message = {
+                notification: { 
+                    title: notifTitle, 
+                    body: notifBody 
+                },
+                data: { 
+                    type: 'new_message', 
+                    conversationId: conversationId.toString(),
+                    click_action: 'FLUTTER_NOTIFICATION_CLICK' 
+                },
+                tokens: uniqueTokens
+            };
+
+            const response = await admin.messaging().sendEachForMulticast(message);
+            console.log(`   ✅ Message push envoyé à ${response.successCount} participants.`);
+        } else {
+            console.log("   ⚠️ Aucun destinataire avec token pour ce message.");
+        }
+
+    } catch (error) {
+        console.error("❌ Erreur notifyConversation:", error);
+    }
+}

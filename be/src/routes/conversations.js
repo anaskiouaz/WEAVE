@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from '../config/db.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { logAudit, AUDIT_ACTIONS } from '../utils/audits.js';
+import { notifyConversation } from '../utils/notifications.js'; // 👈 IMPORT AJOUTÉ
 
 const router = Router();
 
@@ -60,21 +61,12 @@ router.post('/:id/messages', async (req, res) => {
         profile_photo: authorInfo.profile_photo
     };
 
-    // B bis. LOG AUDIT (non bloquant)
-    try {
-        const convInfo = await pool.query('SELECT cercle_id FROM conversation WHERE id = $1', [id]);
-        const circleId = convInfo.rows[0]?.cercle_id || null;
-        await logAudit(
-            authorId,
-            AUDIT_ACTIONS.MESSAGE_SENT,
-            `${authorInfo.name} a envoyé un message`,
-            circleId
-        );
-    } catch (auditErr) {
-        console.error('Erreur audit message:', auditErr);
-    }
+    // --- C. ENVOI NOTIFICATION PUSH (NOUVEAU) ---
+    // On le fait de manière asynchrone sans bloquer la réponse HTTP
+    notifyConversation(id, authorId, authorInfo.name, content);
+    // ---------------------------------------------
 
-    // C. SOCKET.IO - LA PARTIE CRITIQUE
+    // D. SOCKET.IO - TEMPS RÉEL
     // On récupère l'instance stockée dans server.js
     const io = req.app.get('io');
 
@@ -90,6 +82,20 @@ router.post('/:id/messages', async (req, res) => {
         console.error("⚠️ [SOCKET] Instance non trouvée dans req.app.get('io') !");
     }
 
+    // E. LOG AUDIT (non bloquant)
+    try {
+        const convInfo = await pool.query('SELECT cercle_id FROM conversation WHERE id = $1', [id]);
+        const circleId = convInfo.rows[0]?.cercle_id || null;
+        await logAudit(
+            authorId,
+            AUDIT_ACTIONS.MESSAGE_SENT,
+            `${authorInfo.name} a envoyé un message`,
+            circleId
+        );
+    } catch (auditErr) {
+        console.error('Erreur audit message:', auditErr);
+    }
+
     res.status(201).json(fullMessage);
 
   } catch (error) {
@@ -102,9 +108,6 @@ router.post('/:id/messages', async (req, res) => {
 // 3. AUTRES ROUTES (Lecture, Participants, Création...)
 // ============================================================
 router.post('/', async (req, res) => {
-    // ... (Garde ton code de création ici, ou je peux te le remettre si besoin, 
-    // mais pour l'instantanéité c'est surtout le POST messages qui compte)
-    // Pour simplifier je remets la version courte standard :
     const { userIds, type, nom, cercleId } = req.body; 
     const creatorId = req.user.id;
     const participants = [...new Set([creatorId, ...userIds])];
