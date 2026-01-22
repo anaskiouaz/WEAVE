@@ -1,5 +1,5 @@
 name: Audit de Sécurité Azure Weave
-on: [push] # Se lance à chaque push sur n'importe quelle branche
+on: [push]
 
 jobs:
   audit-security:
@@ -11,45 +11,42 @@ jobs:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
       - name: Audit de la Base de Données et Réseau
-        shell: /usr/bin/bash -e
+        shell: bash
         run: |
-          # Variables basées sur tes informations
+          # Variables de ton infrastructure
           RG="weave-team"
           DB_SERVER="weave-db-server"
 
           echo "🚀 Lancement de l'audit pour le groupe: $RG"
           echo "------------------------------------------"
 
-          # 1. Vérification de l'Accès Public (Point critique)
+          # 1. Vérification de l'Accès Public
+          # Récupère l'état du réseau public pour PostgreSQL
           public_access=$(az postgres flexible-server show --resource-group $RG --name $DB_SERVER --query "network.publicNetworkAccess" -o tsv)
           if [ "$public_access" == "Enabled" ]; then
-            echo "⚠️  ALERTE : L'accès public à la DB est activé (Actuellement: $public_access)."
+            echo "⚠️  ALERTE : L'accès public à la DB est activé."
           else
             echo "✅ SUCCÈS : L'accès public est restreint."
           fi
 
-          # 2. Vérification du chiffrement TLS
+          # 2. Vérification TLS
           tls_version=$(az postgres flexible-server parameter show --resource-group $RG --server-name $DB_SERVER --name "minimal_tls_version" --query "value" -o tsv)
-          echo "🔒 Version TLS minimale configurée : $tls_version"
+          echo "🔒 Version TLS minimale : $tls_version"
 
-          # 3. Vérification de la version PostgreSQL
-          db_version=$(az postgres flexible-server show --resource-group $RG --name $DB_SERVER --query "version" -o tsv)
-          echo "🐘 Version de PostgreSQL : $db_version (Ok)"
-
-          # 4. Vérification de l'état du stockage
+          # 3. Vérification Stockage (Important car auto-grow est désactivé chez toi)
           storage_size=$(az postgres flexible-server show --resource-group $RG --name $DB_SERVER --query "storage.storageSizeGb" -o tsv)
           auto_grow=$(az postgres flexible-server show --resource-group $RG --name $DB_SERVER --query "storage.autoGrow" -o tsv)
           echo "💾 Stockage : ${storage_size}GB (Auto-grow: $auto_grow)"
           
           if [ "$auto_grow" == "Disabled" ]; then
-            echo "⚠️  ATTENTION : Le stockage ne s'agrandira pas automatiquement si la DB est pleine."
+            echo "⚠️  ATTENTION : Le stockage ne s'agrandira pas automatiquement."
           fi
 
-          # 5. Vérification DDoS (si un VNet existe)
+          # 4. Vérification DDoS
           echo "🛡️  Vérification DDoS..."
           VNET_NAME=$(az network vnet list --resource-group "$RG" --query "[0].name" -o tsv)
           if [ -z "$VNET_NAME" ]; then
-            echo "ℹ️  Note : Aucun VNet détecté. Vos services utilisent l'IP publique directe."
+            echo "ℹ️  Note : Aucun VNet détecté (Services en IP publique directe)."
           else
             status=$(az network vnet show --name "$VNET_NAME" --resource-group "$RG" --query "enableDdosProtection" -o tsv)
             echo "Statut DDoS sur $VNET_NAME : $status"
