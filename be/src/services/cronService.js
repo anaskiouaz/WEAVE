@@ -1,32 +1,31 @@
 import cron from 'node-cron';
 import db from '../config/db.js';
-import admin from '../config/firebase.js'; // Assure-toi que le chemin est bon
+import admin from '../config/firebase.js';
+import { notifyCircle } from '../utils/notifications.js'; // ✅ On réutilise l'intelligence de notif
 import { logAudit, AUDIT_ACTIONS } from '../utils/audits.js';
 
 const initCronJobs = () => {
     console.log("🕰️ Service de rappels (Cron) activé - Vérification chaque minute");
 
-    // Vérifie chaque minute ("* * * * *")
+    // =========================================================================
+    // JOB 1 : RAPPELS (30 MIN AVANT)
+    // =========================================================================
     cron.schedule('* * * * *', async () => {
         try {
-            // 1. Calculer l'heure cible (Maintenant + 30 min)
+            // 1. Calcul de l'heure cible (Maintenant + 30 min)
             const targetDate = new Date();
             targetDate.setMinutes(targetDate.getMinutes() + 30);
 
-            // 2. CORRECTION DATE : Utiliser la date LOCALE (comme getHours) et pas UTC
             const year = targetDate.getFullYear();
             const month = String(targetDate.getMonth() + 1).padStart(2, '0');
             const day = String(targetDate.getDate()).padStart(2, '0');
-            const dateStr = `${year}-${month}-${day}`; // Format YYYY-MM-DD Local
+            const dateStr = `${year}-${month}-${day}`; // YYYY-MM-DD
 
-            // 3. Heure format HH:MM
             const hours = String(targetDate.getHours()).padStart(2, '0');
             const minutes = String(targetDate.getMinutes()).padStart(2, '0');
             const timeStr = `${hours}:${minutes}`;
 
-            // console.log(`🔍 Scan des rappels pour : ${dateStr} à ${timeStr}`);
-
-            // 4. CORRECTION SQL : Remplacer 'due_date' par 'date'
+            // 2. Récupérer les tâches concernées
             const query = `
                 SELECT * FROM tasks 
                 WHERE date = $1 
@@ -37,99 +36,115 @@ const initCronJobs = () => {
             const result = await db.query(query, [dateStr, timeStr]);
 
             if (result.rows.length > 0) {
-                console.log(`⚡ ${result.rows.length} rappel(s) trouvé(s) !`);
-                
-                // Récupérer les tokens (On envoie à tout le monde pour l'instant)
-                const userTokens = await db.query("SELECT fcm_token FROM users WHERE fcm_token IS NOT NULL AND fcm_token != ''");
-                const tokens = [...new Set(userTokens.rows.map(r => r.fcm_token))];
+                console.log(`⏰ ${result.rows.length} tâche(s) démarrent dans 30 min (${timeStr})`);
 
-                if (tokens.length === 0) {
-                    console.log("⚠️ Aucun appareil enregistré pour recevoir la notif.");
-                    return;
-                }
-
-                // Boucle sur chaque tâche trouvée
                 for (const task of result.rows) {
-                    const message = {
-                        notification: {
-                            title: '⏰ Rappel : Activité dans 30 min',
-                            body: `Préparez-vous pour : ${task.title}`
-                        },
-                        // On ajoute des data pour pouvoir rediriger l'user au clic
-                        data: { 
-                            taskId: task.id.toString(), 
-                            type: 'reminder',
-                            click_action: 'FLUTTER_NOTIFICATION_CLICK'
-                        },
-                        tokens: tokens
-                    };
+                    
+                    // CAS A : Tâche déjà assignée à quelqu'un -> Rappel personnel
+                    if (task.assigned_to && task.assigned_to.length > 0) {
+                        // Récupérer les tokens des volontaires
+                        const volunteers = await db.query(
+                            `SELECT fcm_token, name FROM users WHERE id = ANY($1) AND fcm_token IS NOT NULL`,
+                            [task.assigned_to]
+                        );
 
-                    try {
-                        const response = await admin.messaging().sendEachForMulticast(message);
-                        console.log(`✅ Rappel envoyé (${response.successCount} succès) pour "${task.title}"`);
+                        const tokens = volunteers.rows.map(v => v.fcm_token);
                         
-                        // Marquer comme "Envoyé"
-                        await db.query('UPDATE tasks SET reminder_sent = TRUE WHERE id = $1', [task.id]);
-                    } catch (sendError) {
-                        console.error("❌ Erreur envoi Firebase:", sendError);
+                        if (tokens.length > 0) {
+                            const message = {
+                                notification: {
+                                    title: '⏰ C\'est bientôt !',
+                                    body: `Votre intervention "${task.title}" commence dans 30 min.`
+                                },
+                                data: { 
+                                    taskId: task.id.toString(), 
+                                    type: 'reminder',
+                                    click_action: 'FLUTTER_NOTIFICATION_CLICK'
+                                },
+                                tokens: tokens
+                            };
+                            await admin.messaging().sendEachForMulticast(message);
+                            console.log(`   ✅ Rappel envoyé aux volontaires pour "${task.title}"`);
+                        }
+                    } 
+                    
+                    // CAS B : Tâche non pourvue -> Appel à l'aide intelligent (disponibilité)
+                    else {
+                        console.log(`   ⚠️ Tâche "${task.title}" non pourvue : Envoi alerte aux dispos.`);
+                        
+                        // On utilise notifyCircle qui filtre déjà par Dispo & Compétence !
+                        await notifyCircle(
+                            task.circle_id,
+                            "🚨 Besoin d'aide urgent",
+                            `L'activité "${task.title}" commence dans 30 min et personne n'est inscrit !`,
+                            { taskId: task.id.toString(), type: 'urgent_reminder' },
+                            null, // Pas d'exclus
+                            task.time, // Heure pour filtrer les dispos
+                            task.date, // Date pour filtrer les dispos
+                            null       // Skill (optionnel, on peut le rajouter si vous avez un champ skill)
+                        );
                     }
+
+                    // 3. Marquer comme envoyé pour ne pas spammer
+                    await db.query('UPDATE tasks SET reminder_sent = TRUE WHERE id = $1', [task.id]);
                 }
             }
 
         } catch (err) {
-            console.error("❌ Erreur Cron:", err.message);
+            console.error("❌ Erreur Cron Rappels:", err.message);
         }
     });
 
-    // Nouveau job: journaliser les tâches passées pour les aidants inscrits
+    // =========================================================================
+    // JOB 2 : JOURNALISATION AUTOMATIQUE (TÂCHES PASSÉES)
+    // =========================================================================
     cron.schedule('* * * * *', async () => {
         try {
             const now = new Date();
-            const year = now.getFullYear();
-            const month = String(now.getMonth() + 1).padStart(2, '0');
-            const day = String(now.getDate()).padStart(2, '0');
-            const hour = String(now.getHours()).padStart(2, '0');
-            const minute = String(now.getMinutes()).padStart(2, '0');
+            const dateStr = now.toISOString().split('T')[0];
+            const timeStr = now.toTimeString().substring(0, 5);
 
-            const dateStr = `${year}-${month}-${day}`;
-            const timeStr = `${hour}:${minute}`;
-
-            // Sélectionner les tâches dont la date est aujourd'hui et l'heure <= maintenant, ou dates antérieures
+            // Tâches passées non encore journalisées (logique simplifiée)
+            // Note: Idéalement, on ajouterait un flag 'audit_logged' dans la table tasks pour éviter de re-scanner
+            // Ici on se base sur les logs existants pour ne pas dupliquer
+            
             const tasksRes = await db.query(`
                 SELECT id, circle_id, title, date, time, assigned_to
                 FROM tasks
-                WHERE (
-                    date < $1
-                    OR (date = $1 AND LEFT(CAST(time AS TEXT), 5) <= $2)
-                )
+                WHERE (date < $1 OR (date = $1 AND LEFT(CAST(time AS TEXT), 5) <= $2))
                 AND assigned_to IS NOT NULL
+                AND array_length(assigned_to, 1) > 0
             `, [dateStr, timeStr]);
 
             for (const task of tasksRes.rows) {
-                const assigned = Array.isArray(task.assigned_to) ? task.assigned_to : [];
-                if (assigned.length === 0) continue;
-
-                // Pour chaque aidant inscrit, enregistrer un audit TASK_PASSED une seule fois par tâche
-                for (const userId of assigned) {
-                    const existsRes = await db.query(
-                        `SELECT 1 FROM audit_logs WHERE user_id = $1 AND action = 'TASK_PASSED' AND details LIKE $2 LIMIT 1`,
+                for (const userId of task.assigned_to) {
+                    // Vérifier si déjà loggué
+                    const exists = await db.query(
+                        `SELECT 1 FROM audit_logs 
+                         WHERE user_id = $1 
+                         AND action = 'TASK_PASSED' 
+                         AND details LIKE $2 
+                         LIMIT 1`,
                         [userId, `%task:${task.id}%`]
                     );
-                    if (existsRes.rows.length > 0) continue; // déjà journalisé
 
-                    // Récupérer le nom pour le détail (optionnel)
-                    let userName = 'Utilisateur';
-                    try {
+                    if (exists.rows.length === 0) {
+                        // Récupérer nom user
                         const u = await db.query('SELECT name FROM users WHERE id = $1', [userId]);
-                        userName = u.rows[0]?.name || userName;
-                    } catch {}
+                        const userName = u.rows[0]?.name || 'Utilisateur';
 
-                    const details = `${userName} a passé la tâche "${task.title}" (task:${task.id})`;
-                    await logAudit(userId, AUDIT_ACTIONS.TASK_PASSED, details, task.circle_id);
+                        await logAudit(
+                            userId, 
+                            AUDIT_ACTIONS.TASK_PASSED, 
+                            `${userName} a terminé la tâche "${task.title}" (task:${task.id})`, 
+                            task.circle_id
+                        );
+                        console.log(`   📝 Audit auto: Tâche ${task.id} passée pour ${userName}`);
+                    }
                 }
             }
         } catch (err) {
-            console.error('❌ Erreur Cron TASK_PASSED:', err.message);
+            console.error('❌ Erreur Cron Audit:', err.message);
         }
     });
 };
