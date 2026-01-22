@@ -1,11 +1,13 @@
 import db from '../config/db.js';
 import { Router } from 'express';
+import { authenticateToken } from '../middleware/auth.js';
 
 const router = Router();
 
-router.get('/', async (req, res) => {
+router.get('/', authenticateToken, async (req, res) => {
     try {
         const { circle_id } = req.query;
+        const userId = req.user.id; // Récupère l'utilisateur connecté
         let resolvedCircleId = circle_id;
 
         // 1. Gestion du cercle par défaut
@@ -47,9 +49,19 @@ router.get('/', async (req, res) => {
                      WHERE circle_id = $1 AND role = 'HELPER') as active_helpers,
 
                     -- Compte des souvenirs (Journal)
-                    (SELECT COUNT(*) FROM journal_entries WHERE circle_id = $1) as memories_count
+                    (SELECT COUNT(*) FROM journal_entries WHERE circle_id = $1) as memories_count,
+                    
+                    -- Compte les messages non lus pour L'UTILISATEUR CONNECTÉ UNIQUEMENT
+                    (SELECT COALESCE(COUNT(*)::int, 0)
+                     FROM message m
+                     JOIN participant_conversation pc ON m.conversation_id = pc.conversation_id
+                     JOIN conversation c ON m.conversation_id = c.id
+                     WHERE c.cercle_id = $1 
+                     AND pc.utilisateur_id = $2
+                     AND m.date_envoi > pc.date_lecture 
+                     AND m.auteur_id != $2) as unread_count
 
-            `, [resolvedCircleId])
+            `, [resolvedCircleId, userId])
         ]);
 
         const stats = statsData.rows[0];
@@ -69,7 +81,7 @@ router.get('/', async (req, res) => {
                     active_helpers: parseInt(stats.active_helpers || 0),
                     tasks_this_week: parseInt(stats.tasks_week || 0),
                     memories: parseInt(stats.memories_count || 0), 
-                    unread_messages: 3 // Reste en dur pour l'instant (nécessite jointure complexe avec tes tables conversations)
+                    unread_messages: parseInt(stats.unread_count || 0)
                 }
             }
         });
