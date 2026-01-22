@@ -2,6 +2,7 @@ import http from 'http';
 import { Server } from 'socket.io'; 
 import app from './app.js';
 import { pool } from './config/db.js';
+import initCronJobs from './services/cronService.js';
 
 const PORT = process.env.PORT || 4000;
 
@@ -43,6 +44,7 @@ server.listen(PORT, async () => {
     await pool.query('SELECT 1');
     console.log(`🚀 Serveur démarré sur http://localhost:${PORT}`);
     console.log(`📦 Base de données connectée.`);
+    initCronJobs();
   } catch (err) {
     console.error('❌ Erreur connexion DB:', err);
   }
