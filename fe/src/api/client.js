@@ -40,7 +40,7 @@ async function handleResponse(res) {
 }
 
 export async function apiGet(path, options = {}) {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  const res = await fetch(`${API_BASE_URL}${normalizePath(path)}`, {
     method: 'GET',
     headers: getHeaders(options),
   });
@@ -48,7 +48,7 @@ export async function apiGet(path, options = {}) {
 }
 
 export async function apiPost(path, body, options = {}) {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  const res = await fetch(`${API_BASE_URL}${normalizePath(path)}`, {
     method: 'POST',
     headers: getHeaders(options),
     body: JSON.stringify(body),
@@ -57,7 +57,7 @@ export async function apiPost(path, body, options = {}) {
 }
 
 export async function apiPut(path, body, options = {}) {
-  const res = await fetch(`${API_BASE_URL}${path}`, {
+  const res = await fetch(`${API_BASE_URL}${normalizePath(path)}`, {
     method: 'PUT',
     headers: getHeaders(options),
     body: JSON.stringify(body),
@@ -68,6 +68,26 @@ export async function apiPut(path, body, options = {}) {
 export async function apiDelete(path, data = null) {
   const config = { method: 'DELETE', headers: getHeaders() };
   if (data) config.body = JSON.stringify(data);
-  const res = await fetch(`${API_BASE_URL}${path}`, config);
+  const res = await fetch(`${API_BASE_URL}${normalizePath(path)}`, config);
   return handleResponse(res);
+}
+
+// Normalize certain legacy/alternate paths to current backend routes.
+function normalizePath(path) {
+  if (!path) return '';
+
+  // Keep legacy mapping if present
+  if (path === '/users/me') return '/auth/me';
+
+  // Ensure we work with a leading slash
+  let p = path.startsWith('/') ? path : `/${path}`;
+
+  // If the requested path already contains a leading /api (causing /api/api),
+  // remove the first /api occurrence so final url becomes /api/whatever (single api).
+  if (p === '/api') return '';
+  if (p.startsWith('/api/')) {
+    p = p.replace(/^\/api/, '');
+  }
+
+  return p;
 }
