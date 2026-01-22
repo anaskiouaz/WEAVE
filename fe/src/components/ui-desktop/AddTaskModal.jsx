@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { X, Calendar, Clock, Users } from 'lucide-react';
+import { X, Calendar, Clock, Users, Check } from 'lucide-react';
 import { SKILL_OPTIONS } from '../../constants/skills';
 
 export default function AddTaskModal({ isOpen, onClose, onSave, prefillDate, skills = [] }) {
@@ -11,6 +11,8 @@ export default function AddTaskModal({ isOpen, onClose, onSave, prefillDate, ski
         required_helpers: 1,
         description: ''
     });
+    const [showCustomType, setShowCustomType] = useState(false);
+    const [customType, setCustomType] = useState('');
 
     // Mettre à jour la date si on ouvre via le bouton "+" d'un jour spécifique
     useEffect(() => {
@@ -37,7 +39,13 @@ export default function AddTaskModal({ isOpen, onClose, onSave, prefillDate, ski
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!formData.title.trim() || !formData.date) return;
-        onSave(formData);
+        
+        // Si un type personnalisé est en cours de saisie, l'utiliser
+        const finalData = {
+            ...formData,
+            type: (showCustomType && customType.trim()) ? customType.trim() : formData.type
+        };
+        onSave(finalData);
     };
 
     if (!isOpen) return null;
@@ -83,18 +91,89 @@ export default function AddTaskModal({ isOpen, onClose, onSave, prefillDate, ski
                               .map(s => (typeof s === 'string' ? s.trim() : ''))
                               .filter(Boolean)
                             ));
-                            const withOther = merged.includes('Autre') ? merged : [...merged, 'Autre'];
                             return (
-                        <select
-                            className="w-full p-3 rounded-xl focus:outline-none focus:ring-2"
-                            style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-input)', color: 'var(--text-primary)', '--tw-ring-color': 'var(--soft-coral)' }}
-                            value={formData.type}
-                            onChange={e => setFormData({ ...formData, type: e.target.value })}
-                        >
-                            {withOther.map((opt) => (
-                                <option key={opt} value={opt}>{opt}</option>
-                            ))}
-                        </select>
+                              <div className="flex flex-wrap gap-2">
+                                {merged.map((opt) => (
+                                  <button
+                                    key={opt}
+                                    type="button"
+                                    onClick={() => { setFormData({ ...formData, type: opt }); setShowCustomType(false); }}
+                                    className="px-3 py-2 rounded-full text-sm font-semibold transition-all border-2"
+                                    style={{
+                                      backgroundColor: formData.type === opt ? 'rgba(240, 128, 128, 0.15)' : 'var(--bg-secondary)',
+                                      color: formData.type === opt ? 'var(--soft-coral)' : 'var(--text-secondary)',
+                                      borderColor: formData.type === opt ? 'var(--soft-coral)' : 'var(--border-input)'
+                                    }}
+                                  >
+                                    {opt}
+                                  </button>
+                                ))}
+                                {/* Bouton Autre */}
+                                {!showCustomType ? (
+                                  <button
+                                    type="button"
+                                    onClick={() => setShowCustomType(true)}
+                                    className="px-3 py-2 rounded-full text-sm font-semibold transition-all border-2 border-dashed"
+                                    style={{
+                                      backgroundColor: 'transparent',
+                                      color: 'var(--soft-coral)',
+                                      borderColor: 'var(--soft-coral)'
+                                    }}
+                                  >
+                                    + Autre
+                                  </button>
+                                ) : (
+                                  <div className="flex items-center gap-2">
+                                    <input
+                                      type="text"
+                                      value={customType}
+                                      onChange={(e) => setCustomType(e.target.value)}
+                                      onKeyDown={(e) => {
+                                        if (e.key === 'Enter') {
+                                          e.preventDefault();
+                                          if (customType.trim()) {
+                                            setFormData({ ...formData, type: customType.trim() });
+                                            setShowCustomType(false);
+                                          }
+                                        }
+                                      }}
+                                      placeholder="Type personnalisé..."
+                                      className="px-3 py-2 rounded-full text-sm border-2 focus:outline-none"
+                                      style={{
+                                        backgroundColor: 'var(--bg-secondary)',
+                                        color: 'var(--text-primary)',
+                                        borderColor: 'var(--soft-coral)'
+                                      }}
+                                      autoFocus
+                                    />
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        if (customType.trim()) {
+                                          setFormData({ ...formData, type: customType.trim() });
+                                          setShowCustomType(false);
+                                        }
+                                      }}
+                                      disabled={!customType.trim()}
+                                      className="p-2 rounded-full transition-all"
+                                      style={{
+                                        backgroundColor: customType.trim() ? 'var(--soft-coral)' : 'var(--bg-secondary)',
+                                        color: customType.trim() ? 'white' : 'var(--text-secondary)'
+                                      }}
+                                    >
+                                      <Check size={16} />
+                                    </button>
+                                    <button
+                                      type="button"
+                                      onClick={() => { setShowCustomType(false); setCustomType(''); }}
+                                      className="p-2 rounded-full transition-all"
+                                      style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
+                                    >
+                                      <X size={16} />
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
                             );
                         })()}
                     </div>

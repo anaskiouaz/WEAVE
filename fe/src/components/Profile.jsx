@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, LogOut, Camera, RotateCcw, Cookie, Heart, ChevronDown, ChevronUp, Moon, Sun, Download, AlertTriangle } from 'lucide-react';
+import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, LogOut, Camera, RotateCcw, Cookie, Heart, ChevronDown, ChevronUp, Moon, Sun, Download, AlertTriangle, Check } from 'lucide-react';
 import { apiGet, apiPut, apiPost, apiDelete } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
@@ -45,6 +45,8 @@ export default function Profile() {
   const [profileForm, setProfileForm] = useState({});
   const [availForm, setAvailForm] = useState([]);
   const [skillsForm, setSkillsForm] = useState([]);
+  const [customSkill, setCustomSkill] = useState('');
+  const [showCustomSkillInput, setShowCustomSkillInput] = useState(false);
 
   const weekDays = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
   const hours = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
@@ -142,11 +144,20 @@ export default function Profile() {
     } catch (err) { console.error(err); }
   };
 
-  const startEditSkills = () => { setSkillsForm([...skills]); setIsEditingSkills(true); };
+  const startEditSkills = () => { setSkillsForm([...skills]); setIsEditingSkills(true); setShowCustomSkillInput(false); setCustomSkill(''); };
   
   const toggleSkill = (skill) => {
     if (skillsForm.includes(skill)) setSkillsForm(skillsForm.filter(s => s !== skill));
     else setSkillsForm([...skillsForm, skill]);
+  };
+
+  const addCustomSkill = () => {
+    const trimmed = customSkill.trim();
+    if (trimmed && !skillsForm.includes(trimmed)) {
+      setSkillsForm([...skillsForm, trimmed]);
+    }
+    setCustomSkill('');
+    setShowCustomSkillInput(false);
   };
 
   const saveSkills = async () => {
@@ -435,7 +446,7 @@ export default function Profile() {
             )}
           </div>
           <div className="flex flex-wrap gap-3">
-            {(isEditingSkills ? availableSkillsList : skills).map(skill => {
+            {(isEditingSkills ? [...new Set([...availableSkillsList, ...skillsForm])] : skills).map(skill => {
               const isSelected = isEditingSkills ? skillsForm.includes(skill) : true;
               if (!isEditingSkills && !skills.includes(skill)) return null;
               return (
@@ -454,6 +465,57 @@ export default function Profile() {
                 </button>
               );
             })}
+            {/* Bouton "Autre" pour ajouter une compétence personnalisée */}
+            {isEditingSkills && !showCustomSkillInput && (
+              <button 
+                onClick={() => setShowCustomSkillInput(true)}
+                className="px-4 py-2 rounded-full font-semibold text-sm transition-all border-2 border-dashed cursor-pointer hover:scale-105 hover:-translate-y-0.5"
+                style={{ 
+                  backgroundColor: 'transparent',
+                  color: 'var(--soft-coral)',
+                  borderColor: 'var(--soft-coral)'
+                }}
+              >
+                + Autre
+              </button>
+            )}
+            {/* Champ de saisie pour compétence personnalisée */}
+            {isEditingSkills && showCustomSkillInput && (
+              <div className="flex items-center gap-2">
+                <input
+                  type="text"
+                  value={customSkill}
+                  onChange={(e) => setCustomSkill(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && addCustomSkill()}
+                  placeholder="Votre compétence..."
+                  className="px-4 py-2 rounded-full text-sm border-2 focus:outline-none"
+                  style={{ 
+                    backgroundColor: 'var(--bg-secondary)',
+                    color: 'var(--text-primary)',
+                    borderColor: 'var(--soft-coral)'
+                  }}
+                  autoFocus
+                />
+                <button 
+                  onClick={addCustomSkill}
+                  disabled={!customSkill.trim()}
+                  className="p-2 rounded-full transition-all"
+                  style={{ 
+                    backgroundColor: customSkill.trim() ? 'var(--soft-coral)' : 'var(--bg-secondary)',
+                    color: customSkill.trim() ? 'white' : 'var(--text-secondary)'
+                  }}
+                >
+                  <Check size={16} />
+                </button>
+                <button 
+                  onClick={() => { setShowCustomSkillInput(false); setCustomSkill(''); }}
+                  className="p-2 rounded-full transition-all"
+                  style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-secondary)' }}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+            )}
           </div>
           {!isEditingSkills && <button onClick={startEditSkills} className="mt-6 flex items-center gap-2 text-sm font-semibold transition-colors" style={{ color: 'var(--soft-coral)' }}><Edit2 size={16} /> Modifier</button>}
         </div>
