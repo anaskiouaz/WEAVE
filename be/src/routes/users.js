@@ -73,6 +73,140 @@ router.post('/audit-logs', async (req, res) => {
     }
 });
 
+// =============================================
+// EXPORT DES DONNÉES PERSONNELLES (RGPD)
+// =============================================
+router.get('/me/export', authenticateToken, async (req, res) => {
+  const userId = req.user.id;
+  
+  try {
+    // Helper function pour requêtes sécurisées
+    const safeQuery = async (query, params) => {
+      try {
+        const result = await db.query(query, params);
+        return result.rows;
+      } catch (err) {
+        console.warn('Export query failed:', err.message);
+        return [];
+      }
+    };
+
+    // 1. Données utilisateur (obligatoire)
+    const userResult = await db.query(
+      `SELECT id, name, email, phone, address, role_global, onboarding_role, 
+              notifications_enabled, created_at, privacy_consent
+       FROM users WHERE id = $1`,
+      [userId]
+    );
+    
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: 'Utilisateur non trouvé' });
+    }
+    
+    const userData = userResult.rows[0];
+    
+    // 2. Rôles dans les cercles
+    const roles = await safeQuery(
+      `SELECT ur.role, ur.created_at, cc.name as circle_name
+       FROM user_roles ur
+       JOIN care_circles cc ON ur.circle_id = cc.id
+       WHERE ur.user_id = $1`,
+      [userId]
+    );
+    
+    // 3. Disponibilités
+    const availability = await safeQuery(
+      `SELECT day_of_week, start_time, end_time, cc.name as circle_name
+       FROM user_availability ua
+       JOIN care_circles cc ON ua.circle_id = cc.id
+       WHERE ua.user_id = $1`,
+      [userId]
+    );
+    
+    // 4. Messages envoyés
+    const messages = await safeQuery(
+      `SELECT m.contenu, m.date_envoi, c.nom as conversation_name
+       FROM message m
+       JOIN conversation c ON m.conversation_id = c.id
+       WHERE m.auteur_id = $1
+       ORDER BY m.date_envoi DESC`,
+      [userId]
+    );
+    
+    // 5. Souvenirs/Journal créés
+    const journal = await safeQuery(
+      `SELECT text_content, mood, created_at, cc.name as circle_name
+       FROM journal_entries je
+       JOIN care_circles cc ON je.circle_id = cc.id
+       WHERE je.author_id = $1
+       ORDER BY je.created_at DESC`,
+      [userId]
+    );
+    
+    // 6. Tâches où l'utilisateur s'est inscrit
+    const tasks = await safeQuery(
+      `SELECT t.title, t.description, t.date, t.time, ts.signed_up_at, cc.name as circle_name
+       FROM task_signups ts
+       JOIN tasks t ON ts.task_id = t.id
+       JOIN care_circles cc ON t.circle_id = cc.id
+       WHERE ts.user_id = $1
+       ORDER BY ts.signed_up_at DESC`,
+      [userId]
+    );
+    
+    // 7. Évaluations reçues
+    const ratingsReceived = await safeQuery(
+      `SELECT rating, comment, created_at, u.name as from_user
+       FROM helper_ratings hr
+       JOIN users u ON hr.rater_user_id = u.id
+       WHERE hr.rated_user_id = $1`,
+      [userId]
+    );
+    
+    // 8. Évaluations données
+    const ratingsGiven = await safeQuery(
+      `SELECT rating, comment, created_at, u.name as to_user
+       FROM helper_ratings hr
+       JOIN users u ON hr.rated_user_id = u.id
+       WHERE hr.rater_user_id = $1`,
+      [userId]
+    );
+    
+    // Construire l'export complet
+    const exportData = {
+      export_date: new Date().toISOString(),
+      export_version: '1.0',
+      user: {
+        ...userData,
+        password_hash: '[MASQUÉ POUR SÉCURITÉ]'
+      },
+      circles_membership: roles,
+      availability: availability,
+      messages_sent: messages,
+      journal_entries: journal,
+      task_signups: tasks,
+      ratings: {
+        received: ratingsReceived,
+        given: ratingsGiven
+      }
+    };
+    
+    // Log de l'export (non-bloquant)
+    try {
+      await logAudit(userId, 'DATA_EXPORT', `Export des données personnelles de ${userData.name}`);
+    } catch (e) { console.warn('Audit log failed:', e.message); }
+    
+    // Envoyer comme fichier JSON téléchargeable
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('Content-Disposition', `attachment; filename="weave-export-${userId}-${Date.now()}.json"`);
+    res.json(exportData);
+    
+  } catch (error) {
+    console.error('Erreur export données:', error);
+    res.status(500).json({ error: 'Erreur lors de l\'export des données', details: error.message });
+  }
+});
+
 // 4. CONSENTEMENT (PATCH)
 router.patch('/:id/consent', async (req, res) => {
     try {

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, LogOut, Camera, RotateCcw, Cookie, Heart, ChevronDown, ChevronUp, Moon, Sun } from 'lucide-react';
-import { apiGet, apiPut, apiPost } from '../api/client';
+import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, LogOut, Camera, RotateCcw, Cookie, Heart, ChevronDown, ChevronUp, Moon, Sun, Download, AlertTriangle } from 'lucide-react';
+import { apiGet, apiPut, apiPost, apiDelete } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useTheme } from '../context/ThemeContext';
 import { useCookieConsent } from '../context/CookieContext';
@@ -35,6 +35,12 @@ export default function Profile() {
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [showAssistedPeople, setShowAssistedPeople] = useState(false);
   const [assistedPeopleList] = useState(['Grand-Père Michel']); 
+
+  // --- RGPD : Export et Suppression ---
+  const [isExporting, setIsExporting] = useState(false);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [deleteConfirmText, setDeleteConfirmText] = useState('');
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const [profileForm, setProfileForm] = useState({});
   const [availForm, setAvailForm] = useState([]);
@@ -250,6 +256,63 @@ export default function Profile() {
   const handleLogout = () => {
     logout();
     navigate('/login');
+  };
+
+  // --- RGPD : Export des données ---
+  const handleExportData = async () => {
+    setIsExporting(true);
+    try {
+      const apiUrl = `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api'}/users/me/export`;
+      console.log('Export URL:', apiUrl);
+      
+      const response = await fetch(apiUrl, {
+        method: 'GET',
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('weave_token')}`
+        }
+      });
+      
+      console.log('Response status:', response.status);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Export error response:', errorText);
+        throw new Error(`Erreur ${response.status}: ${errorText}`);
+      }
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `weave-mes-donnees-${new Date().toISOString().split('T')[0]}.json`;
+      document.body.appendChild(a);
+      a.click();
+      window.URL.revokeObjectURL(url);
+      a.remove();
+    } catch (error) {
+      console.error('Erreur export complète:', error);
+      alert(`Erreur lors de l'export: ${error.message}`);
+    } finally {
+      setIsExporting(false);
+    }
+  };
+
+  // --- RGPD : Suppression du compte ---
+  const handleDeleteAccount = async () => {
+    if (deleteConfirmText !== 'SUPPRIMER') return;
+    
+    setIsDeleting(true);
+    try {
+      await apiDelete(`/users/${USER_ID}`);
+      logout();
+      navigate('/login');
+    } catch (error) {
+      console.error('Erreur suppression:', error);
+      alert(error.response?.data?.error || 'Erreur lors de la suppression du compte');
+    } finally {
+      setIsDeleting(false);
+      setShowDeleteModal(false);
+    }
   };
   
   const handlePhotoUpload = async (e) => {
@@ -574,6 +637,31 @@ export default function Profile() {
               <span>Gérer mes cookies</span>
             </button>
 
+            {/* EXPORT DONNÉES RGPD */}
+            <button 
+              onClick={handleExportData}
+              disabled={isExporting}
+              className="flex items-center gap-3 p-3 rounded-2xl transition-all w-full text-left font-semibold"
+              style={{ color: 'var(--text-primary)', opacity: isExporting ? 0.6 : 1 }}
+              onMouseEnter={(e) => { if (!isExporting) { e.currentTarget.style.backgroundColor = 'rgba(240, 128, 128, 0.08)'; e.currentTarget.style.color = 'var(--soft-coral)'; }}}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; e.currentTarget.style.color = 'var(--text-primary)'; }}
+            >
+              <Download size={20} />
+              <span>{isExporting ? 'Export en cours...' : 'Exporter mes données'}</span>
+            </button>
+
+            {/* SUPPRESSION COMPTE RGPD */}
+            <button 
+              onClick={() => setShowDeleteModal(true)}
+              className="flex items-center gap-3 p-3 rounded-2xl transition-all w-full text-left font-semibold"
+              style={{ color: '#dc2626' }}
+              onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = 'rgba(220, 38, 38, 0.08)'; }}
+              onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = 'transparent'; }}
+            >
+              <AlertTriangle size={20} />
+              <span>Supprimer mon compte</span>
+            </button>
+
             {/* DÉCONNEXION */}
             <button 
               onClick={handleLogout}
@@ -590,6 +678,85 @@ export default function Profile() {
         </div>
 
       </div>
+
+      {/* MODAL SUPPRESSION COMPTE */}
+      {showDeleteModal && (
+        <div 
+          className="fixed inset-0 z-50 flex items-center justify-center p-4"
+          style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)' }}
+          onClick={() => setShowDeleteModal(false)}
+        >
+          <div 
+            className="rounded-2xl p-6 max-w-md w-full shadow-xl"
+            style={{ backgroundColor: 'var(--bg-card)' }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex items-center gap-3 mb-4">
+              <div className="p-2 rounded-full" style={{ backgroundColor: 'rgba(220, 38, 38, 0.1)' }}>
+                <AlertTriangle size={24} style={{ color: '#dc2626' }} />
+              </div>
+              <h3 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>
+                Supprimer mon compte
+              </h3>
+            </div>
+            
+            <p className="mb-4" style={{ color: 'var(--text-secondary)' }}>
+              Cette action est <strong>irréversible</strong>. Toutes vos données seront définitivement supprimées :
+            </p>
+            
+            <ul className="mb-4 text-sm space-y-1" style={{ color: 'var(--text-secondary)' }}>
+              <li>• Votre profil et informations personnelles</li>
+              <li>• Vos messages et conversations</li>
+              <li>• Vos souvenirs et photos</li>
+              <li>• Vos tâches et calendrier</li>
+            </ul>
+            
+            <p className="mb-2 text-sm" style={{ color: 'var(--text-secondary)' }}>
+              Pour confirmer, tapez <strong style={{ color: '#dc2626' }}>SUPPRIMER</strong> ci-dessous :
+            </p>
+            
+            <input
+              type="text"
+              value={deleteConfirmText}
+              onChange={(e) => setDeleteConfirmText(e.target.value)}
+              placeholder="Tapez SUPPRIMER"
+              className="w-full p-3 rounded-xl mb-4 border-2"
+              style={{ 
+                backgroundColor: 'var(--bg-primary)', 
+                color: 'var(--text-primary)',
+                borderColor: deleteConfirmText === 'SUPPRIMER' ? '#dc2626' : 'var(--border-light)'
+              }}
+            />
+            
+            <div className="flex gap-3">
+              <button
+                onClick={() => { setShowDeleteModal(false); setDeleteConfirmText(''); }}
+                className="flex-1 py-3 rounded-xl font-semibold transition-colors"
+                style={{ 
+                  backgroundColor: 'var(--bg-primary)', 
+                  color: 'var(--text-primary)',
+                  border: '1px solid var(--border-light)'
+                }}
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleDeleteAccount}
+                disabled={deleteConfirmText !== 'SUPPRIMER' || isDeleting}
+                className="flex-1 py-3 rounded-xl font-semibold transition-colors"
+                style={{ 
+                  backgroundColor: deleteConfirmText === 'SUPPRIMER' ? '#dc2626' : '#9ca3af',
+                  color: 'white',
+                  opacity: isDeleting ? 0.6 : 1,
+                  cursor: deleteConfirmText === 'SUPPRIMER' && !isDeleting ? 'pointer' : 'not-allowed'
+                }}
+              >
+                {isDeleting ? 'Suppression...' : 'Supprimer définitivement'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
