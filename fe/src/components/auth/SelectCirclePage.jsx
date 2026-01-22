@@ -44,7 +44,7 @@ export default function SelectCirclePage() {
     };
 
     // --- CORRECTION MAJEURE ICI ---
-    const handleSuccessRedirect = async (circleId, circleName) => {
+    const handleSuccessRedirect = async (circleId, circleName, role = 'HELPER') => {
         console.log("🚀 Sélection Cercle :", circleId, circleName);
         
         try {
@@ -58,7 +58,13 @@ export default function SelectCirclePage() {
 
             // 3. IMPORTANT : Mettre à jour le User dans le contexte pour qu'il sache qu'il a un cercle actif
             if (setUser) {
-                setUser(prev => ({ ...prev, current_circle_id: circleId }));
+                setUser(prev => {
+                    const prevCircles = Array.isArray(prev?.circles) ? prev.circles : [];
+                    // Si le cercle est déjà présent, on ne le duplique pas
+                    const exists = prevCircles.some(c => String(c.id ?? c.circle_id) === String(circleId));
+                    const newCircles = exists ? prevCircles : [{ id: circleId, senior_name: circleName, role }].concat(prevCircles);
+                    return { ...prev, current_circle_id: circleId, circles: newCircles };
+                });
             }
             
             // 4. Redirection douce avec React Router (plus rapide et sans rechargement complet)
@@ -122,7 +128,7 @@ export default function SelectCirclePage() {
             const finalName = data.circle_name || data.circle?.senior_name || data.data?.senior_name || seniorData.name;
 
             if (finalId) {
-                handleSuccessRedirect(finalId, finalName);
+                handleSuccessRedirect(finalId, finalName, 'ADMIN');
             } else {
                 setLoading(false);
                 throw new Error("ID du cercle manquant dans la réponse");

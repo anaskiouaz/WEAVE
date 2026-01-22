@@ -1,6 +1,9 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus, Star, Award, PenSquare, Bell, LogOut, Camera, Cookie } from 'lucide-react';
+import {
+  Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus,
+  Star, Award, PenSquare, Bell, LogOut, Camera, Cookie, AlertTriangle
+} from 'lucide-react';
 import { apiGet, apiPut, apiPost } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useCookieConsent } from '../context/CookieContext';
@@ -9,52 +12,79 @@ import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 
 export default function Profile() {
-  const { user, logout } = useAuth();
+  const { user, logout, circleId } = useAuth();
   const { openPreferences } = useCookieConsent();
   const navigate = useNavigate();
-  
-  // --- ID DYNAMIQUE ---
-  const USER_ID = user?.id; 
 
+  // --- ID DYNAMIQUE ---
+  const USER_ID = user?.id;
+
+  // --- ETATS DE DONNEES ---
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef(null);
 
-  const [isEditingProfile, setIsEditingProfile] = useState(false);
-  const [isEditingAvailability, setIsEditingAvailability] = useState(false);
-  const [isEditingSkills, setIsEditingSkills] = useState(false);
-  
   const [userInfo, setUserInfo] = useState({ name: '', email: '', phone: '', address: '', joinDate: '', yearsActive: '0 jour', photoUrl: null });
   const [availability, setAvailability] = useState([]);
   const [stats, setStats] = useState({ interventions: 0, moments: 0, messagesSent: 0, rating: 0 });
   const [skills, setSkills] = useState([]);
-  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
-  
-  // --- UI ETATS ---
-  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
+  // --- ETATS UI D'EDITION ---
+  const [isEditingProfile, setIsEditingProfile] = useState(false);
+  const [isEditingAvailability, setIsEditingAvailability] = useState(false);
+  const [isEditingSkills, setIsEditingSkills] = useState(false);
+  const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
+
+  // --- FORMULAIRES ---
   const [profileForm, setProfileForm] = useState({});
   const [availForm, setAvailForm] = useState([]);
   const [skillsForm, setSkillsForm] = useState([]);
 
+  // --- ETATS SETTINGS & MODALS ---
+  const [notificationsEnabled, setNotificationsEnabled] = useState(false);
+
+  // Modal suppression Cercle (Admin)
+  const [showDeleteCircleModal, setShowDeleteCircleModal] = useState(false);
+  const [deleteCircleConfirmText, setDeleteCircleConfirmText] = useState('');
+  const [isDeletingCircle, setIsDeletingCircle] = useState(false);
+
+  // Modal suppression Compte (Nouveau)
+  const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
+  const [deleteAccountInput, setDeleteAccountInput] = useState('');
+  const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+
+  // Constantes
   const weekDays = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
   const hours = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
   const availableSkillsList = ['Courses', 'Cuisine', 'Accompagnement médical', 'Promenade', 'Lecture', 'Jardinage', 'Bricolage'];
 
+  // --- HELPERS API ---
+  const buildApiUrl = (p) => {
+    const raw = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+    let host = raw.replace(/\/$/, '');
+    if (host.endsWith('/api')) host = host.slice(0, -4);
+    const path = p.startsWith('/') ? p.slice(1) : p;
+    return `${host}/api/${path}`;
+  };
+
+  // --- INITIALISATION ---
   useEffect(() => {
     if (USER_ID) {
-        setIsLoading(true);
-        fetchData();
-        checkNotificationStatus();
+      setIsLoading(true);
+      fetchData();
+      checkNotificationStatus();
     }
   }, [USER_ID]);
+
+  // Résoudre le cercle courant
+  const currentCircle = (circleId && user?.circles?.find(c => String(c.id) === String(circleId))) || user?.circles?.[0] || null;
+  const currentCircleName = currentCircle?.senior_name || currentCircle?.name || currentCircle?.circle_nom || '';
+  const isAdmin = currentCircle && (String(currentCircle.role || '').toUpperCase() === 'ADMIN' || String(currentCircle.role || '').toUpperCase() === 'SUPERADMIN');
 
   const checkNotificationStatus = async () => {
     if (Capacitor.getPlatform() === 'web') return;
     try {
       const perm = await PushNotifications.checkPermissions();
-      if (perm.receive === 'granted') {
-        setNotificationsEnabled(true);
-      }
+      if (perm.receive === 'granted') setNotificationsEnabled(true);
     } catch (e) {
       console.error("Erreur check notifs", e);
     }
@@ -63,51 +93,36 @@ export default function Profile() {
   const fetchData = async () => {
     try {
       const options = { headers: { 'x-user-id': USER_ID } };
-      
-      // 1. Charger le profil de base
+
+      // 1. Profil
       const data = await apiGet('/module/profile', options);
-      
       if (data.success) {
         const userData = data.user;
-        const createdDate = new Date(userData.created_at);
-
         setUserInfo({
           name: userData.name,
           email: userData.email,
           phone: userData.phone || '',
           address: userData.address || '',
-          joinDate: createdDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
-          yearsActive: 0,  // Sera mis à jour par les stats
-          photoUrl: userData.profile_photo ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'}/uploads/${userData.profile_photo}` : null
+          joinDate: new Date(userData.created_at).toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
+          yearsActive: 0,
+          photoUrl: userData.profile_photo ? buildApiUrl(`/upload/blob/${userData.profile_photo}`) : null
         });
 
-        // Formatage des disponibilités
-        const formattedAvail = (data.availability || []).map(a => ({
-            day: a.day_of_week,
-            slots: a.slots
-        }));
-        setAvailability(formattedAvail);
-        
-        // Initialisation des skills
+        setAvailability((data.availability || []).map(a => ({ day: a.day_of_week, slots: a.slots })));
         setSkills(Array.isArray(userData.skills) ? userData.skills : []);
-        
-        // Notifs depuis la DB
-        if (userData.notifications_enabled !== undefined) {
-            setNotificationsEnabled(userData.notifications_enabled);
-        }
+        if (userData.notifications_enabled !== undefined) setNotificationsEnabled(userData.notifications_enabled);
 
-        // 2. Charger les statistiques
+        // 2. Stats
         try {
-            const statsData = await apiGet('/module/profile/stats', options);
-            if (statsData.success) {
-                setStats(statsData.stats);
-                if (statsData.stats.yearsActiveText) {
-                    setUserInfo(prev => ({ ...prev, yearsActive: statsData.stats.yearsActiveText }));
-                }
+          const statsData = await apiGet('/module/profile/stats', options);
+          if (statsData.success) {
+            setStats(statsData.stats);
+            if (statsData.stats.yearsActiveText) {
+              setUserInfo(prev => ({ ...prev, yearsActive: statsData.stats.yearsActiveText }));
             }
-        } catch (statsError) {
-            console.log("⚠️ API Stats non disponible ou vide, utilisation valeurs par défaut.");
-            setStats({ interventions: 0, moments: 0, messagesSent: 0, rating: 5.0 });
+          }
+        } catch (e) {
+          setStats({ interventions: 0, moments: 0, messagesSent: 0, rating: 5.0 });
         }
       }
     } catch (error) {
@@ -117,78 +132,43 @@ export default function Profile() {
     }
   };
 
-  // --- GESTION PHOTO ---
-  const handlePhotoClick = () => fileInputRef.current.click();
-  
+  // --- HANDLERS PHOTO ---
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
-
     setIsUploadingPhoto(true);
     try {
-      // 1. Afficher l'aperçu temporaire
       const tempUrl = URL.createObjectURL(file);
       setUserInfo({ ...userInfo, photoUrl: tempUrl });
 
-      // 2. Préparer le FormData pour l'upload
       const formData = new FormData();
       formData.append('image', file);
-
-      // 3. Uploader vers le backend
-      const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
-      const uploadResponse = await fetch(`${API_BASE_URL}/api/upload/image`, {
-        method: 'POST',
-        body: formData,
-      });
-
-      if (!uploadResponse.ok) {
-        throw new Error('Erreur lors de l\'upload de l\'image');
-      }
+      const uploadResponse = await fetch(buildApiUrl('/upload/image'), { method: 'POST', body: formData });
+      if (!uploadResponse.ok) throw new Error('Erreur upload');
 
       const uploadData = await uploadResponse.json();
-      if (uploadData.status !== 'ok' || !uploadData.data.blobName) {
-        throw new Error('Erreur lors de la sauvegarde de l\'image');
-      }
+      if (uploadData.status !== 'ok') throw new Error('Erreur sauvegarde');
 
-      // 4. Sauvegarder le nom du blob en base de données
       const options = { headers: { 'x-user-id': USER_ID } };
-      const saveResponse = await apiPost('/module/profile/upload-photo', {
-        photoBlobName: uploadData.data.blobName
-      }, options);
+      await apiPost('/module/profile/upload-photo', { photoBlobName: uploadData.data.blobName }, options);
 
-      if (saveResponse.success) {
-        // 5. Mettre à jour l'URL avec le blob final
-        const photoUrl = `${API_BASE_URL}/uploads/${uploadData.data.blobName}`;
-        setUserInfo({ ...userInfo, photoUrl });
-        alert('Photo de profil mise à jour avec succès!');
-      }
+      setUserInfo({ ...userInfo, photoUrl: buildApiUrl(`/upload/blob/${uploadData.data.blobName}`) });
+      alert('Photo mise à jour');
     } catch (err) {
-      console.error('Erreur upload photo:', err);
-      alert(`Erreur lors de l'upload: ${err.message}`);
-      // Réinitialiser la photo en cas d'erreur
-      setUserInfo({ ...userInfo, photoUrl: userInfo.photoUrl }); // Remet l'ancienne si besoin, logic à affiner si on stockait l'ancienne URL
+      console.error(err);
+      alert("Erreur lors de la mise à jour de la photo");
     } finally {
       setIsUploadingPhoto(false);
     }
   };
 
-  // --- SAUVEGARDES PROFIL ---
-  const startEditProfile = () => { setProfileForm({ ...userInfo }); setIsEditingProfile(true); };
-  
+  // --- HANDLERS UPDATE PROFILE ---
   const saveProfile = async () => {
     try {
       const options = { headers: { 'x-user-id': USER_ID } };
       const data = await apiPut('/module/profile/info', profileForm, options);
       if (data.success) { setUserInfo({ ...userInfo, ...profileForm }); setIsEditingProfile(false); }
     } catch (err) { console.error(err); }
-  };
-
-  // --- SAUVEGARDES SKILLS ---
-  const startEditSkills = () => { setSkillsForm([...skills]); setIsEditingSkills(true); };
-  
-  const toggleSkill = (skill) => {
-    if (skillsForm.includes(skill)) setSkillsForm(skillsForm.filter(s => s !== skill));
-    else setSkillsForm([...skillsForm, skill]);
   };
 
   const saveSkills = async () => {
@@ -199,16 +179,16 @@ export default function Profile() {
     } catch (err) { console.error(err); }
   };
 
-  // --- SAUVEGARDES DISPONIBILITÉS ---
-  const startEditAvail = () => { 
-    const initialForm = availability.length > 0 
-      ? availability.map(a => ({
-          day: a.day_of_week || a.day,
-          slots: a.slots
-        })) 
-      : [{ day: 'Lundi', slots: '08:00 - 18:00' }];
-    setAvailForm(initialForm); 
-    setIsEditingAvailability(true); 
+  const toggleSkill = (skill) => {
+    if (skillsForm.includes(skill)) setSkillsForm(skillsForm.filter(s => s !== skill));
+    else setSkillsForm([...skillsForm, skill]);
+  };
+
+  // --- HANDLERS AVAILABILITY ---
+  const updateAvailRow = (index, field, value) => {
+    const newAvail = [...availForm];
+    newAvail[index][field] = value;
+    setAvailForm(newAvail);
   };
 
   const updateTimeSlot = (index, type, value) => {
@@ -221,41 +201,23 @@ export default function Profile() {
     setAvailForm(newAvail);
   };
 
-  const updateAvailRow = (index, field, value) => { 
-    const newAvail = [...availForm]; 
-    newAvail[index][field] = value; 
-    setAvailForm(newAvail); 
-  };
-  const addAvailRow = () => setAvailForm([...availForm, { day: 'Lundi', slots: '08:00 - 18:00' }]); 
-  const removeAvailRow = (index) => setAvailForm(availForm.filter((_, i) => i !== index));
-
   const saveAvailability = async () => {
     try {
       const options = { headers: { 'x-user-id': USER_ID } };
-      const circleId = localStorage.getItem('circle_id');
-      if (!circleId) { alert('Aucun cercle sélectionné'); return; }
-      
-      const dataToSend = availForm.map(item => ({ 
-        day_of_week: item.day || item.day_of_week, 
-        slots: item.slots 
-      }));
-      
-      const data = await apiPut('/module/profile/availability', { 
-        circle_id: circleId, 
-        availability: dataToSend 
-      }, options);
-      
-      if (data.success) { 
-        setAvailability(dataToSend); 
-        setIsEditingAvailability(false); 
+      const cid = localStorage.getItem('circle_id');
+      if (!cid) return alert('Aucun cercle sélectionné');
+
+      const dataToSend = availForm.map(item => ({ day_of_week: item.day || item.day_of_week, slots: item.slots }));
+      const data = await apiPut('/module/profile/availability', { circle_id: cid, availability: dataToSend }, options);
+
+      if (data.success) {
+        setAvailability(dataToSend);
+        setIsEditingAvailability(false);
       }
-    } catch (err) { 
-      console.error(err); 
-      alert('Erreur lors de la sauvegarde des disponibilités');
-    }
+    } catch (err) { console.error(err); alert('Erreur lors de la sauvegarde'); }
   };
 
-  // --- GESTION NOTIFICATIONS ---
+  // --- HANDLER NOTIFICATIONS ---
   const handleNotificationToggle = async () => {
     // 1. Sur PC (Web), on ne fait rien (bouton caché mais sécurité en plus)
     if (!Capacitor.isNativePlatform()) return;
@@ -298,7 +260,7 @@ export default function Profile() {
     navigate('/login');
   };
 
-  if (isLoading) return <div className="p-10 flex justify-center h-screen items-center"><Loader2 className="animate-spin text-blue-600 w-10 h-10"/></div>;
+  if (isLoading) return <div className="p-10 flex justify-center h-screen items-center"><Loader2 className="animate-spin text-blue-600 w-10 h-10" /></div>;
 
   return (
     <div className="min-h-screen bg-gray-50 pb-12">
@@ -308,228 +270,299 @@ export default function Profile() {
       <div className="bg-gradient-to-r from-blue-700 via-blue-500 to-orange-400 pb-32 shadow-md">
         <div className="max-w-4xl mx-auto p-8 pt-12">
           <div className="flex items-center gap-6">
-            <div className="relative group cursor-pointer" onClick={!isUploadingPhoto ? handlePhotoClick : null}>
+            <div className="relative group cursor-pointer" onClick={() => !isUploadingPhoto && fileInputRef.current.click()}>
               <div className="w-24 h-24 bg-white rounded-full flex items-center justify-center text-blue-600 text-3xl font-bold border-4 border-white/40 shadow-xl overflow-hidden relative">
-                {isUploadingPhoto && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-black/30 z-10">
-                    <Loader2 className="animate-spin text-white w-6 h-6" />
-                  </div>
-                )}
+                {isUploadingPhoto && <div className="absolute inset-0 bg-black/30 flex items-center justify-center z-10"><Loader2 className="animate-spin text-white" /></div>}
                 {userInfo.photoUrl ? <img src={userInfo.photoUrl} className="w-full h-full object-cover" alt="Profil" /> : userInfo.name?.charAt(0).toUpperCase()}
               </div>
-              {!isUploadingPhoto && (
-                <div className="absolute bottom-0 right-0 bg-white p-2 rounded-full text-gray-600 hover:text-blue-600 shadow-lg transition-transform transform group-hover:scale-110"><Camera size={16} /></div>
-              )}
+              <div className="absolute bottom-0 right-0 bg-white p-2 rounded-full text-gray-600 shadow-lg group-hover:scale-110 transition-transform"><Camera size={16} /></div>
             </div>
-
             <div className="text-white drop-shadow-md">
-              <h1 className="text-3xl font-bold tracking-tight">{userInfo.name}</h1>
+              <h1 className="text-3xl font-bold">{userInfo.name}</h1>
               <p className="opacity-95 flex items-center gap-2 font-medium mt-1">
-                <Award size={18} className="text-orange-200" /> 
-                Aidant{userInfo.name && userInfo.name.endsWith('e') ? 'e' : ''} depuis {userInfo.yearsActive}
+                <Award size={18} className="text-orange-200" /> Aidant{userInfo.name?.endsWith('e') && 'e'} depuis {userInfo.yearsActive}
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* --- CONTENU --- */}
+      {/* CONTENU */}
       <div className="max-w-4xl mx-auto px-8 -mt-24 space-y-6">
 
         {/* STATS */}
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100 transform hover:-translate-y-1 transition-transform duration-200">
-            <span className="text-3xl font-bold text-gray-800">{stats.interventions}</span>
-            <span className="text-gray-500 text-sm font-bold uppercase tracking-wide mt-1">Interventions</span>
-          </div>
-          <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100 transform hover:-translate-y-1 transition-transform duration-200">
-            <span className="text-3xl font-bold text-gray-800">{stats.moments}</span>
-            <span className="text-gray-500 text-sm font-bold uppercase tracking-wide mt-1">Souvenirs postés</span>
-          </div>
-          <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100 transform hover:-translate-y-1 transition-transform duration-200">
-            <span className="text-3xl font-bold text-gray-800">{stats.messagesSent || 0}</span>
-            <span className="text-gray-500 text-sm font-bold uppercase tracking-wide mt-1">Messages envoyés</span>
-          </div>
-          <div className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100 transform hover:-translate-y-1 transition-transform duration-200">
-            <div className="flex items-center gap-1 text-3xl font-bold text-gray-800">
-              {stats.rating} <Star className="text-yellow-400 fill-yellow-400 w-6 h-6" />
+          {[
+            { val: stats.interventions, label: 'Interventions' },
+            { val: stats.moments, label: 'Souvenirs' },
+            { val: stats.messagesSent || 0, label: 'Messages' },
+            { val: <>{stats.rating} <Star className="inline w-6 h-6 text-yellow-400 fill-yellow-400" /></>, label: 'Appréciation' }
+          ].map((s, i) => (
+            <div key={i} className="bg-white rounded-xl shadow-md p-6 flex flex-col items-center justify-center border border-gray-100 hover:-translate-y-1 transition-transform">
+              <span className="text-3xl font-bold text-gray-800">{s.val}</span>
+              <span className="text-gray-500 text-sm font-bold uppercase tracking-wide mt-1">{s.label}</span>
             </div>
-            <span className="text-gray-500 text-sm font-bold uppercase tracking-wide mt-1">Appréciation</span>
-          </div>
+          ))}
         </div>
 
         {/* COMPÉTENCES */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <div className="flex justify-between items-start mb-6">
             <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2"><Award className="text-blue-600" size={20} /> Compétences</h2>
-            {isEditingSkills && (
+            {isEditingSkills ? (
               <div className="flex gap-2">
-                <button onClick={() => setIsEditingSkills(false)} className="px-3 py-2 text-sm border rounded flex gap-1 items-center"><X size={14}/> Annuler</button>
-                <button onClick={saveSkills} className="px-3 py-2 text-sm bg-blue-600 text-white rounded flex gap-1 items-center"><Save size={14}/> Enregistrer</button>
+                <button onClick={() => setIsEditingSkills(false)} className="px-3 py-2 text-sm border rounded flex gap-1 items-center"><X size={14} /> Annuler</button>
+                <button onClick={saveSkills} className="px-3 py-2 text-sm bg-blue-600 text-white rounded flex gap-1 items-center"><Save size={14} /> Enregistrer</button>
               </div>
-            )}
+            ) : <button onClick={() => { setSkillsForm([...skills]); setIsEditingSkills(true); }} className="text-sm font-medium text-blue-600 flex items-center gap-2"><Edit2 size={16} /> Modifier</button>}
           </div>
           <div className="flex flex-wrap gap-3">
             {(isEditingSkills ? availableSkillsList : skills).map(skill => {
-              const isSelected = isEditingSkills ? skillsForm.includes(skill) : true;
+              const isSel = isEditingSkills ? skillsForm.includes(skill) : true;
               if (!isEditingSkills && !skills.includes(skill)) return null;
               return (
-                <button key={skill} onClick={() => isEditingSkills && toggleSkill(skill)} disabled={!isEditingSkills} className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${isSelected ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-gray-50 text-gray-400 border-gray-200'} ${isEditingSkills ? 'cursor-pointer hover:scale-105' : ''}`}>
+                <button key={skill} onClick={() => isEditingSkills && toggleSkill(skill)} disabled={!isEditingSkills}
+                  className={`px-4 py-2 rounded-lg font-medium text-sm transition-all ${isSel ? 'bg-orange-100 text-orange-700 border-orange-200' : 'bg-gray-50 text-gray-400 border-gray-200'} ${isEditingSkills ? 'cursor-pointer hover:scale-105' : ''}`}>
                   {skill}
                 </button>
               );
             })}
           </div>
-          {!isEditingSkills && <button onClick={startEditSkills} className="mt-6 flex items-center gap-2 text-sm font-medium text-blue-600"><Edit2 size={16} /> Modifier</button>}
         </div>
 
         {/* DISPONIBILITÉS */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
-           <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2"><Loader2 className="text-blue-600" size={20} /> Disponibilités</h2>
-              {isEditingAvailability ? (
-                 <div className="flex gap-2">
-                    <button onClick={() => setIsEditingAvailability(false)} className="px-3 py-2 text-sm border rounded flex gap-1 items-center"><X size={14}/> Annuler</button>
-                    <button onClick={saveAvailability} className="px-3 py-2 text-sm bg-blue-600 text-white rounded flex gap-1 items-center"><Save size={14}/> Enregistrer</button>
-                 </div>
-              ) : (
-                 <button onClick={startEditAvail} className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg flex items-center gap-2"><Edit2 size={16} /> Modifier</button>
-              )}
-           </div>
-           <div className="space-y-3">
-              {isEditingAvailability ? (
-                  <div className="space-y-3">
-                      {availForm.map((item, index) => {
-                          let [start, end] = item.slots && item.slots.includes(' - ') 
-                            ? item.slots.split(' - ') 
-                            : ['08:00', '18:00'];
-
-                          return (
-                            <div key={index} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-gray-50 p-2 rounded-lg border border-gray-200">
-                                <select 
-                                  value={item.day} 
-                                  onChange={(e) => updateAvailRow(index, 'day', e.target.value)} 
-                                  className="border p-2 rounded bg-white w-full sm:w-32 text-sm focus:ring-2 focus:ring-blue-500 outline-none"
-                                >
-                                  {weekDays.map(d => <option key={d} value={d}>{d}</option>)}
-                                </select>
-                                
-                                <div className="flex items-center gap-2 flex-1 w-full">
-                                    <span className="text-gray-500 text-sm">De</span>
-                                    <select value={start} onChange={(e) => updateTimeSlot(index, 'start', e.target.value)} className="border p-2 rounded bg-white flex-1 text-sm outline-none">{hours.map(h => <option key={h} value={h}>{h}</option>)}</select>
-                                    <span className="text-gray-500 text-sm">à</span>
-                                    <select value={end} onChange={(e) => updateTimeSlot(index, 'end', e.target.value)} className="border p-2 rounded bg-white flex-1 text-sm outline-none">{hours.map(h => <option key={h} value={h}>{h}</option>)}</select>
-                                </div>
-
-                                <button onClick={() => removeAvailRow(index)} className="p-2 text-red-500 hover:bg-red-50 rounded transition-colors self-end sm:self-center">
-                                  <Trash2 size={18}/>
-                                </button>
-                            </div>
-                          );
-                      })}
-                      <button onClick={addAvailRow} className="mt-2 text-sm text-blue-600 font-medium flex items-center gap-2"><Plus size={16}/> Ajouter un créneau</button>
-                  </div>
-              ) : (
-                  availability.length > 0 ? (
-                      <div className="grid grid-cols-1 gap-2">
-                        {availability.map((item, idx) => (
-                            <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
-                              <span className="font-medium text-gray-900 w-32">{item.day_of_week || item.day}</span>
-                              <span className="text-gray-600 bg-white px-3 py-1 rounded border border-gray-200 text-sm">{item.slots}</span>
-                            </div>
-                        ))}
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2"><Loader2 className="text-blue-600" size={20} /> Disponibilités</h2>
+            {isEditingAvailability ? (
+              <div className="flex gap-2">
+                <button onClick={() => setIsEditingAvailability(false)} className="px-3 py-2 text-sm border rounded flex gap-1 items-center"><X size={14} /> Annuler</button>
+                <button onClick={saveAvailability} className="px-3 py-2 text-sm bg-blue-600 text-white rounded flex gap-1 items-center"><Save size={14} /> Enregistrer</button>
+              </div>
+            ) : (
+              <button onClick={() => {
+                setAvailForm(availability.length ? availability.map(a => ({ day: a.day_of_week || a.day, slots: a.slots })) : [{ day: 'Lundi', slots: '08:00 - 18:00' }]);
+                setIsEditingAvailability(true);
+              }} className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg flex items-center gap-2"><Edit2 size={16} /> Modifier</button>
+            )}
+          </div>
+          {/* ... Logique d'affichage des disponibilités identique ... */}
+          <div className="space-y-3">
+            {isEditingAvailability ? (
+              <div className="space-y-3">
+                {availForm.map((item, index) => {
+                  let [start, end] = item.slots && item.slots.includes(' - ') ? item.slots.split(' - ') : ['08:00', '18:00'];
+                  return (
+                    <div key={index} className="flex flex-col sm:flex-row gap-3 items-start sm:items-center bg-gray-50 p-2 rounded-lg border border-gray-200">
+                      <select value={item.day} onChange={(e) => updateAvailRow(index, 'day', e.target.value)} className="border p-2 rounded bg-white w-full sm:w-32 text-sm outline-none">
+                        {weekDays.map(d => <option key={d} value={d}>{d}</option>)}
+                      </select>
+                      <div className="flex items-center gap-2 flex-1 w-full">
+                        <span className="text-gray-500 text-sm">De</span>
+                        <select value={start} onChange={(e) => updateTimeSlot(index, 'start', e.target.value)} className="border p-2 rounded bg-white flex-1 text-sm outline-none">{hours.map(h => <option key={h} value={h}>{h}</option>)}</select>
+                        <span className="text-gray-500 text-sm">à</span>
+                        <select value={end} onChange={(e) => updateTimeSlot(index, 'end', e.target.value)} className="border p-2 rounded bg-white flex-1 text-sm outline-none">{hours.map(h => <option key={h} value={h}>{h}</option>)}</select>
                       </div>
-                  ) : (<div className="text-center py-6 bg-gray-50 rounded-lg border border-dashed border-gray-300"><p className="text-gray-500 italic text-sm">Aucune disponibilité.</p></div>)
-              )}
-           </div>
+                      <button onClick={() => setAvailForm(availForm.filter((_, i) => i !== index))} className="p-2 text-red-500 hover:bg-red-50 rounded"><Trash2 size={18} /></button>
+                    </div>
+                  );
+                })}
+                <button onClick={() => setAvailForm([...availForm, { day: 'Lundi', slots: '08:00 - 18:00' }])} className="mt-2 text-sm text-blue-600 font-medium flex items-center gap-2"><Plus size={16} /> Ajouter un créneau</button>
+              </div>
+            ) : (
+              availability.length > 0 ? (
+                <div className="grid grid-cols-1 gap-2">
+                  {availability.map((item, idx) => (
+                    <div key={idx} className="flex items-center justify-between p-3 bg-gray-50 rounded-lg border border-gray-100">
+                      <span className="font-medium text-gray-900 w-32">{item.day_of_week || item.day}</span>
+                      <span className="text-gray-600 bg-white px-3 py-1 rounded border border-gray-200 text-sm">{item.slots}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : <div className="text-center py-6 bg-gray-50 border border-dashed rounded-lg text-gray-500 italic text-sm">Aucune disponibilité.</div>
+            )}
+          </div>
         </div>
 
         {/* INFOS PERSONNELLES */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
-           <div className="flex justify-between items-center mb-6">
-              <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2"><Mail className="text-blue-600" size={20} /> Infos personnelles</h2>
-              {isEditingProfile ? (
-                  <div className="flex gap-2">
-                      <button onClick={() => setIsEditingProfile(false)} className="px-3 py-2 border rounded flex gap-1 items-center text-sm"><X size={14}/> Annuler</button>
-                      <button onClick={saveProfile} className="px-3 py-2 bg-blue-600 text-white rounded flex gap-1 items-center text-sm"><Save size={14}/> Enregistrer</button>
-                  </div>
-              ) : (
-                  <button onClick={startEditProfile} className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg flex items-center gap-2"><Edit2 size={16} /> Modifier</button>
-              )}
-           </div>
-           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-               {isEditingProfile ? (
-                 <>
-                    <div className="md:col-span-2">
-                      <label className="text-xs font-semibold text-gray-500 uppercase">Nom</label>
-                      <input 
-                        value={profileForm.name || ''} 
-                        disabled 
-                        className="mt-1 w-full p-2 border rounded bg-gray-100 text-gray-500 cursor-not-allowed"
-                        title="Le nom ne peut pas être modifié"
-                      />
-                    </div>
-                    <div><label className="text-xs font-semibold text-gray-500 uppercase">Email</label><div className="flex items-center gap-3 mt-1 p-2 bg-gray-50 rounded border border-gray-100"><Mail className="w-4 h-4 text-gray-400"/><span className="text-gray-700">{userInfo.email}</span></div></div>
-                    <div><label className="text-xs font-semibold text-gray-500 uppercase">Tel</label><input value={profileForm.phone || ''} onChange={(e) => setProfileForm({...profileForm, phone: e.target.value})} className="mt-1 w-full p-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"/></div>
-                    <div className="md:col-span-2"><label className="text-xs font-semibold text-gray-500 uppercase">Adresse</label><input value={profileForm.address || ''} onChange={(e) => setProfileForm({...profileForm, address: e.target.value})} className="mt-1 w-full p-2 border rounded outline-none focus:ring-2 focus:ring-blue-500"/></div>
-                 </>
-               ) : (
-                 <>
-                    <div><label className="text-xs font-semibold text-gray-500 uppercase">Nom</label><div className="flex items-center gap-3 mt-1 p-2 bg-gray-50 rounded border border-gray-100"><PenSquare className="w-4 h-4 text-gray-400"/><span className="text-gray-700">{userInfo.name}</span></div></div>
-                    <div><label className="text-xs font-semibold text-gray-500 uppercase">Email</label><div className="flex items-center gap-3 mt-1 p-2 bg-gray-50 rounded border border-gray-100"><Mail className="w-4 h-4 text-gray-400"/><span className="text-gray-700">{userInfo.email}</span></div></div>
-                    <div><label className="text-xs font-semibold text-gray-500 uppercase">Tel</label><div className="flex items-center gap-3 mt-1 p-2 bg-gray-50 rounded border border-gray-100"><Phone className="w-4 h-4 text-gray-400"/><span className="text-gray-700">{userInfo.phone || '-'}</span></div></div>
-                    <div className="md:col-span-2"><label className="text-xs font-semibold text-gray-500 uppercase">Adresse</label><div className="flex items-center gap-3 mt-1 p-2 bg-gray-50 rounded border border-gray-100"><MapPin className="w-4 h-4 text-gray-400"/><span className="text-gray-700">{userInfo.address || '-'}</span></div></div>
-                 </>
-               )}
-           </div>
+          <div className="flex justify-between items-center mb-6">
+            <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2"><Mail className="text-blue-600" size={20} /> Infos personnelles</h2>
+            {isEditingProfile ? (
+              <div className="flex gap-2">
+                <button onClick={() => setIsEditingProfile(false)} className="px-3 py-2 border rounded flex gap-1 items-center text-sm"><X size={14} /> Annuler</button>
+                <button onClick={saveProfile} className="px-3 py-2 bg-blue-600 text-white rounded flex gap-1 items-center text-sm"><Save size={14} /> Enregistrer</button>
+              </div>
+            ) : (
+              <button onClick={() => { setProfileForm({ ...userInfo }); setIsEditingProfile(true); }} className="px-4 py-2 text-sm font-medium text-blue-600 bg-blue-50 rounded-lg flex items-center gap-2"><Edit2 size={16} /> Modifier</button>
+            )}
+          </div>
+          {/* Champs Infos Perso */}
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            {isEditingProfile ? (
+              <>
+                <div className="md:col-span-2">
+                  <label className="text-xs font-semibold text-gray-500 uppercase">Nom</label>
+                  <input value={profileForm.name || ''} disabled className="mt-1 w-full p-2 border rounded bg-gray-100 text-gray-500 cursor-not-allowed" />
+                </div>
+                <div><label className="text-xs font-semibold text-gray-500 uppercase">Email</label><div className="mt-1 p-2 bg-gray-50 rounded border text-gray-500">{userInfo.email}</div></div>
+                <div><label className="text-xs font-semibold text-gray-500 uppercase">Tel</label><input value={profileForm.phone || ''} onChange={(e) => setProfileForm({ ...profileForm, phone: e.target.value })} className="mt-1 w-full p-2 border rounded outline-none focus:ring-2 focus:ring-blue-500" /></div>
+                <div className="md:col-span-2"><label className="text-xs font-semibold text-gray-500 uppercase">Adresse</label><input value={profileForm.address || ''} onChange={(e) => setProfileForm({ ...profileForm, address: e.target.value })} className="mt-1 w-full p-2 border rounded outline-none focus:ring-2 focus:ring-blue-500" /></div>
+              </>
+            ) : (
+              <>
+                <div><label className="text-xs font-semibold text-gray-500 uppercase">Nom</label><div className="flex items-center gap-3 mt-1 p-2 bg-gray-50 rounded border border-gray-100"><PenSquare className="w-4 h-4 text-gray-400" /><span className="text-gray-700">{userInfo.name}</span></div></div>
+                <div><label className="text-xs font-semibold text-gray-500 uppercase">Email</label><div className="flex items-center gap-3 mt-1 p-2 bg-gray-50 rounded border border-gray-100"><Mail className="w-4 h-4 text-gray-400" /><span className="text-gray-700">{userInfo.email}</span></div></div>
+                <div><label className="text-xs font-semibold text-gray-500 uppercase">Tel</label><div className="flex items-center gap-3 mt-1 p-2 bg-gray-50 rounded border border-gray-100"><Phone className="w-4 h-4 text-gray-400" /><span className="text-gray-700">{userInfo.phone || '-'}</span></div></div>
+                <div className="md:col-span-2"><label className="text-xs font-semibold text-gray-500 uppercase">Adresse</label><div className="flex items-center gap-3 mt-1 p-2 bg-gray-50 rounded border border-gray-100"><MapPin className="w-4 h-4 text-gray-400" /><span className="text-gray-700">{userInfo.address || '-'}</span></div></div>
+              </>
+            )}
+          </div>
         </div>
 
-        {/* --- PARAMÈTRES --- */}
+        {/* --- PARAMÈTRES GÉNÉRAUX --- */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <h2 className="text-lg font-bold text-gray-900 mb-6">Paramètres</h2>
           <div className="space-y-6">
-            
-            {/* NOTIFICATIONS */}
-            <div className="flex items-center justify-between md:hidden">
+
+            {/* Notifications Switch */}
+            <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Bell className="text-gray-500" size={20} />
                 <span className="text-gray-700 font-medium">Notifications Push</span>
               </div>
-              <button 
-                onClick={handleNotificationToggle}
-                className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors duration-300 focus:outline-none ${notificationsEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
-              >
-                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform duration-300 ${notificationsEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
+              <button onClick={handleNotificationToggle} className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${notificationsEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}>
+                <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${notificationsEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>
               </button>
             </div>
 
-            {/* RELANCER LE TOUR ONBOARDING */}
-            <div className="pt-4 border-t border-gray-100">
-              <RestartOnboardingButton />
-            </div>
+            <div className="pt-4 border-t border-gray-100"><RestartOnboardingButton /></div>
 
-            {/* GESTION COOKIES RGPD */}
-            <button 
-              onClick={openPreferences}
-              className="flex items-center gap-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition-colors w-full text-left"
-            >
+            {/* Cookies */}
+            <button onClick={openPreferences} className="flex items-center gap-3 text-gray-700 hover:text-blue-600 hover:bg-blue-50 p-2 rounded-lg transition-colors w-full text-left">
               <Cookie size={20} />
               <span className="font-medium">Gérer mes cookies</span>
             </button>
 
-            {/* DÉCONNEXION */}
-            <button 
-              onClick={handleLogout}
-              className="flex items-center gap-3 text-orange-600 hover:text-orange-700 hover:bg-orange-50 p-2 rounded-lg transition-colors w-full text-left pt-4 border-t border-gray-100 mt-2"
-            >
+            {/* LOGOUT */}
+            <button onClick={handleLogout} className="flex items-center gap-3 text-orange-600 hover:text-orange-700 hover:bg-orange-50 p-2 rounded-lg transition-colors w-full text-left pt-4 border-t border-gray-100 mt-2">
               <LogOut size={20} />
               <span className="font-medium text-lg">Se déconnecter</span>
             </button>
-
           </div>
         </div>
 
+        {/* --- ZONE DE DANGER (Suppression Cercle & Compte) --- */}
+        <div className="bg-white rounded-xl shadow-sm border border-red-100 p-8 overflow-hidden">
+          <div className="flex items-center gap-2 mb-6 text-red-700">
+            <AlertTriangle size={24} />
+            <h2 className="text-lg font-bold">Zone dangereuse</h2>
+          </div>
+
+          <div className="space-y-6">
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-4 bg-red-50 rounded-lg border border-red-100 gap-4">
+              <div>
+                <h3 className="font-bold text-red-800">Supprimer mon compte</h3>
+                <p className="text-sm text-red-600 mt-1">Efface votre profil, vos messages et retire votre accès à tous les cercles.</p>
+              </div>
+              <button onClick={() => setShowDeleteAccountModal(true)} className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap font-medium text-sm">
+                <Trash2 size={16} /> Supprimer mon compte
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
+
+      {/* --- MODAL SUPPRESSION CERCLE --- */}
+      {showDeleteCircleModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden">
+            <div className="p-6 bg-red-50 border-b border-red-100 flex items-center gap-3">
+              <div className="w-10 h-10 bg-red-100 rounded-full flex items-center justify-center text-red-600"><AlertTriangle size={20} /></div>
+              <div>
+                <h3 className="text-lg font-bold text-red-700">Supprimer "{currentCircleName}" ?</h3>
+                <p className="text-xs text-red-600">Action irréversible</p>
+              </div>
+            </div>
+            <div className="p-6 space-y-4">
+              <p className="text-sm text-gray-700">Pour confirmer, veuillez saisir le nom du cercle : <strong>{currentCircleName}</strong></p>
+              <input type="text" value={deleteCircleConfirmText} onChange={(e) => setDeleteCircleConfirmText(e.target.value)} placeholder="Nom du cercle" className="w-full p-2 border rounded-lg outline-none focus:ring-2 focus:ring-red-500" />
+            </div>
+            <div className="p-6 bg-gray-50 flex gap-3">
+              <button onClick={() => setShowDeleteCircleModal(false)} className="flex-1 py-2 border rounded-lg">Annuler</button>
+              <button onClick={handleDeleteCircle} disabled={deleteCircleConfirmText !== currentCircleName || isDeletingCircle} className="flex-1 py-2 bg-red-600 text-white rounded-lg disabled:opacity-50">
+                {isDeletingCircle ? '...' : 'Supprimer'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* --- MODAL SUPPRESSION COMPTE (NEW) --- */}
+      {showDeleteAccountModal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden transform transition-all">
+
+            <div className="p-6 bg-red-50 border-b border-red-100">
+              <div className="flex items-center gap-3">
+                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center shrink-0">
+                  <Trash2 className="w-6 h-6 text-red-600" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-red-700">Supprimer votre compte ?</h3>
+                  <p className="text-sm text-red-600">Vous allez perdre toutes vos données.</p>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-6 space-y-4">
+              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+                <p className="text-sm text-red-800">
+                  <strong>Attention :</strong> Cette action est définitive. Vos informations personnelles, historique d'interventions et accès seront effacés.
+                </p>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Pour confirmer, tapez <span className="font-bold text-red-600">supprimer</span> ci-dessous :
+                </label>
+                <input
+                  type="text"
+                  value={deleteAccountInput}
+                  onChange={(e) => setDeleteAccountInput(e.target.value)}
+                  placeholder="supprimer"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-all"
+                />
+              </div>
+            </div>
+
+            <div className="p-6 bg-gray-50 border-t border-gray-100 flex gap-3">
+              <button
+                onClick={() => {
+                  setShowDeleteAccountModal(false);
+                  setDeleteAccountInput('');
+                }}
+                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+              >
+                Annuler
+              </button>
+              <button
+                onClick={handleConfirmDeleteAccount}
+                disabled={deleteAccountInput.toLowerCase() !== 'supprimer' || isDeletingAccount}
+                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+              >
+                {isDeletingAccount ? (
+                  <><Loader2 className="w-4 h-4 animate-spin" /> Suppression...</>
+                ) : (
+                  <><Trash2 className="w-4 h-4" /> Confirmer</>
+                )}
+              </button>
+            </div>
+
+          </div>
+        </div>
+      )}
+
     </div>
   );
 }
