@@ -1,0 +1,48 @@
+name: "Azure Infrastructure Security Audit"
+
+on:
+  push:
+    branches: [ main ]
+  schedule:
+    - cron: '0 12 * * *' # Vérification automatique tous les jours à midi
+
+jobs:
+  azure-audit:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Connexion à Azure
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: "Audit : DDoS Protection & Réseau"
+        run: |
+          # Vérifie si la protection DDoS est active sur ton VNet
+          # Remplace 'MonVNet' et 'MonRG' par tes vrais noms
+          ddos_status=$(az network vnet show --name MonVNet --resource-group MonRG --query "enableDdosProtection" -o tsv)
+          
+          if [ "$ddos_status" != "true" ]; then
+            echo "❌ ERREUR : La protection DDoS n'est pas activée sur le VNet."
+            exit 1
+          fi
+
+      - name: "Audit : Microsoft Defender for Cloud"
+        run: |
+          # Vérifie si Defender est actif pour PostgreSQL
+          # On cherche le 'Standard' setting pour les bases de données open-source
+          defender_status=$(az security pricing show --name OpenSourceRelationalDatabases --query "pricingTier" -o tsv)
+          
+          if [ "$defender_status" != "Standard" ]; then
+            echo "❌ ERREUR : Microsoft Defender for Cloud est désactivé pour la DB."
+            exit 1
+          fi
+
+      - name: "Audit : Fuite de secrets (Key Vault)"
+        run: |
+          # Vérifie que ton App Service utilise bien des références Key Vault 
+          # au lieu de valeurs en clair
+          raw_secrets=$(az webapp config appsettings list --name MonAppService --resource-group MonRG --query "[?contains(value, 'password') || contains(value, 'secret')].value" -o tsv)
+          
+          if [[ "$raw_secrets" != *"@Microsoft.KeyVault"* ]]; then
+             echo "⚠️ ATTENTION : Des secrets semblent être stockés en clair sans Key Vault."
+          fi
