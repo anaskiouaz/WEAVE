@@ -107,7 +107,8 @@ router.delete('/:id/volunteer', async (req, res) => {
             `${userName} s'est désisté de "${updatedTask.title}". Une place est dispo !`,
             { taskId: updatedTask.id.toString(), type: 'task_updated' },
             userId,
-            updatedTask.time, updatedTask.date, updatedTask.task_type
+            updatedTask.time, updatedTask.date, updatedTask.task_type,
+            null
         );
 
         await logAudit(userId, AUDIT_ACTIONS.TASK_UPDATED, `${userName} désinscrit de "${updatedTask.title}"`, updatedTask.circle_id);

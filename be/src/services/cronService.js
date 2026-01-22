@@ -1,7 +1,7 @@
 import cron from 'node-cron';
 import db from '../config/db.js';
 import admin from '../config/firebase.js';
-import { notifyCircle } from '../utils/notifications.js'; // ✅ On réutilise l'intelligence de notif
+import { notifyCircle } from '../utils/notifications.js';
 import { logAudit, AUDIT_ACTIONS } from '../utils/audits.js';
 
 const initCronJobs = () => {
@@ -12,18 +12,37 @@ const initCronJobs = () => {
     // =========================================================================
     cron.schedule('* * * * *', async () => {
         try {
-            // 1. Calcul de l'heure cible (Maintenant + 30 min)
-            const targetDate = new Date();
-            targetDate.setMinutes(targetDate.getMinutes() + 30);
+            // 1. Calcul de l'heure cible (Maintenant + 30 min) en forçant le fuseau horaire PARIS
+            // On crée une date actuelle
+            const now = new Date();
+            
+            // On ajoute 30 minutes
+            const futureDate = new Date(now.getTime() + 30 * 60000);
 
-            const year = targetDate.getFullYear();
-            const month = String(targetDate.getMonth() + 1).padStart(2, '0');
-            const day = String(targetDate.getDate()).padStart(2, '0');
-            const dateStr = `${year}-${month}-${day}`; // YYYY-MM-DD
+            // On formate cette date future selon le fuseau horaire de Paris pour extraire les composants
+            const formatter = new Intl.DateTimeFormat('fr-FR', {
+                timeZone: 'Europe/Paris',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            });
 
-            const hours = String(targetDate.getHours()).padStart(2, '0');
-            const minutes = String(targetDate.getMinutes()).padStart(2, '0');
-            const timeStr = `${hours}:${minutes}`;
+            const parts = formatter.formatToParts(futureDate);
+            const getPart = (type) => parts.find(p => p.type === type).value;
+
+            const year = getPart('year');
+            const month = getPart('month');
+            const day = getPart('day');
+            const hours = getPart('hour');
+            const minutes = getPart('minute');
+
+            const dateStr = `${year}-${month}-${day}`; // Format YYYY-MM-DD
+            const timeStr = `${hours}:${minutes}`;     // Format HH:MM
+
+            // console.log(`🔍 Vérification rappels pour : ${dateStr} à ${timeStr} (Heure Paris)`);
 
             // 2. Récupérer les tâches concernées
             const query = `
@@ -72,7 +91,6 @@ const initCronJobs = () => {
                     else {
                         console.log(`   ⚠️ Tâche "${task.title}" non pourvue : Envoi alerte aux dispos.`);
                         
-                        // On utilise notifyCircle qui filtre déjà par Dispo & Compétence !
                         await notifyCircle(
                             task.circle_id,
                             "🚨 Besoin d'aide urgent",
@@ -81,11 +99,11 @@ const initCronJobs = () => {
                             null, // Pas d'exclus
                             task.time, // Heure pour filtrer les dispos
                             task.date, // Date pour filtrer les dispos
-                            null       // Skill (optionnel, on peut le rajouter si vous avez un champ skill)
+                            null       // Skill
                         );
                     }
 
-                    // 3. Marquer comme envoyé pour ne pas spammer
+                    // 3. Marquer comme envoyé
                     await db.query('UPDATE tasks SET reminder_sent = TRUE WHERE id = $1', [task.id]);
                 }
             }
@@ -100,14 +118,24 @@ const initCronJobs = () => {
     // =========================================================================
     cron.schedule('* * * * *', async () => {
         try {
+            // Même logique de date pour l'audit pour être cohérent
             const now = new Date();
-            const dateStr = now.toISOString().split('T')[0];
-            const timeStr = now.toTimeString().substring(0, 5);
-
-            // Tâches passées non encore journalisées (logique simplifiée)
-            // Note: Idéalement, on ajouterait un flag 'audit_logged' dans la table tasks pour éviter de re-scanner
-            // Ici on se base sur les logs existants pour ne pas dupliquer
+            const formatter = new Intl.DateTimeFormat('fr-FR', {
+                timeZone: 'Europe/Paris',
+                year: 'numeric',
+                month: '2-digit',
+                day: '2-digit',
+                hour: '2-digit',
+                minute: '2-digit',
+                hour12: false
+            });
             
+            const parts = formatter.formatToParts(now);
+            const getPart = (type) => parts.find(p => p.type === type).value;
+            
+            const dateStr = `${getPart('year')}-${getPart('month')}-${getPart('day')}`;
+            const timeStr = `${getPart('hour')}:${getPart('minute')}`;
+
             const tasksRes = await db.query(`
                 SELECT id, circle_id, title, date, time, assigned_to
                 FROM tasks
@@ -118,7 +146,6 @@ const initCronJobs = () => {
 
             for (const task of tasksRes.rows) {
                 for (const userId of task.assigned_to) {
-                    // Vérifier si déjà loggué
                     const exists = await db.query(
                         `SELECT 1 FROM audit_logs 
                          WHERE user_id = $1 
@@ -129,7 +156,6 @@ const initCronJobs = () => {
                     );
 
                     if (exists.rows.length === 0) {
-                        // Récupérer nom user
                         const u = await db.query('SELECT name FROM users WHERE id = $1', [userId]);
                         const userName = u.rows[0]?.name || 'Utilisateur';
 
