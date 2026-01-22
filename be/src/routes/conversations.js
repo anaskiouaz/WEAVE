@@ -54,6 +54,9 @@ router.post('/:id/messages', async (req, res) => {
       'INSERT INTO message (conversation_id, auteur_id, contenu, is_moderated) VALUES ($1, $2, $3, $4) RETURNING *',
       [id, authorId, contenuFinal, isModerated]
     );
+
+
+    
     const savedMessage = insertResult.rows[0];
 
     // Récupère les infos de l'auteur
