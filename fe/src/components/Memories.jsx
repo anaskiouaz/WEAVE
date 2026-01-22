@@ -7,31 +7,32 @@ import { useAuth } from '../context/AuthContext'; // Import du hook d'authentifi
 import MobileMemories from './ui-mobile/MobileMemories'; // Import du composant mobile
 
 export default function Memories() {
-  // CONST PHOTO
+  // State pour la capture photo via Capacitor (mobile)
   const [tempPhoto, setTempPhoto] = useState(null);
-  const [newContent, setNewContent] = useState('');
 
-  const { user, circleId } = useAuth(); // Récupération de l'utilisateur connecté ET du circleId
+  const { user, circleId } = useAuth();
+  
+  // Data et UI state
   const [memories, setMemories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // --- ÉTATS POUR LE NOUVEAU SOUVENIR ---
+  // Nouveau souvenir
   const [newText, setNewText] = useState("");
-  const [newMood, setNewMood] = useState(5); // Valeur par défaut
+  const [newMood, setNewMood] = useState(5);
   const [newPhotoUrl, setNewPhotoUrl] = useState("");
   const [newPhotoFile, setNewPhotoFile] = useState(null);
   const [isPublishing, setIsPublishing] = useState(false);
 
-  // --- ÉTATS AJOUTÉS POUR LES COMMENTAIRES ---
+  // Commentaires
   const [activeCommentId, setActiveCommentId] = useState(null);
   const [commentText, setCommentText] = useState("");
   const [isSending, setIsSending] = useState(false);
 
-  // ID du cercle - utilise le circleId du contexte (sélectionné par l'utilisateur)
+  // ID du cercle actuel (depuis le contexte utilisateur)
   const CIRCLE_ID = circleId || user?.circles?.[0]?.id || "d0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44";
 
-  // Récupération des données depuis la base de données
+  // Récupère tous les souvenirs du cercle
   const fetchMemories = async () => {
     try {
       setLoading(true);
@@ -57,7 +58,7 @@ export default function Memories() {
     fetchMemories();
   }, [CIRCLE_ID]);
 
-  // Nettoyer les URLs d'objet lors du démontage du composant
+  // Nettoie les URLs blob au démontage pour éviter les fuites mémoire
   useEffect(() => {
     return () => {
       if (newPhotoUrl && newPhotoUrl.startsWith('blob:')) {
@@ -66,7 +67,7 @@ export default function Memories() {
     };
   }, [newPhotoUrl]);
 
-  // --- FONCTION POUR PUBLIER UN SOUVENIR ---
+  // Publie un nouveau souvenir avec texte et photo optionnelle
   const handleAddMemory = async () => {
     if (!newText.trim() || !user) return;
 
@@ -79,7 +80,7 @@ export default function Memories() {
         const formData = new FormData();
         formData.append('image', newPhotoFile);
 
-        // Helpers locaux pour construire proprement les URLs (évite /api/api)
+        // Construit l'URL API en évitant les doublons /api/api
         const buildApiUrl = (p) => {
           const raw = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
           let host = raw.replace(/\/$/, '');
@@ -88,7 +89,7 @@ export default function Memories() {
           return `${host}/api/${path}`;
         };
 
-        // 2. On fait l'appel vers la bonne route (avec /api)
+        // Upload l'image vers le backend
         const uploadResponse = await fetch(buildApiUrl('/upload/image'), {
           method: 'POST',
           body: formData,
@@ -99,14 +100,14 @@ export default function Memories() {
           throw new Error(errorData.message || 'Erreur lors de l\'upload de l\'image');
         }
 
-  const uploadData = await uploadResponse.json();
-  if (uploadData.status !== 'ok') {
-    throw new Error(uploadData.message || 'Erreur upload');
-  }
+        const uploadData = await uploadResponse.json();
+        if (uploadData.status !== 'ok') {
+          throw new Error(uploadData.message || 'Erreur upload');
+        }
 
-  // 3. On récupère le nom du blob renvoyé par le backend
-  photoBlobName = uploadData.data.blobName;
-}
+        // Récupère le nom du blob pour stocker en BDD
+        photoBlobName = uploadData.data.blobName;
+      }
 
       await apiPost('/souvenirs', {
         circle_id: CIRCLE_ID,
@@ -137,27 +138,21 @@ export default function Memories() {
     }
   };
 
-// --- NOUVELLE FONCTION CAPACITOR ---
+  // Déclenche la caméra pour une prise de photo (Capacitor)
   const prendrePhoto = async () => {
     try {
       const image = await Camera.getPhoto({
         quality: 90,
-        allowEditing: true, // Permet de recadrer après la prise
-        resultType: CameraResultType.Uri // Récupère un chemin web affichable
+        allowEditing: true,
+        resultType: CameraResultType.Uri
       });
-
-      // image.webPath contient l'URL locale de l'image pour l'affichage
       setTempPhoto(image.webPath);
     } catch (error) {
       console.log('Prise de photo annulée ou erreur:', error);
     }
   };
-
-  const clearPhoto = () => {
-    setTempPhoto(null);
-  };
   
-  // --- FONCTION AJOUTÉE POUR ENVOYER UN COMMENTAIRE ---
+  // Envoie un commentaire sur un souvenir
   const handleSendComment = async (entryId) => {
     if (!commentText.trim()) return;
     
@@ -177,17 +172,15 @@ export default function Memories() {
     }
   };
 
-  // --- FONCTION AJOUTÉE POUR SUPPRIMER UN COMMENTAIRE ---
+  // Supprime un commentaire (seulement si l'utilisateur en est l'auteur)
   const handleDeleteComment = async (memoryId, commentId, commentAuthor, memoryAuthor) => {
     if (!user) return;
 
-    // Vérifier que l'utilisateur est l'auteur du commentaire
     if (commentAuthor !== user.name && memoryAuthor !== user.name) {
       alert("Vous ne pouvez pas supprimer les commentaires des autres.");
       return;
     }
 
-    // Demander confirmation avant suppression
     const confirmDelete = window.confirm("Êtes-vous sûr de vouloir supprimer ce commentaire ?");
     if (!confirmDelete) return;
 
@@ -204,11 +197,10 @@ export default function Memories() {
     }
   };
 
-  // --- FONCTION POUR SUPPRIMER UN SOUVENIR ---
+  // Supprime un souvenir (seulement son auteur peut le faire)
   const handleDeleteMemory = async (memoryId) => {
     if (!user) return;
 
-    // Demander confirmation avant suppression
     const confirmDelete = window.confirm("Êtes-vous sûr de vouloir supprimer ce souvenir ? Cette action est irréversible.");
     if (!confirmDelete) return;
 
@@ -219,143 +211,137 @@ export default function Memories() {
 
       // Rafraîchir la liste après suppression
       await fetchMemories();
-      alert("Souvenir supprimé avec succès");
     } catch (err) {
       console.error("Erreur lors de la suppression:", err);
       alert("Erreur lors de la suppression du souvenir: " + err.message);
     }
   };
 
-  // 🔹 Construire l'URL complète de l'image
+  // Construit l'URL complète pour charger une image depuis le stockage
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-  // Si la variable inclut /api, on le retire pour servir les fichiers statiques
   const FILES_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, '');
 
-const getPhotoUrl = (photo) => {
-  if (!photo) return null;
-  if (photo.startsWith('http')) return photo;
-  return `${FILES_BASE_URL}/uploads/${photo}`;
-};
+  const getPhotoUrl = (photo) => {
+    if (!photo) return null;
+    if (photo.startsWith('http')) return photo;
+    return `${FILES_BASE_URL}/uploads/${photo}`;
+  };
 
-// 🔹 Charger une image en base64 pour jsPDF
-// Fallback proxy pour les images Azure afin d'éviter les erreurs CORS/canvas
-const loadImageAsBase64 = async (url) => {
-  try {
-    // Si c'est une URL Azure, passer par le proxy backend
-    if (url.includes('.blob.core.windows.net')) {
-      let blobName = null;
-      try {
-        const u = new URL(url);
-        const parts = u.pathname.split('/');
-        blobName = parts[parts.length - 1];
-      } catch {}
+  // Charge une image en base64 pour l'export PDF (gère Azure via proxy)
+  const loadImageAsBase64 = async (url) => {
+    try {
+      if (url.includes('.blob.core.windows.net')) {
+        let blobName = null;
+        try {
+          const u = new URL(url);
+          const parts = u.pathname.split('/');
+          blobName = parts[parts.length - 1];
+        } catch {}
 
-      if (blobName) {
-        const API_BASE_URL_FULL = import.meta.env.VITE_API_BASE_URL || '';
-        const proxyUrl = `${API_BASE_URL_FULL}/upload/blob/${blobName}`;
-        const resp = await fetch(proxyUrl);
-        if (!resp.ok) throw new Error('Proxy image fetch failed');
-        const blob = await resp.blob();
-        const reader = new FileReader();
-        const base64 = await new Promise((resolve, reject) => {
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-        return base64;
+        if (blobName) {
+          const API_BASE_URL_FULL = import.meta.env.VITE_API_BASE_URL || '';
+          const proxyUrl = `${API_BASE_URL_FULL}/upload/blob/${blobName}`;
+          const resp = await fetch(proxyUrl);
+          if (!resp.ok) throw new Error('Proxy image fetch failed');
+          const blob = await resp.blob();
+          const reader = new FileReader();
+          const base64 = await new Promise((resolve, reject) => {
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          return base64;
+        }
       }
+
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = url;
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      return canvas.toDataURL('image/jpeg', 0.9);
+    } catch (e) {
+      console.error('loadImageAsBase64 failed:', e);
+      throw e;
     }
+  };
 
-    // Par défaut: charger via Image + canvas (pour fichiers locaux)
-    const img = new window.Image();
-    img.crossOrigin = 'anonymous';
-    await new Promise((resolve, reject) => {
-      img.onload = resolve;
-      img.onerror = reject;
-      img.src = url;
-    });
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0);
-    return canvas.toDataURL('image/jpeg', 0.9);
-  } catch (e) {
-    console.error('loadImageAsBase64 failed:', e);
-    throw e;
-  }
-};
-
-  // Fonction d'export PDF avec les données réelles
+  // Génère et télécharge un PDF du journal de bord
   const handleDownloadPDF = async () => {
-  const doc = new jsPDF();
+    const doc = new jsPDF();
   doc.setFontSize(20);
   doc.text('Journal de bord - Souvenirs Partagés', 20, 20);
 
   let yPosition = 40;
 
-  for (let index = 0; index < memories.length; index++) {
-    const memory = memories[index];
+    for (let index = 0; index < memories.length; index++) {
+      const memory = memories[index];
 
-    if (yPosition > 260) {
-      doc.addPage();
-      yPosition = 20;
-    }
+      if (yPosition > 260) {
+        doc.addPage();
+        yPosition = 20;
+      }
 
-    const dateStr = new Date(memory.created_at).toLocaleDateString('fr-FR');
-    const authorStr = memory.author_name || "Auteur inconnu";
+      const dateStr = new Date(memory.created_at).toLocaleDateString('fr-FR');
+      const authorStr = memory.author_name || "Auteur inconnu";
 
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`${dateStr} - Par ${authorStr}`, 20, yPosition);
-    yPosition += 7;
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`${dateStr} - Par ${authorStr}`, 20, yPosition);
+      yPosition += 7;
 
-    doc.setFontSize(11);
-    doc.setTextColor(0);
-    const lines = doc.splitTextToSize(memory.text_content || '', 170);
-    doc.text(lines, 20, yPosition);
-    yPosition += lines.length * 7 + 5;
+      doc.setFontSize(11);
+      doc.setTextColor(0);
+      const lines = doc.splitTextToSize(memory.text_content || '', 170);
+      doc.text(lines, 20, yPosition);
+      yPosition += lines.length * 7 + 5;
 
-    // ✅ AJOUT DE LA PHOTO DANS LE PDF
-    if (memory.photo_data) {
-      try {
-        const imageUrl = getPhotoUrl(memory.photo_data);
-        const imageBase64 = await loadImageAsBase64(imageUrl);
+      // Ajoute la photo si présente
+      if (memory.photo_data) {
+        try {
+          const imageUrl = getPhotoUrl(memory.photo_data);
+          const imageBase64 = await loadImageAsBase64(imageUrl);
 
-        const imgWidth = 170;
-        const imgHeight = 100;
+          const imgWidth = 170;
+          const imgHeight = 100;
 
-        if (yPosition + imgHeight > 280) {
-          doc.addPage();
-          yPosition = 20;
+          if (yPosition + imgHeight > 280) {
+            doc.addPage();
+            yPosition = 20;
+          }
+
+          doc.addImage(imageBase64, 'JPEG', 20, yPosition, imgWidth, imgHeight);
+          yPosition += imgHeight + 10;
+        } catch (err) {
+          console.error("Erreur image PDF :", err);
         }
+      }
 
-        doc.addImage(imageBase64, 'JPEG', 20, yPosition, imgWidth, imgHeight);
-        yPosition += imgHeight + 10;
-      } catch (err) {
-        console.error("Erreur image PDF :", err);
+      if (index < memories.length - 1) {
+        doc.setDrawColor(200);
+        doc.line(20, yPosition, 190, yPosition);
+        yPosition += 10;
       }
     }
 
-    if (index < memories.length - 1) {
-      doc.setDrawColor(200);
-      doc.line(20, yPosition, 190, yPosition);
-      yPosition += 10;
-    }
-  }
+    doc.save(`journal-souvenirs-${new Date().toISOString().split('T')[0]}.pdf`);
+  };
 
-  doc.save(`journal-souvenirs-${new Date().toISOString().split('T')[0]}.pdf`);
-};
-// --- LOGIQUE POUR LE MOBILE (A RAJOUTER) ---
-
-  // 1. Synchroniser la photo prise par Capacitor (tempPhoto) vers l'URL d'affichage
+  // Synchro photo Capacitor vers affichage
   useEffect(() => {
     if (tempPhoto) {
       setNewPhotoUrl(tempPhoto);
     }
   }, [tempPhoto]);
 
-  // 2. Gestionnaires pour le formulaire Mobile
+  // Sélection de photo sur mobile
   const handleMobilePhotoSelect = (e) => {
     const file = e.target.files[0];
     if (file) {
@@ -364,25 +350,25 @@ const loadImageAsBase64 = async (url) => {
     }
   };
 
+  // Supprime la photo sélectionnée
   const handleMobilePhotoClear = () => {
     setNewPhotoFile(null);
     setNewPhotoUrl("");
     setTempPhoto(null);
   };
 
-  // 3. Wrapper pour envoyer un commentaire depuis le mobile (qui passe le texte en argument)
+  // Envoie un commentaire depuis l'interface mobile
   const handleMobileSendComment = async (id, text) => {
-    setCommentText(text); // On met à jour le state pour la cohérence
-    // On appelle l'API directement ici pour éviter les décalages d'état async
+    setCommentText(text);
     try {
-        await apiPost(`/souvenirs/${id}/comments`, {
-            author_name: user?.name || "Utilisateur",
-            content: text
-        });
-        setCommentText("");
-        await fetchMemories();
+      await apiPost(`/souvenirs/${id}/comments`, {
+        author_name: user?.name || "Utilisateur",
+        content: text
+      });
+      setCommentText("");
+      await fetchMemories();
     } catch (err) {
-        console.error("Erreur commentaire mobile:", err);
+      console.error("Erreur commentaire mobile:", err);
     }
   };
 
@@ -395,9 +381,9 @@ const loadImageAsBase64 = async (url) => {
     );
   }
 
-return (
+  return (
     <>
-      {/* --- VERSION MOBILE (Visible uniquement sur petits écrans) --- */}
+      {/* Version mobile */}
       <div className="md:hidden">
         <MobileMemories 
           memories={memories}
@@ -424,7 +410,7 @@ return (
         />
       </div>
 
-      {/* --- VERSION DESKTOP (Visible uniquement sur PC/Tablette) --- */}
+      {/* Version desktop */}
       <div className="hidden md:block p-8">
         <div className="max-w-4xl mx-auto">
           <div className="flex justify-between items-center mb-8">
@@ -447,7 +433,7 @@ return (
             </div>
           )}
               
-          {/* --- FORMULAIRE D'AJOUT DESKTOP --- */}
+          {/* Formulaire pour créer un nouveau souvenir */}
           <div className="mb-8 bg-white rounded-lg shadow-sm border p-6">
             <div className="flex gap-4">
               <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
@@ -462,7 +448,6 @@ return (
                   rows={3}
                 />
                 
-                {/* Aperçu de l'image sélectionnée */}
                 {newPhotoUrl && (
                   <div className="mt-3">
                     <img 
@@ -473,7 +458,6 @@ return (
                   </div>
                 )}
 
-                {/* Input caché pour la capture d'image */}
                 <input
                   type="file"
                   accept="image/*"
@@ -523,7 +507,7 @@ return (
             </div>
           </div>
 
-          {/* Flux des souvenirs réels (DESKTOP) */}
+          {/* Affichage des souvenirs */}
           <div className="space-y-6">
             {memories.length === 0 ? (
               <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
@@ -581,7 +565,7 @@ return (
                     )}
                   </div>
 
-                  {/* Section Commentaires Desktop */}
+                  {/* Commentaires */}
                   {activeCommentId === memory.id && (
                     <div className="mt-4 pt-4 border-t border-gray-50">
                       <div className="space-y-3 mb-4 max-h-60 overflow-y-auto pr-2">

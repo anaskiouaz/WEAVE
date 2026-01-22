@@ -7,7 +7,7 @@ import { authenticateToken } from '../middleware/auth.js';
 
 const router = Router();
 
-// GET /me (Récupérer profil)
+// Récupère les informations du profil utilisateur connecté
 router.get('/me', authenticateToken, async (req, res) => { // <--- AJOUT du middleware
     try {
         // req.user est maintenant garanti par authenticateToken
@@ -27,7 +27,7 @@ router.get('/me', authenticateToken, async (req, res) => { // <--- AJOUT du midd
     }
 });
 
-// PUT /me (Mettre à jour les préférences)
+// Met à jour les préférences utilisateur (notifications)
 router.put('/me', authenticateToken, async (req, res) => { // <--- AJOUT du middleware
     try {
         const userId = req.user.id;
@@ -58,7 +58,7 @@ router.get('/audit-logs', async (req, res) => {
     }
 });
 
-// 3. AUDIT LOGS (POST)
+// Enregistre les actions utilisateur dans les journaux d'audit
 router.post('/audit-logs', async (req, res) => {
     try {
         const { userId, action, details, circleId } = req.body;
@@ -88,9 +88,7 @@ router.patch('/:id/consent', async (req, res) => {
     } catch (error) { res.status(500).json({ success: false, error: error.message }); }
 });
 
-// ============================================================
-// DELETE user and all related data (protected)
-// ============================================================
+// Supprime un utilisateur et toutes ses données associées (sécurisé)
 router.delete('/:id', authenticateToken, async (req, res) => {
   const { id } = req.params;
   try {

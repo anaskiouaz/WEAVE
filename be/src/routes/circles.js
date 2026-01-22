@@ -10,16 +10,14 @@ const generateInviteCode = () => {
   return 'W-' + Math.random().toString(36).substring(2, 7).toUpperCase();
 };
 
-// ============================================================
-// 1. RÉCUPÉRER LES MEMBRES (TA FONCTIONNALITÉ VITALE)
-// ============================================================
-// Note : J'ai adapté l'URL pour qu'elle corresponde à ce que ton Frontend appelle (/api/circles/:id/members)
+// Récupère les membres d'un cercle
+// Note: Accessible à tous les membres du cercle, pas seulement les admins
 router.get('/:id/members', authenticateToken, async (req, res) => {
   const { id } = req.params; // circleId
   const requesterId = req.user?.id;
 
-  try {
-    // Autoriser tous les membres du cercle (pas uniquement les admins)
+    // Vérifier que l'utilisateur appartient au cercle
+    try{
     const membership = await pool.query(
       `SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2 LIMIT 1`,
       [requesterId, id]
@@ -43,9 +41,7 @@ router.get('/:id/members', authenticateToken, async (req, res) => {
   }
 });
 
-// ============================================================
-// 2. LISTER MES CERCLES (DEV - POUR DASHBOARD)
-// ============================================================
+// Liste tous les cercles de l'utilisateur connecté
 router.get('/', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
@@ -70,9 +66,7 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 });
 
-// ============================================================
-// 3. CRÉER UN CERCLE (FONCTION ÉQUIPE)
-// ============================================================
+// Crée un nouveau cercle de soin avec le bénéficiaire
 router.post('/', authenticateToken, async (req, res) => {
   const client = await pool.connect(); 
   
@@ -280,13 +274,13 @@ router.delete('/:circleId/members/:memberId', authenticateToken, async (req, res
       return res.status(400).json({ error: "Vous ne pouvez supprimer que les aidants." });
     }
 
-    // 3. Supprimer le rôle du membre
+    // Supprime le rôle du membre dans le cercle
     await pool.query(
       `DELETE FROM user_roles WHERE user_id = $1 AND circle_id = $2`,
       [memberId, circleId]
     );
 
-    // Récupérer le nom du membre supprimé pour le log
+    // Récupère le nom du membre pour l'audit
     const memberRes = await pool.query(`SELECT name FROM users WHERE id = $1`, [memberId]);
     const memberName = memberRes.rows[0]?.name || 'Utilisateur';
 
@@ -307,7 +301,6 @@ router.delete('/:circleId/members/:memberId', authenticateToken, async (req, res
 });
 
 // 7. RÉCUPÉRER LES LOGS D'ACTIVITÉ DU CERCLE (DEPUIS DEV)
-// ============================================================
 router.get('/:circleId/logs', authenticateToken, async (req, res) => {
   const { circleId } = req.params;
   const { limit = 50 } = req.query;
@@ -349,7 +342,6 @@ router.get('/:circleId/logs', authenticateToken, async (req, res) => {
 });
 
 // 8. SUPPRIMER UN CERCLE (DEPUIS DEV - GÈRE TES MESSAGES AUSSI)
-// ============================================================
 router.delete('/:circleId', authenticateToken, async (req, res) => {
   const { circleId } = req.params;
   const userId = req.user.id;
@@ -413,7 +405,6 @@ router.delete('/:circleId', authenticateToken, async (req, res) => {
 });
 
 // 9. GET INFO CERCLE (TA ROUTE - À GARDER POUR LE FRONT)
-// ============================================================
 router.get('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     try {

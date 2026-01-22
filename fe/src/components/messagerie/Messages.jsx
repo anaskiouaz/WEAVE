@@ -29,7 +29,7 @@ const Messages = () => {
   const socketRef = useRef();
   const messagesEndRef = useRef(null);
 
-  // --- 1. INITIALISATION SOCKET ---
+  // Initialisation Socket.IO
   useEffect(() => {
     if (!user) return;
 
@@ -54,7 +54,7 @@ const Messages = () => {
     };
   }, [user]);
 
-  // --- 2. GESTION ÉVÉNEMENTS & CONV ACTIVE ---
+  // Gestion des événements et conversation active
   useEffect(() => {
     if (!socketRef.current) return;
 
@@ -96,7 +96,7 @@ const Messages = () => {
 
   const scrollToBottom = () => setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
 
-  // --- API CALLS ---
+  // Appels API pour charger les conversations et messages
   const loadConversations = async () => {
     try {
       const data = await apiGet('/conversations');
@@ -141,7 +141,7 @@ const Messages = () => {
     } catch (err) { console.error("Erreur participants:", err); }
   };
 
-  // --- ACTIONS ---
+  // Actions de l'utilisateur (envoyer, archiver, etc.)
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -231,10 +231,10 @@ const Messages = () => {
     else setSelectedMembers(prev => [...prev, id]);
   };
 
-  // --- RENDER ---
+  // Rendu du composant
   return (
     <>
-      {/* --- VERSION MOBILE --- */}
+      {/* Version mobile */}
       <div className="md:hidden">
         <MobileMessages 
           user={user}
@@ -269,7 +269,7 @@ const Messages = () => {
         />
       </div>
 
-      {/* --- VERSION DESKTOP --- */}
+      {/* Version desktop */}
       <div className="hidden md:flex h-[calc(100vh-100px)] bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 relative">
         {/* GAUCHE : LISTE */}
         <div className="w-1/3 border-r bg-gray-50 flex flex-col">
@@ -356,7 +356,7 @@ const Messages = () => {
           )}
         </div>
 
-        {/* --- MODALE CRÉATION DESKTOP --- */}
+        {/* Modal de création de conversation (desktop) */}
         {showNewConvModal && (
           <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 animate-in zoom-in-95">
@@ -380,7 +380,7 @@ const Messages = () => {
           </div>
         )}
 
-        {/* --- MODALE INFO GROUPE DESKTOP --- */}
+        {/* Modal d'infos du groupe (desktop) */}
         {showInfo && activeConversation && (
           <div className="absolute inset-0 bg-black/50 z-50 flex justify-end">
             <div className="w-80 bg-white h-full shadow-2xl p-6 overflow-y-auto animate-in slide-in-from-right">

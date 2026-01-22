@@ -7,9 +7,7 @@ const router = Router();
 
 router.use(authenticateToken);
 
-// ============================================================
-// 1. RÉCUPÉRER MES CONVERSATIONS
-// ============================================================
+// Récupère toutes les conversations de l'utilisateur
 router.get('/', async (req, res) => {
   try {
     const userId = req.user.id;
@@ -34,23 +32,21 @@ router.get('/', async (req, res) => {
   }
 });
 
-// ============================================================
-// 2. ENVOYER UN MESSAGE (C'EST ICI QUE ÇA SE JOUE)
-// ============================================================
+// Envoie un message dans une conversation
 router.post('/:id/messages', async (req, res) => {
   const { id } = req.params; // L'ID de la conversation
   const { content } = req.body;
   const authorId = req.user.id;
 
   try {
-    // A. Sauvegarder en DB
+    // Sauvegarde le message en BDD
     const insertResult = await pool.query(
       'INSERT INTO message (conversation_id, auteur_id, contenu) VALUES ($1, $2, $3) RETURNING *',
       [id, authorId, content]
     );
     const savedMessage = insertResult.rows[0];
 
-    // B. Récupérer infos auteur
+    // Récupère les infos de l'auteur
     const userResult = await pool.query('SELECT name, profile_photo FROM users WHERE id = $1', [authorId]);
     const authorInfo = userResult.rows[0];
 
@@ -60,7 +56,7 @@ router.post('/:id/messages', async (req, res) => {
         profile_photo: authorInfo.profile_photo
     };
 
-    // B bis. LOG AUDIT (non bloquant)
+    // Enregistre l'audit (non bloquant)
     try {
         const convInfo = await pool.query('SELECT cercle_id FROM conversation WHERE id = $1', [id]);
         const circleId = convInfo.rows[0]?.cercle_id || null;
@@ -74,8 +70,7 @@ router.post('/:id/messages', async (req, res) => {
         console.error('Erreur audit message:', auditErr);
     }
 
-    // C. SOCKET.IO - LA PARTIE CRITIQUE
-    // On récupère l'instance stockée dans server.js
+    // Envoie le message en temps réel via Socket.IO
     const io = req.app.get('io');
 
     if (io) {
@@ -98,9 +93,8 @@ router.post('/:id/messages', async (req, res) => {
   }
 });
 
-// ============================================================
-// 3. AUTRES ROUTES (Lecture, Participants, Création...)
-// ============================================================
+
+// Autres routes pour les conversations (lecture, participants, création)
 router.post('/', async (req, res) => {
     // ... (Garde ton code de création ici, ou je peux te le remettre si besoin, 
     // mais pour l'instantanéité c'est surtout le POST messages qui compte)

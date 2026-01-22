@@ -10,7 +10,7 @@ router.get('/', authenticateToken, async (req, res) => {
         const userId = req.user.id; // Récupère l'utilisateur connecté
         let resolvedCircleId = circle_id;
 
-        // 1. Gestion du cercle par défaut
+        // Détermine le cercle par défaut si aucun n'est spécifié
         if (!resolvedCircleId || resolvedCircleId === 'undefined') {
             const defaultCircle = await db.query(
                 `SELECT id FROM care_circles ORDER BY created_at ASC LIMIT 1`
@@ -22,9 +22,9 @@ router.get('/', authenticateToken, async (req, res) => {
             }
         }
 
-        // 2. Requêtes (Correction ici : on utilise 'user_roles' et 'journal_entries')
+        // Récupère les tâches à venir et les statistiques du cercle
         const [upcomingTasks, statsData] = await Promise.all([
-            // A. Les 3 prochaines tâches
+            // Les 3 prochaines tâches
             db.query(
                 `SELECT id, title, date, time, task_type, helper_name 
                  FROM tasks 
@@ -34,7 +34,7 @@ router.get('/', authenticateToken, async (req, res) => {
                 [resolvedCircleId]
             ),
             
-            // B. Les Statistiques
+            // Les statistiques du cercle
             db.query(`
                 SELECT 
                     -- Compte les tâches des 7 prochains jours

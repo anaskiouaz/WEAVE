@@ -6,23 +6,22 @@ import { authenticateToken } from '../middleware/auth.js';
 
 const router = Router();
 
-// --- INSCRIPTION (REGISTER) ---
+// Enregistre un nouvel utilisateur avec validation d'email unique
 router.post('/register', async (req, res) => {
   const { name, email, password, onboarding_role, phone, birth_date } = req.body;
 
   try {
-    // 1. Vérifier si l'email existe déjà
+    // Vérifie que l'email n'existe pas déjà
     const userCheck = await db.query('SELECT * FROM users WHERE email = $1', [email]);
     if (userCheck.rows.length > 0) {
       return res.status(400).json({ success: false, error: "Cet email est déjà utilisé par un autre compte." });
     }
 
-    // 2. Hacher le mot de passe
+    // Hache le mot de passe avec bcrypt
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // 3. Insérer le nouvel utilisateur
-    // On met aussi 'role_global' à 'USER' par défaut si c'est null, pour la compatibilité
+    // Insère le nouvel utilisateur en base de données avec rôle USER par défaut
     const newUser = await db.query(
       `INSERT INTO users (name, email, password_hash, onboarding_role, role_global, phone, birth_date) 
        VALUES ($1, $2, $3, $4, 'USER', $5, $6) 
@@ -38,12 +37,12 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// --- CONNEXION (LOGIN) ---
+// Authentifie un utilisateur et retourne un token JWT
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   
   try {
-    // 1. Chercher l'utilisateur
+    // Recherche l'utilisateur par email
     const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
     
     if (result.rows.length === 0) {
@@ -52,14 +51,14 @@ router.post('/login', async (req, res) => {
 
     const user = result.rows[0];
 
-    // 2. Vérifier le mot de passe
+    // Valide le mot de passe contre le hash stocké
     const isMatch = await bcrypt.compare(password, user.password_hash);
     
     if (!isMatch) {
       return res.status(401).json({ success: false, error: "Mot de passe incorrect." });
     }
 
-    // 3. Récupérer les cercles
+    // Récupère les cercles de soin associés à l'utilisateur
     const circlesResult = await db.query(`
       SELECT cc.id, cc.invite_code, u.name AS senior_name, ur.role
       FROM care_circles cc
@@ -77,7 +76,7 @@ router.post('/login', async (req, res) => {
         mainCircleNom = circles[0].senior_name; 
     }
 
-    // 4. Génération du token
+    // Génère un token JWT d'authentification
     // On utilise role_global s'il existe, sinon onboarding_role
     const activeRole = user.role_global || user.onboarding_role;
 

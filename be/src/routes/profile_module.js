@@ -4,10 +4,7 @@ import db from '../config/db.js';
 const router = Router();
 const getUserId = (req) => req.headers['x-user-id'];
 
-// ============================================================
-// 1. LIRE LE PROFIL (Tout est maintenant dans la table users)
-// ============================================================
-// GET profil + disponibilités (par cercle si circle_id fourni)
+// Récupère le profil utilisateur et ses disponibilités par cercle
 router.get('/', async (req, res) => {
     const userId = getUserId(req);
     const circleId = req.query.circle_id;
@@ -45,10 +42,7 @@ router.get('/', async (req, res) => {
     }
 });
 
-// ============================================================
-// 2. SAUVEGARDER INFOS (Tel, Adresse)
-// Note: Le nom (name) ne peut plus être modifié, comme l'email
-// ============================================================
+// Sauvegarde les informations de contact (téléphone, adresse)
 router.put('/info', async (req, res) => {
     const userId = getUserId(req);
     const { phone, address } = req.body;
@@ -61,9 +55,7 @@ router.put('/info', async (req, res) => {
     } catch (e) { res.status(500).json({ success: false, error: e.message }); }
 });
 
-// ============================================================
-// 2b. SAUVEGARDER PRÉFÉRENCE NOTIFICATIONS
-// ============================================================
+// Sauvegarde les préférences de notifications de l'utilisateur
 router.put('/notifications', async (req, res) => {
     const userId = getUserId(req);
     const { notifications_enabled } = req.body;
@@ -80,9 +72,7 @@ router.put('/notifications', async (req, res) => {
     }
 });
 
-// ============================================================
-// 3. SAUVEGARDER COMPÉTENCES
-// ============================================================
+// Sauvegarde les compétences de l'utilisateur en base de données
 router.put('/skills', async (req, res) => {
     const userId = getUserId(req);
     const { skills } = req.body;

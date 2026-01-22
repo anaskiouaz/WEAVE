@@ -5,18 +5,16 @@ import { Calendar, Heart, MessageSquare, Users, Clock, Activity, ShoppingCart, S
 import { PushNotifications } from '@capacitor/push-notifications';
 import { Capacitor } from '@capacitor/core';
 
-// 1. IMPORT DU HOOK useAuth DEPUIS TON FICHIER CONTEXT
-import { useAuth } from '../context/AuthContext'; 
+import { useAuth } from '../context/AuthContext';
 
 export default function Dashboard() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   
-  // 2. RECUPERATION DU CIRCLE ID VIA LE CONTEXTE ET LES PARAMETRES URL
-  // Ce circleId vient directement du localStorage grâce à ton AuthProvider
+  // Récupération du cercle via le contexte et les paramètres URL
+  // Priorité: param URL > contexte
   const { circleId: contextCircleId, setCircle, user } = useAuth();
   
-  // Priorité: param URL > contexte
   const circleIdFromUrl = searchParams.get('circle_id');
   const activeCircleId = circleIdFromUrl || contextCircleId;
   
@@ -29,14 +27,13 @@ export default function Dashboard() {
     unread_messages: 0
   });
 
-  // Fonction de chargement des données
+  // Charge les données du dashboard
   const loadTasks = async () => {
     try {
       setLoading(true);
       
-      // 3. ENVOI DU CIRCLE_ID AU BACKEND
-      // Si activeCircleId existe, on l'ajoute à l'URL
-      // Sinon, on appelle /dashboard sans paramètre (le backend prendra celui par défaut)
+      // Envoie l'ID du cercle au backend
+      // Si aucun ID, le backend utilise la valeur par défaut
       const endpoint = activeCircleId ? `/dashboard?circle_id=${activeCircleId}` : '/dashboard';
       
       console.log(`Chargement dashboard pour le cercle : ${activeCircleId || 'Défaut'}`);
@@ -55,11 +52,11 @@ export default function Dashboard() {
     }
   };
 
-  // Gestion des Notifications (inchangée mais utilise user.id du context si dispo)
+  // Gère l'activation des notifications push sur mobile
   const activerNotifs = async () => {
     if (Capacitor.getPlatform() === 'web') return; 
     try {
-        const userId = user ? user.id : null; // Utilise le user du contexte
+      const userId = user ? user.id : null;
 
         await PushNotifications.removeAllListeners(); 
         await PushNotifications.addListener('registration', async (token) => {
@@ -73,24 +70,22 @@ export default function Dashboard() {
     } catch (e) { console.error(`Erreur Notifs: ${e.message}`); }
   };
 
-  // Synchroniser le contexte avec l'URL quand le circleId de l'URL change
+  // Synchronise le contexte quand l'URL change
   useEffect(() => {
     if (circleIdFromUrl && circleIdFromUrl !== contextCircleId) {
       console.log(`Mise à jour du contexte: ${circleIdFromUrl}`);
-      // On met le circleId à jour dans le contexte et localStorage
       localStorage.setItem('circle_id', circleIdFromUrl);
-      setCircle(circleIdFromUrl, null); // null pour garder l'ancien nom si on le met pas
+      setCircle(circleIdFromUrl, null);
     }
   }, [circleIdFromUrl, contextCircleId, setCircle]);
 
-  // 4. DECLENCHEMENT AUTOMATIQUE
-  // Dès que 'activeCircleId' change, le useEffect se relance
+  // Recharge les données quand le cercle change
   useEffect(() => {
     loadTasks();
     activerNotifs();
   }, [activeCircleId]); 
 
-  // --- RENDU GRAPHIQUE (inchangé) ---
+  // RENDU GRAPHIQUE
   const statsDisplay = [
     { label: 'Aidants actifs', value: dashboardStats.active_helpers, icon: Users, color: 'blue' },
     { label: 'Tâches cette semaine', value: dashboardStats.tasks_this_week, icon: Calendar, color: 'green' },
@@ -110,7 +105,7 @@ export default function Dashboard() {
     <div className="p-4 md:p-8">
       <div className="max-w-6xl mx-auto">
         <div className="mb-8 flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-            <div>
+          <div>
               <h1 className="text-gray-900 text-2xl font-bold mb-2">Tableau de bord</h1>
               <p className="text-gray-600">
                   Vue d'ensemble {activeCircleId && <span className="text-xs text-gray-400">(Cercle #{activeCircleId.slice(0,8)}...)</span>}
@@ -125,7 +120,7 @@ export default function Dashboard() {
             </button>
         </div>
 
-        {/* Stats Grid */}
+        {/* Statistiques du dashboard */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
           {statsDisplay.map((stat) => {
             const Icon = stat.icon;

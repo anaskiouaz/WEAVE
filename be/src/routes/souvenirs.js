@@ -327,7 +327,7 @@ export async function deleteJournalEntry(req, res) {
   }
 }
 
-// --- Router Express pour exposer les endpoints ---
+// Routes Express pour exposer les endpoints des souvenirs/journal
 const router = Router();
 
 router.get('/', getJournalEntries);
