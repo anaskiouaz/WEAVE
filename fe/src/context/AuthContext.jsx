@@ -78,8 +78,17 @@ export const AuthProvider = ({ children }) => {
       if (!res.ok) return null;
       const data = await res.json();
       if (data && data.user) {
+        // Mettre à jour l'utilisateur avec ses cercles mis à jour
         setUser(data.user);
         try { localStorage.setItem('weave_user', JSON.stringify(data.user)); } catch { }
+        
+        // Ne mettre à jour le cercle principal QUE s'il n'y a pas déjà un cercle sélectionné
+        const currentCircleId = localStorage.getItem('circle_id');
+        if (!currentCircleId && data.circle_id) {
+          setCircleId(data.circle_id);
+          try { localStorage.setItem('circle_id', data.circle_id); } catch { }
+        }
+        
         return data.user;
       }
     } catch (err) {
@@ -108,7 +117,7 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     setLoading(true);
     try {
-      const data = await apiPost('/users', userData);
+      const data = await apiPost('/auth/register', userData);
       return { success: data.success };
     } catch (error) {
       return { success: false, error: error.message };

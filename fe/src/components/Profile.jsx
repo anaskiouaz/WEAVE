@@ -4,7 +4,7 @@ import {
   Mail, Phone, MapPin, Loader2, Save, X, Edit2, Trash2, Plus,
   Star, Award, PenSquare, Bell, LogOut, Camera, Cookie, AlertTriangle
 } from 'lucide-react';
-import { apiGet, apiPut, apiPost } from '../api/client';
+import { apiGet, apiPut, apiPost, apiDelete } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import { useCookieConsent } from '../context/CookieContext';
 import RestartOnboardingButton from './RestartOnboardingButton';
@@ -51,6 +51,11 @@ export default function Profile() {
   const [showDeleteAccountModal, setShowDeleteAccountModal] = useState(false);
   const [deleteAccountInput, setDeleteAccountInput] = useState('');
   const [isDeletingAccount, setIsDeletingAccount] = useState(false);
+  const [adminCircles, setAdminCircles] = useState([]);
+  const [membersByCircle, setMembersByCircle] = useState({});
+  const [newAdminSelections, setNewAdminSelections] = useState({});
+  const [isLoadingAdminChoices, setIsLoadingAdminChoices] = useState(false);
+  const [adminLoadError, setAdminLoadError] = useState('');
 
   // Constantes
   const weekDays = ['Lundi', 'Mardi', 'Mercredi', 'Jeudi', 'Vendredi', 'Samedi', 'Dimanche'];
@@ -260,6 +265,123 @@ export default function Profile() {
     navigate('/login');
   };
 
+  const formatCircleName = (circle) => circle?.senior_name || circle?.name || circle?.circle_nom || `Cercle #${circle?.id}`;
+
+  const loadAdminCirclesAndMembers = async () => {
+    setAdminLoadError('');
+    const circles = Array.isArray(user?.circles)
+      ? user.circles.filter(c => String(c.role || '').toUpperCase() === 'ADMIN')
+      : [];
+    
+    console.log('Admin circles:', circles);
+    setAdminCircles(circles);
+    if (!circles.length) return;
+
+    setIsLoadingAdminChoices(true);
+    const nextMembers = {};
+    const selections = {};
+
+    try {
+      for (const c of circles) {
+        try {
+          const list = await apiGet(`/circles/${c.id}/members`);
+          const eligibleMembers = Array.isArray(list)
+            ? list.filter(m => String(m.id) !== String(USER_ID) && String(m.role).toUpperCase() !== 'PC')
+            : [];
+          
+          nextMembers[c.id] = eligibleMembers;
+          console.log(`Circle ${c.id} eligible members:`, eligibleMembers);
+          
+          // Sélectionner automatiquement le premier candidat
+          if (eligibleMembers.length > 0) {
+            const firstId = eligibleMembers[0].id;
+            selections[c.id] = firstId;
+            console.log(`Auto-selected ${firstId} for circle ${c.id}`);
+          }
+        } catch (e) {
+          console.error(`Error loading members for circle ${c.id}:`, e);
+          nextMembers[c.id] = [];
+          setAdminLoadError("Impossible de charger les membres du cercle.");
+        }
+      }
+      setMembersByCircle(nextMembers);
+      setNewAdminSelections(selections);
+      console.log('Final selections:', selections);
+    } finally {
+      setIsLoadingAdminChoices(false);
+    }
+  };
+
+  const handleOpenDeleteAccount = async () => {
+    setShowDeleteAccountModal(true);
+    await loadAdminCirclesAndMembers();
+  };
+
+  const handleConfirmDeleteAccount = async () => {
+    if (deleteAccountInput.toLowerCase() !== 'supprimer') return;
+    if (!USER_ID) return alert('Utilisateur introuvable');
+
+    console.log('Starting deletion with:', { 
+      adminCircles, 
+      membersByCircle, 
+      newAdminSelections 
+    });
+
+    const circlesWithCandidates = adminCircles.filter(c => (membersByCircle[c.id] || []).length > 0);
+    const circlesWithoutCandidates = adminCircles.filter(c => (membersByCircle[c.id] || []).length === 0);
+
+    console.log('Circles with candidates:', circlesWithCandidates);
+    console.log('Circles without candidates:', circlesWithoutCandidates);
+
+    // Vérifier que tous les cercles avec candidats ont une sélection valide
+    for (const circle of circlesWithCandidates) {
+      const successorId = newAdminSelections[circle.id] || (membersByCircle[circle.id] || [])[0]?.id;
+      console.log(`Validating circle ${circle.id}: successorId=${successorId}`);
+      if (!successorId) {
+        return alert('Choisissez un nouvel admin pour chaque cercle où un membre est disponible.');
+      }
+    }
+
+    setIsDeletingAccount(true);
+    try {
+      console.log('=== DÉBUT SUPPRESSION COMPTE ===');
+      
+      // Supprimer les cercles où aucun autre membre n'est disponible (admin + bénéficiaire uniquement)
+      console.log(`Suppression de ${circlesWithoutCandidates.length} cercle(s) sans candidats`);
+      for (const circle of circlesWithoutCandidates) {
+        console.log(`Suppression du cercle ${circle.id}`);
+        await apiDelete(`/circles/${circle.id}`);
+      }
+
+      // Transférer l'admin pour chaque cercle où un successeur est disponible
+      console.log(`Transfert admin pour ${circlesWithCandidates.length} cercle(s) avec candidats`);
+      for (const circle of circlesWithCandidates) {
+        const successorId = newAdminSelections[circle.id] || (membersByCircle[circle.id] || [])[0]?.id;
+        console.log(`Transfert admin cercle ${circle.id} vers ${successorId}`);
+        if (!successorId) {
+          throw new Error(`ID de successeur invalide pour le cercle ${circle.id}`);
+        }
+        await apiPost(`/circles/${circle.id}/transfer-admin`, { newAdminId: successorId });
+        console.log(`✓ Admin transféré pour le cercle ${circle.id}`);
+      }
+
+      console.log('Suppression de l\'utilisateur...');
+      await apiDelete(`/users/${USER_ID}`);
+      console.log('✓ Utilisateur supprimé');
+      
+      alert('Votre compte a été supprimé.');
+      logout();
+      navigate('/');
+    } catch (err) {
+      console.error('Erreur suppression compte:', err);
+      alert(err?.message || 'Impossible de supprimer le compte pour le moment.');
+    } finally {
+      setIsDeletingAccount(false);
+      setShowDeleteAccountModal(false);
+      setDeleteAccountInput('');
+    }
+  };
+
   if (isLoading) return <div className="p-10 flex justify-center h-screen items-center"><Loader2 className="animate-spin text-blue-600 w-10 h-10" /></div>;
 
   return (
@@ -465,7 +587,7 @@ export default function Profile() {
                 <h3 className="font-bold text-red-800">Supprimer mon compte</h3>
                 <p className="text-sm text-red-600 mt-1">Efface votre profil, vos messages et retire votre accès à tous les cercles.</p>
               </div>
-              <button onClick={() => setShowDeleteAccountModal(true)} className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap font-medium text-sm">
+              <button onClick={handleOpenDeleteAccount} className="px-4 py-2 bg-red-600 text-white hover:bg-red-700 rounded-lg transition-colors flex items-center gap-2 whitespace-nowrap font-medium text-sm">
                 <Trash2 size={16} /> Supprimer mon compte
               </button>
             </div>
@@ -500,8 +622,8 @@ export default function Profile() {
 
       {/* Modal de confirmation avant suppression du compte */}
       {showDeleteAccountModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden transform transition-all">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden transform transition-all my-8">
 
             <div className="p-6 bg-red-50 border-b border-red-100">
               <div className="flex items-center gap-3">
@@ -521,6 +643,44 @@ export default function Profile() {
                   <strong>Attention :</strong> Cette action est définitive. Vos informations personnelles, historique d'interventions et accès seront effacés.
                 </p>
               </div>
+
+              {adminCircles.length > 0 && (
+                <div className="space-y-3">
+                  <p className="text-sm text-gray-700 font-medium">
+                    Vous êtes admin de ces cercles. Choisissez un nouvel admin quand c'est possible. Si vous êtes seul·e avec le bénéficiaire, le cercle sera supprimé.
+                  </p>
+                  {adminCircles.map((c) => (
+                    <div key={c.id} className="border border-gray-200 rounded-lg p-3 bg-gray-50">
+                      <div className="text-sm font-semibold text-gray-800 mb-2">{formatCircleName(c)}</div>
+                      {isLoadingAdminChoices ? (
+                        <div className="text-xs text-gray-500">Chargement des membres...</div>
+                      ) : (membersByCircle[c.id] || []).length === 0 ? (
+                        <div className="text-xs text-red-600">Aucun autre membre disponible. Ce cercle sera supprimé lors de la suppression du compte.</div>
+                      ) : (
+                        (membersByCircle[c.id] || []).length === 1 ? (
+                          <div className="text-xs text-gray-700">
+                            Le nouvel admin sera : <span className="font-semibold">{(membersByCircle[c.id] || [])[0].name || (membersByCircle[c.id] || [])[0].email}</span>
+                          </div>
+                        ) : (
+                          <select
+                            className="w-full px-3 py-2 border rounded-lg text-sm focus:ring-2 focus:ring-red-500 focus:border-red-500"
+                            value={newAdminSelections[c.id] || ''}
+                            onChange={(e) => setNewAdminSelections(prev => ({ ...prev, [c.id]: e.target.value }))}
+                          >
+                            <option value="" disabled>-- Sélectionner un membre --</option>
+                            {(membersByCircle[c.id] || []).map(m => (
+                              <option key={m.id} value={m.id}>
+                                {m.name || m.email} {m.role ? `(${m.role})` : ''}
+                              </option>
+                            ))}
+                          </select>
+                        )
+                      )}
+                    </div>
+                  ))}
+                  {adminLoadError && <p className="text-xs text-red-600">{adminLoadError}</p>}
+                </div>
+              )}
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -548,7 +708,12 @@ export default function Profile() {
               </button>
               <button
                 onClick={handleConfirmDeleteAccount}
-                disabled={deleteAccountInput.toLowerCase() !== 'supprimer' || isDeletingAccount}
+                disabled={
+                  deleteAccountInput.toLowerCase() !== 'supprimer'
+                  || isDeletingAccount
+                  || isLoadingAdminChoices
+                  || (adminCircles.length > 0 && adminCircles.some(c => (membersByCircle[c.id] || []).length > 0 && !newAdminSelections[c.id]))
+                }
                 className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {isDeletingAccount ? (

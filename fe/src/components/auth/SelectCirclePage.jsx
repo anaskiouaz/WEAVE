@@ -11,7 +11,7 @@ import { Users, UserPlus, ArrowRight, Loader2, ArrowLeft, Calendar, Phone, Steth
 const MEDICAL_OPTIONS = [
     "Risque d'Escarres", "Phlébite / Thrombose", "Fonte musculaire",
     "Ankyloses / Raideurs", "Constipation", "Incontinence",
-    "Encombrement bronchique", "Syndrome de glissement", "Ostéoporose", "Alzheimer"
+    "Encombrement bronchique", "Syndrome de glissement", "Ostéoporose", "Alzheimer", "Autre"
 ];
 
 export default function SelectCirclePage() {
@@ -282,7 +282,7 @@ export default function SelectCirclePage() {
                                 </div>
                             </div>
                             <div className="space-y-3 pt-2">
-                                <Label className="flex items-center gap-2"><Stethoscope className="w-4 h-4 text-blue-600" /> Pathologies / Risques</Label>
+                                <Label className="flex items-center gap-2"><Stethoscope className="w-4 h-4 text-blue-600" /> Pathologies / Risques <span className="text-gray-400 text-xs font-normal">(optionnel)</span></Label>
                                 <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
                                     <div className="flex flex-wrap gap-2">
                                         {MEDICAL_OPTIONS.map((option) => {

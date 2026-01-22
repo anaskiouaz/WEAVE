@@ -103,6 +103,60 @@ router.delete('/:id', authenticateToken, async (req, res) => {
     // Transactional deletion of related records
     await db.query('BEGIN');
 
+    // Vérifier si l'utilisateur est le bénéficiaire (senior) d'un cercle
+    const seniorCircles = await db.query(
+      'SELECT id FROM care_circles WHERE senior_id = $1',
+      [id]
+    );
+    
+    if (seniorCircles.rows.length > 0) {
+      await db.query('ROLLBACK');
+      return res.status(400).json({ 
+        success: false, 
+        error: 'Impossible de supprimer ce compte car il est le bénéficiaire d\'un ou plusieurs cercles. Supprimez d\'abord les cercles concernés.' 
+      });
+    }
+
+    // Transférer created_by vers un admin du cercle pour les cercles créés par cet utilisateur
+    const createdCircles = await db.query(
+      'SELECT id FROM care_circles WHERE created_by = $1',
+      [id]
+    );
+    
+    for (const circle of createdCircles.rows) {
+      // Trouver un admin du cercle pour le remplacer comme créateur
+      const newCreator = await db.query(
+        `SELECT user_id FROM user_roles WHERE circle_id = $1 AND role = 'ADMIN' AND user_id != $2 LIMIT 1`,
+        [circle.id, id]
+      );
+      
+      if (newCreator.rows.length > 0) {
+        await db.query(
+          'UPDATE care_circles SET created_by = $1 WHERE id = $2',
+          [newCreator.rows[0].user_id, circle.id]
+        );
+      } else {
+        // Si aucun admin disponible, trouver n'importe quel membre non-PC
+        const anyMember = await db.query(
+          `SELECT user_id FROM user_roles WHERE circle_id = $1 AND role != 'PC' AND user_id != $2 LIMIT 1`,
+          [circle.id, id]
+        );
+        
+        if (anyMember.rows.length > 0) {
+          await db.query(
+            'UPDATE care_circles SET created_by = $1 WHERE id = $2',
+            [anyMember.rows[0].user_id, circle.id]
+          );
+        }
+      }
+    }
+
+    // Messages authored by user (in conversations)
+    await db.query('DELETE FROM message WHERE auteur_id = $1', [id]);
+
+    // Participants in conversations
+    await db.query('DELETE FROM participant_conversation WHERE utilisateur_id = $1', [id]);
+
     // Ratings (as rater or rated)
     await db.query('DELETE FROM helper_ratings WHERE rated_user_id = $1 OR rater_user_id = $1', [id]);
 
@@ -117,6 +171,9 @@ router.delete('/:id', authenticateToken, async (req, res) => {
 
     // Journal entries / souvenirs authored by user
     await db.query('DELETE FROM journal_entries WHERE author_id = $1', [id]);
+
+    // Task signups
+    await db.query('DELETE FROM task_signups WHERE user_id = $1', [id]);
 
     // Any other tables that reference users should be cleaned here as needed.
 

@@ -37,8 +37,16 @@ function ProtectedLayout() {
   const [emergencyOpen, setEmergencyOpen] = useState(false);
 
   // 1. On récupère 'user' ici pour vérifier le rôle
-  const { token, logout, user, unreadMessages, setUnreadMessages, circleId } = useAuth();
+  const { token, logout, user, unreadMessages, setUnreadMessages, circleId, refreshUser } = useAuth();
   const navigate = useNavigate();
+
+  // --- RAFRAÎCHIR LES DONNÉES UTILISATEUR AU CHARGEMENT ---
+  useEffect(() => {
+    // Rafraîchir les données utilisateur (incluant les cercles et rôles) au chargement
+    if (user && refreshUser) {
+      refreshUser();
+    }
+  }, []); // Une seule fois au montage du composant
 
   // --- RAFRAÎCHISSEMENT DES MESSAGES NON LUS ---
   useEffect(() => {
