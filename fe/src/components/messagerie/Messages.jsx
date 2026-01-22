@@ -366,7 +366,7 @@ const Messages = () => {
                 <div ref={messagesEndRef} />
               </div>
 
-              <form onSubmit={handleSendMessage} className="p-4 flex gap-3" style={{ backgroundColor: 'var(--bg-card)', borderTop: '1px solid var(--border-light)' }}>
+              <form onSubmit={handleSendMessage} className="p-4 flex gap-3" style={{ backgroundColor: 'var(--bg-secondary)', borderTop: '1px solid var(--border-light)' }}>
                 <input type="text" value={newMessage} onChange={(e) => setNewMessage(e.target.value)} placeholder="Écrivez votre message..." className="flex-1 border-2 rounded-full px-5 py-2.5 focus:outline-none focus:ring-2 font-medium transition-all" style={{ backgroundColor: 'var(--bg-input)', borderColor: 'var(--border-input)', color: 'var(--text-primary)' }} />
                 <button type="submit" disabled={!newMessage.trim()} className="p-3 text-white rounded-full transition-all hover:-translate-y-0.5 disabled:opacity-50" style={{ backgroundColor: 'var(--soft-coral)', boxShadow: '0 4px 16px rgba(240, 128, 128, 0.25)' }}><Send className="w-5 h-5" /></button>
               </form>

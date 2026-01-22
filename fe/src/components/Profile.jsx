@@ -385,7 +385,7 @@ export default function Profile() {
       <input type="file" ref={fileInputRef} onChange={handlePhotoUpload} accept="image/*" className="hidden" />
 
       {/* HEADER (Digital Cocooning) */}
-      <div className="pb-32" style={{ background: 'linear-gradient(135deg, var(--text-primary), var(--text-secondary), var(--sage-green))', boxShadow: 'var(--shadow-lg)' }}>
+      <div className="pb-32" style={{ background: 'linear-gradient(135deg, var(--soft-coral), var(--bg-tertiary), var(--sage-green))', boxShadow: 'var(--shadow-lg)' }}>
         <div className="max-w-4xl mx-auto p-8 pt-12">
           <div className="flex items-center gap-6">
             <div className="relative group cursor-pointer" onClick={!isUploadingPhoto ? handlePhotoClick : null}>
@@ -402,10 +402,10 @@ export default function Profile() {
               )}
             </div>
 
-            <div className="text-white drop-shadow-md">
+            <div style={{ color: 'var(--text-primary)' }} className="drop-shadow-sm">
               <h1 className="text-3xl font-bold tracking-tight">{userInfo.name}</h1>
-              <p className="opacity-95 flex items-center gap-2 font-semibold mt-1">
-                <Award size={18} style={{ color: 'var(--sage-green)' }} /> 
+              <p className="opacity-90 flex items-center gap-2 font-semibold mt-1">
+                <Award size={18} style={{ color: 'var(--soft-coral)' }} /> 
                 Aidant{userInfo.name && userInfo.name.endsWith('e') ? 'e' : ''} depuis {userInfo.yearsActive}
               </p>
             </div>
