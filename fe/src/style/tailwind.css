@@ -19,12 +19,12 @@
   --sage-green: #A7C9A7;
   --sage-green-dark: #8FB98F;
   
-  /* ─── Fonds & Surfaces (beige/lin chaleureux) ─── */
-  --bg-primary: #F8F5F0;       /* Fond page - Lin naturel */
-  --bg-secondary: #F0EBE3;     /* Zones secondaires - Sable chaud */
-  --bg-card: #FDFBF7;          /* Cartes - Blanc lin */
-  --bg-elevated: #FFFFFF;      /* Modals - Blanc pur pour contraste */
-  --bg-input: #FEFDFB;         /* Inputs - Crème très léger */
+  /* ─── Fonds & Surfaces (beige chaleureux) ─── */
+  --bg-primary: #EDE4D8;       /* Fond page - Beige sable */
+  --bg-secondary: #E4D9CB;     /* Zones secondaires - Beige caramel */
+  --bg-card: #F5EFE6;          /* Cartes - Beige clair */
+  --bg-elevated: #FAF7F2;      /* Modals - Beige très clair */
+  --bg-input: #F7F2EA;         /* Inputs - Beige crème */
   
   /* ─── Textes ─── */
   --text-primary: #3D5A73;     /* Titres - Bleu profond */
