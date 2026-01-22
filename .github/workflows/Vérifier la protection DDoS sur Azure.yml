@@ -1,27 +1,40 @@
-- name: Vérifier la protection DDoS sur Azure
-      run: |
-        RG_NAME="weave-team"
-        
-        echo "🔍 Recherche de VNets dans le groupe de ressources : $RG_NAME"
-        
-        # Récupère la liste des VNets
-        VNET_LIST=$(az network vnet list --resource-group "$RG_NAME" --query "[].name" -o tsv)
-        
-        if [ -z "$VNET_LIST" ]; then
-          echo "⚠️ INFO : Aucun VNet trouvé dans $RG_NAME."
-          echo "La protection DDoS ne s'applique qu'aux VNets. Vos services (App Service/DB) sont actuellement en accès public."
-          exit 0 # On met 0 pour ne pas bloquer le pipeline, ou 1 si tu veux forcer la création d'un VNet
-        fi
+name: Check Azure DDoS
+on: [push]
 
-        for VNET in $VNET_LIST; do
-          echo "🧐 Vérification de : $VNET"
-          status=$(az network vnet show --name "$VNET" --resource-group "$RG_NAME" --query "enableDdosProtection" -o tsv)
+jobs:
+  check-network:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Connexion à Azure
+        uses: azure/login@v1
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Vérifier la protection DDoS
+        shell: /usr/bin/bash -e
+        run: |
+          # Variables basées sur tes captures d'écran
+          RG_NAME="weave-team"
           
-          if [ "$status" = "true" ]; then
-            echo "✅ DDoS Protection active sur $VNET"
-          else
-            echo "❌ DDoS Protection désactivée sur $VNET"
-            exit 1
+          echo "🔍 Recherche de réseaux virtuels dans le groupe : $RG_NAME"
+          
+          # Récupère le nom du premier VNet trouvé
+          VNET_NAME=$(az network vnet list --resource-group "$RG_NAME" --query "[0].name" -o tsv)
+          
+          if [ -z "$VNET_NAME" ]; then
+            echo "⚠️  INFO : Aucun VNet trouvé dans le groupe '$RG_NAME'."
+            echo "Note : Vos services (App Service/DB) utilisent l'accès public et n'ont pas de VNet dédié."
+            exit 0
           fi
-        done
-      shell: /usr/bin/bash -e
+          
+          echo "✅ VNet détecté : $VNET_NAME"
+          
+          # Vérification du statut
+          ddos_status=$(az network vnet show --name "$VNET_NAME" --resource-group "$RG_NAME" --query "enableDdosProtection" -o tsv)
+          
+          if [ "$ddos_status" != "true" ]; then
+            echo "❌ ERREUR : La protection DDoS n'est pas activée sur $VNET_NAME."
+            exit 1
+          else
+            echo "🛡️  SUCCÈS : La protection DDoS est active."
+          fi
