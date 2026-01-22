@@ -143,7 +143,7 @@ export async function createJournalEntry(req, res) {
             souvenirId: newSouvenir.id.toString(),
             circleId: resolvedCircleId.toString()
         },
-        author_id // Exclure l'auteur
+        null
     );
 
   } catch (err) {
