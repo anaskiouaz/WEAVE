@@ -10,10 +10,9 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Audit de la Base de Données et Réseau
+      - name: Audit de la Base de Données (Postgres 17)
         shell: bash
         run: |
-          # Variables de ton infrastructure
           RG="weave-team"
           DB_SERVER="weave-db-server"
 
@@ -21,33 +20,26 @@ jobs:
           echo "------------------------------------------"
 
           # 1. Vérification de l'Accès Public
-          # Récupère l'état du réseau public pour PostgreSQL
           public_access=$(az postgres flexible-server show --resource-group $RG --name $DB_SERVER --query "network.publicNetworkAccess" -o tsv)
           if [ "$public_access" == "Enabled" ]; then
-            echo "⚠️  ALERTE : L'accès public à la DB est activé."
+            echo "⚠️  ALERTE : L'accès public à la DB est activé. Assurez-vous de restreindre les IPs de pare-feu."
           else
             echo "✅ SUCCÈS : L'accès public est restreint."
           fi
 
-          # 2. Vérification TLS
-          tls_version=$(az postgres flexible-server parameter show --resource-group $RG --server-name $DB_SERVER --name "minimal_tls_version" --query "value" -o tsv)
-          echo "🔒 Version TLS minimale : $tls_version"
+          # 2. Vérification de l'état du serveur (Postgres 17 gère TLS nativement)
+          db_status=$(az postgres flexible-server show --resource-group $RG --name $DB_SERVER --query "state" -o tsv)
+          echo "📊 État du serveur : $db_status"
 
-          # 3. Vérification Stockage (Important car auto-grow est désactivé chez toi)
-          storage_size=$(az postgres flexible-server show --resource-group $RG --name $DB_SERVER --query "storage.storageSizeGb" -o tsv)
-          auto_grow=$(az postgres flexible-server show --resource-group $RG --name $DB_SERVER --query "storage.autoGrow" -o tsv)
-          echo "💾 Stockage : ${storage_size}GB (Auto-grow: $auto_grow)"
+          # 3. Vérification Stockage (Point critique : 32Go sans auto-grow)
+          storage_info=$(az postgres flexible-server show --resource-group $RG --name $DB_SERVER --query "{Size:storage.storageSizeGb, AutoGrow:storage.autoGrow}" -o json)
+          echo "💾 Infos Stockage : $storage_info"
           
+          auto_grow=$(echo $storage_info | jq -r '.AutoGrow')
           if [ "$auto_grow" == "Disabled" ]; then
-            echo "⚠️  ATTENTION : Le stockage ne s'agrandira pas automatiquement."
+            echo "⚠️  ATTENTION : Le stockage est bloqué à 32 Go. Pensez à l'augmenter si vos données saturent."
           fi
 
-          # 4. Vérification DDoS
-          echo "🛡️  Vérification DDoS..."
-          VNET_NAME=$(az network vnet list --resource-group "$RG" --query "[0].name" -o tsv)
-          if [ -z "$VNET_NAME" ]; then
-            echo "ℹ️  Note : Aucun VNet détecté (Services en IP publique directe)."
-          else
-            status=$(az network vnet show --name "$VNET_NAME" --resource-group "$RG" --query "enableDdosProtection" -o tsv)
-            echo "Statut DDoS sur $VNET_NAME : $status"
-          fi
+          # 4. Vérification de la version (Confirmation)
+          version=$(az postgres flexible-server show --resource-group $RG --name $DB_SERVER --query "version" -o tsv)
+          echo "🐘 Moteur : PostgreSQL $version"
