@@ -7,11 +7,9 @@ import {
 import { apiGet, apiPost, apiDelete } from '../api/client';
 import { useAuth } from '../context/AuthContext';
 import TaskDetailsModal from './ui-desktop/TaskDetailsModal';
-import AddTaskModal from './ui-desktop/AddTaskModal'; // <--- IMPORT AJOUTÉ
+import AddTaskModal from './ui-desktop/AddTaskModal';
 
-// --- CONFIGURATION ---
 const getTaskTypeConfig = (taskType) => {
-  // Hardcoded types with icons
   const PREDEFINED = {
     medical: { label: 'Médical', icon: Stethoscope, color: 'text-rose-600', bg: 'bg-rose-100' },
     shopping: { label: 'Courses', icon: ShoppingCart, color: 'text-indigo-600', bg: 'bg-indigo-100' },
@@ -20,7 +18,6 @@ const getTaskTypeConfig = (taskType) => {
   
   if (PREDEFINED[taskType]) return PREDEFINED[taskType];
   
-  // For custom types, use generic Activity icon with neutral colors
   const colors = ['text-blue-600', 'text-purple-600', 'text-pink-600', 'text-cyan-600', 'text-amber-600'];
   const bgs = ['bg-blue-100', 'bg-purple-100', 'bg-pink-100', 'bg-cyan-100', 'bg-amber-100'];
   const index = (taskType?.charCodeAt(0) || 0) % colors.length;
@@ -33,7 +30,6 @@ const getTaskTypeConfig = (taskType) => {
   };
 };
 
-// --- COMPOSANTS UI ---
 const TaskCard = ({ task, onClick, currentUserId, onVolunteer, viewMode = 'card' }) => {
   const config = getTaskTypeConfig(task.task_type);
   const Icon = config.icon;
@@ -60,11 +56,7 @@ const TaskCard = ({ task, onClick, currentUserId, onVolunteer, viewMode = 'card'
   return (
     <div onClick={() => onClick(task)} className={`relative p-3 rounded-xl bg-white border shadow-sm hover:shadow-md transition-all cursor-pointer group flex flex-col gap-2 ${task.completed ? 'border-emerald-200 ring-1 ring-emerald-100 bg-emerald-50' : isSigned ? 'border-green-200 ring-1 ring-green-100' : 'border-slate-100'}`}>
       <div className="flex justify-between items-center">
-        <span
-          className={`p-1 rounded-md flex items-center justify-center ${config.bg} ${config.color}`}
-          title={config.label}
-          aria-label={config.label}
-        >
+        <span className={`p-1 rounded-md flex items-center justify-center ${config.bg} ${config.color}`} title={config.label} aria-label={config.label}>
           <Icon className="w-3 h-3" />
         </span>
         <div className="flex items-center gap-2">
@@ -116,15 +108,13 @@ const DayColumn = ({ dayInfo, tasks, isToday, onTaskClick, onAddTask }) => {
   );
 };
 
-// --- MAIN COMPONENT ---
 export default function CalendarView() {
   const { circleId, user } = useAuth();
   const [viewMode, setViewMode] = useState('week');
   const [now, setNow] = useState(new Date());
 
-  // États Modales
   const [showAddTask, setShowAddTask] = useState(false);
-  const [addTaskDate, setAddTaskDate] = useState(null); // Pour pré-remplir la date
+  const [addTaskDate, setAddTaskDate] = useState(null);
   const [selectedTask, setSelectedTask] = useState(null);
 
   const [currentDate, setCurrentDate] = useState(new Date());
@@ -133,7 +123,6 @@ export default function CalendarView() {
   const [notification, setNotification] = useState({ type: null, message: null });
   const [circleMemberSkills, setCircleMemberSkills] = useState([]);
 
-  // Horloge temps réel (1s)
   useEffect(() => {
     const timer = setInterval(() => setNow(new Date()), 1000);
     return () => clearInterval(timer);
@@ -144,14 +133,11 @@ export default function CalendarView() {
     setTimeout(() => setNotification({ type: null, message: null }), 4000);
   };
 
-  // Charger la liste de toutes les compétences possibles pour alimenter la liste des types de tâches
   const loadCircleSkills = async () => {
     try {
       const allSkills = await apiGet(`/skills`);
       setCircleMemberSkills(Array.isArray(allSkills) ? allSkills : []);
-    } catch (e) {
-      console.error('Erreur chargement compétences', e);
-    }
+    } catch (e) { console.error(e); }
   };
 
   const loadTasks = async () => {
@@ -170,32 +156,37 @@ export default function CalendarView() {
     loadCircleSkills();
   }, [circleId]);
 
+  // CORRECTION MAJEURE ICI : Calcul de dateISO en local pour éviter le décalage UTC
   const weekDays = useMemo(() => {
     const d = new Date(currentDate);
     const day = d.getDay();
     const diff = d.getDate() - day + (day === 0 ? -6 : 1);
     const start = new Date(d.setDate(diff));
+    
     return Array.from({ length: 7 }).map((_, i) => {
       const d = new Date(start);
       d.setDate(start.getDate() + i);
+      
+      // Construction manuelle de YYYY-MM-DD en heure locale
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const dayVal = String(d.getDate()).padStart(2, '0');
+      const dateISO = `${year}-${month}-${dayVal}`;
+
       return {
         name: new Intl.DateTimeFormat('fr-FR', { weekday: 'short' }).format(d),
-        dateISO: d.toISOString().split('T')[0],
+        dateISO: dateISO, // Plus de décalage -1 jour
         displayDate: d.getDate()
       };
     });
   }, [currentDate]);
 
-  // Grouper les tâches par date (YYYY-MM-DD) et trier par date+heure
   const groupedTasks = useMemo(() => {
     const sorted = tasks.slice().sort((a, b) => {
-      // Utiliser directement les strings de date sans conversion Date() pour éviter les décalages timezone
       const dateA = a.date.split('T')[0];
       const dateB = b.date.split('T')[0];
       const timeA = a.time || '00:00';
       const timeB = b.time || '00:00';
-      
-      // Comparer d'abord par date, puis par heure
       if (dateA !== dateB) return dateA.localeCompare(dateB);
       return timeA.localeCompare(timeB);
     });
@@ -207,26 +198,29 @@ export default function CalendarView() {
     }, {});
   }, [tasks]);
 
-  // --- ACTIONS ---
-
-  // Ouvre la modale (avec date optionnelle)
   const openAddModal = (dateISO) => {
-    setAddTaskDate(dateISO || new Date().toISOString().split('T')[0]);
+    // Si dateISO est fournie, on l'utilise, sinon date locale du jour
+    let targetDate = dateISO;
+    if (!targetDate) {
+      const d = new Date();
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const dayVal = String(d.getDate()).padStart(2, '0');
+      targetDate = `${year}-${month}-${dayVal}`;
+    }
+    setAddTaskDate(targetDate);
     setShowAddTask(true);
   };
 
-  // Traite la soumission du formulaire
   const handleCreateTask = async (formData) => {
     try {
       const payload = {
         ...formData,
         circle_id: circleId,
-        helper_name: 'À pourvoir', // Défaut
-        task_type: formData.type // Mapping nom
+        helper_name: 'À pourvoir',
+        task_type: formData.type
       };
-
       await apiPost('/tasks', payload);
-      // Poster un log d'audit (non bloquant)
       (async () => {
         try {
           await apiPost('/users/audit-logs', {
@@ -235,7 +229,7 @@ export default function CalendarView() {
             details: `${user?.name || 'Utilisateur'} a créé la tâche "${formData.title}"`,
             circleId: circleId || null
           });
-        } catch (e) { console.debug('Audit create task failed:', e.message || e); }
+        } catch (e) { console.debug(e); }
       })();
       await loadTasks();
       setShowAddTask(false);
@@ -249,7 +243,6 @@ export default function CalendarView() {
   const handleVolunteer = async (taskId) => {
     try {
       await apiPost(`/tasks/${taskId}/volunteer`, { userId: user.id });
-      // Poster audit côté front (non bloquant)
       (async () => {
         try {
           const task = tasks.find(t => String(t.id) === String(taskId));
@@ -259,7 +252,7 @@ export default function CalendarView() {
             details: `${user.name || 'Utilisateur'} s'est engagé(e) sur \"${task?.title || taskId}\"`,
             circleId: task?.circle_id || circleId || null
           });
-        } catch (e) { console.debug('Audit volunteer failed:', e.message || e); }
+        } catch (e) { console.debug(e); }
       })();
       await loadTasks();
       setSelectedTask(null);
@@ -268,18 +261,18 @@ export default function CalendarView() {
 
   const handleUnvolunteer = async (taskId) => {
     try {
-      await apiPost(`/tasks/${taskId}/unvolunteer`, { userId: user.id });
-      // Poster audit côté front (non bloquant)
+      await apiDelete(`/tasks/${taskId}/volunteer`, { userId: user.id });
+      
       (async () => {
         try {
           const task = tasks.find(t => String(t.id) === String(taskId));
           await apiPost('/users/audit-logs', {
             userId: user.id,
             action: 'TASK_WITHDRAWN',
-            details: `${user.name || 'Utilisateur'} s'est retiré(e) de \"${task?.title || taskId}\"`,
+            details: `${user.name || 'Utilisateur'} s'est retiré(e) de "${task?.title || taskId}"`,
             circleId: task?.circle_id || circleId || null
           });
-        } catch (e) { console.debug('Audit unvolunteer failed:', e.message || e); }
+        } catch (e) { console.debug(e); }
       })();
       await loadTasks();
       setSelectedTask(null);
@@ -296,7 +289,6 @@ export default function CalendarView() {
     }
   };
 
-  // Rôle courant dans le cercle (ADMIN/HELPER/PC)
   const currentCircleRole = useMemo(() => {
     const match = (user?.circles || []).find(c => String(c.id ?? c.circle_id) === String(circleId));
     return (match?.role || '').toUpperCase();
@@ -305,8 +297,7 @@ export default function CalendarView() {
   const canValidate = (task) => {
     const roleOK = currentCircleRole === 'ADMIN' || currentCircleRole === 'HELPER';
     const assigned = Array.isArray(task?.assigned_to) ? task.assigned_to : [];
-    const notYetValidated = !task?.completed; // Hide button if already completed
-    // Show validate even for future tasks if role and assignment are OK
+    const notYetValidated = !task?.completed; 
     if (!roleOK || assigned.length === 0 || !notYetValidated) return false;
     return true;
   };
@@ -323,7 +314,6 @@ export default function CalendarView() {
       await loadTasks();
       setSelectedTask(null);
     } catch (err) {
-      console.error(err);
       showNotification('error', "Erreur lors de la validation");
     }
   };
@@ -335,16 +325,23 @@ export default function CalendarView() {
       await loadTasks();
       setSelectedTask(null);
     } catch (err) {
-      console.error(err);
       showNotification('error', "Erreur lors de l'annulation de validation");
     }
   };
+
+  // On calcule l'ISO local pour la mise en évidence d'aujourd'hui
+  const todayISO = (() => {
+      const d = new Date();
+      const year = d.getFullYear();
+      const month = String(d.getMonth() + 1).padStart(2, '0');
+      const dayVal = String(d.getDate()).padStart(2, '0');
+      return `${year}-${month}-${dayVal}`;
+  })();
 
   return (
     <div className="min-h-screen bg-slate-50/50 font-sans text-slate-800 p-4 md:p-6">
       <div className="max-w-[1400px] mx-auto space-y-6">
 
-        {/* Navigation & Header */}
         <div className="flex flex-col md:flex-row items-center justify-between gap-4 bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
           <div className="flex items-center gap-4">
             <div className="flex items-center bg-slate-100 rounded-lg p-1">
@@ -370,14 +367,12 @@ export default function CalendarView() {
           </div>
         </div>
 
-        {/* Notification */}
         {notification.message && (
           <div className={`fixed bottom-6 right-6 p-4 rounded-xl shadow-lg border animate-in slide-in-from-bottom-5 z-50 ${notification.type === 'error' ? 'bg-red-50 text-red-700 border-red-200' : 'bg-green-50 text-green-700 border-green-200'}`}>
             {notification.message}
           </div>
         )}
 
-        {/* Content */}
         {loading ? (
           <div className="py-20 flex justify-center"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>
         ) : (
@@ -390,7 +385,7 @@ export default function CalendarView() {
                     const taskDate = t.date.split('T')[0];
                     return taskDate === day.dateISO;
                   })}
-                  isToday={day.dateISO === new Date().toISOString().split('T')[0]}
+                  isToday={day.dateISO === todayISO}
                   onTaskClick={setSelectedTask}
                   onAddTask={openAddModal}
                 />
@@ -424,9 +419,6 @@ export default function CalendarView() {
           )
         )}
 
-        {/* --- LES MODALES --- */}
-
-        {/* 1. Ajouter une tâche */}
         <AddTaskModal
           isOpen={showAddTask}
           onClose={() => setShowAddTask(false)}
@@ -435,7 +427,6 @@ export default function CalendarView() {
           skills={circleMemberSkills}
         />
 
-        {/* 2. Détails d'une tâche */}
         <TaskDetailsModal
           task={selectedTask}
           onClose={() => setSelectedTask(null)}
