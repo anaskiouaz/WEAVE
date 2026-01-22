@@ -127,3 +127,84 @@ WEAVE/
 ├── weave-db/             # Base de données
 │   └── migrations/       # Scripts SQL (01_initial_schema.sql...)
 └── docker-compose.yml    # Orchestration locale
+``` 
+ 
+## App Mobile
+
+# Capacitor :
+
+Encapsuler l'app web dans une app native afin d'avoir toutes 
+les fonctionnalités d'une vraie app (notifs, localisation, photos...).
+
+# Fonctionnement :
+
+1/ Enregistrement
+L'app mobile démarre, elle demande à Firebase un token.
+Firebase répond en lui envoyant le token.
+L'app mobile envoie ce Token au Serveur Node.js.
+Le serveur le sauvegarde dans la base de données dans la colonne fcm_token.
+
+2/ Action (ajout tache)
+Sur PC, créer une tâche "Sortir les poubelles".
+Le frontend envoie cette info au backend via une requête HTTP (POST /tasks).
+
+3/ Tri notif
+Le backend reçoit la tâche et l'enregistre dans la BD.
+Après, il demande à la BD qui doivent recevoir la notif.
+La BD ressort la liste des fcm_token enregistrés.
+
+4/ L'Envoi Notif
+Le backend utilise la librairie firebase-admin et le fichier service-account.json.
+Ca dit aux serveurs de Google d'envoyer le message 'Nouvelle tâche' à l'adresse Token.
+Google (FCM) cherche le tel lié au Token sur Internet.
+Il push l'action directement dans le système Android du tel.
+Le tel reçoit le signal, réveille l'app, et affiche la notif "Nouvelle tâche".
+
+# Fichiers Firebase :
+
+Utiles afin de créer un token pour les notifs.
+
+google-services.json (Côté Téléphone / Android) : 
+Quand l'app démarre sur le téléphone, elle montre ce fichier à Google.
+Google vérifie si c'est bien l'application WEAVE.
+Ensuite, Google donne au téléphone un Token. C'est l'id du tel.
+
+service-account.json (Côté Serveur / Docker) : 
+Il contient une clé privée.
+Il dit à Google d'envoyer une notif quand demandé.
+
+Firebase.js : Initialisation de firebase.
+Il initialise le SDK "Admin" qui a le droit d'envoyer des messages aux téléphones.
+
+# Fichiers .env de fe/
+
+Stocke l'adresse ip locale du PC afin de se connecter car le serveur (Docker) tourne dessus.
+Ou alors l'adresse du backend de Azure afin d'avoir l'app en prod.
+
+Il utilise admin.messaging().sendEachForMulticast(...). C'est la méthode obligatoire de Google.
+
+Auto-Réparation (initDB) : Au démarrage, il vérifie chaque colonne..
+Assouplissement : Il retire les obligations strictes (NOT NULL). Avant, si pas de circle_id, ça plantait. Maintenant, ca accepte les champs vides.
+
+# Fichier Dashboard.jsx
+
+Fichier pour envoyer la demande notification et enregistrer sur GoogleFirebase le token.
+
+# Dossier Android
+
+Dossier crée à l'installation de Capacitor, ne pas toucher, configurations de bases.
+npm i @capacitor/core
+npm i -D @capacitor/cli
+npm i @capacitor/android
+etc...
+
+# Logique de notifications.js
+
+notifyCircle : Pour informer tout un cercle d'aidants (Tâches, Souvenirs).
+notifyConversation : Pour informer les participants d'un chat (Messages).
+
+# Logique de cronService
+
+Un script tourne chaque minute pour vérifier les tâches qui commencent dans 30 minutes.
+Cas 1 (Tâche assignée) : Envoie un rappel personnel ("C'est bientôt !") uniquement au bénévole inscrit.
+Cas 2 (Tâche non pourvue) : Envoie une alerte générale ("Urgent : Besoin d'aide !") à tous les membres du cercle disponibles à cette heure-là.
