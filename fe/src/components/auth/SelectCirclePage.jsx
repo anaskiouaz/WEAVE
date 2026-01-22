@@ -262,26 +262,26 @@ export default function SelectCirclePage() {
                             {/* ... (Reste du formulaire identique) ... */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
-                                    <Label htmlFor="birth_date">Date de naissance</Label>
-                                    <div className="relative">
-                                        <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
-                                        <Input id="birth_date" name="birth_date" type="date" className="pl-16 h-12 input-soft w-full" value={seniorData.birth_date} onChange={handleSeniorChange} />
-                                    </div>
+                                    <Label htmlFor="birth_date" className="flex items-center gap-2">
+                                        <Calendar className="h-4 w-4 text-muted" />
+                                        Date de naissance
+                                    </Label>
+                                    <Input id="birth_date" name="birth_date" type="date" className="h-12 input-soft w-full" value={seniorData.birth_date} onChange={handleSeniorChange} />
                                 </div>
                                 <div className="space-y-2">
-                                    <Label htmlFor="phone">Téléphone</Label>
-                                    <div className="relative">
-                                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
-                                        <Input id="phone" name="phone" placeholder="06..." className="pl-16 h-12 input-soft" value={seniorData.phone} onChange={handleSeniorChange} />
-                                    </div>
+                                    <Label htmlFor="phone" className="flex items-center gap-2">
+                                        <Phone className="h-4 w-4 text-muted" />
+                                        Téléphone
+                                    </Label>
+                                    <Input id="phone" name="phone" placeholder="06..." className="h-12 input-soft" value={seniorData.phone} onChange={handleSeniorChange} />
                                 </div>
                             </div>
                             <div className="space-y-2">
-                                <Label htmlFor="email">Email du Bénéficiaire *</Label>
-                                <div className="relative">
-                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
-                                    <Input id="email" name="email" type="email" placeholder="ex: jeanne@example.com" className="pl-16 h-12 input-soft" value={seniorData.email} onChange={handleSeniorChange} required />
-                                </div>
+                                <Label htmlFor="email" className="flex items-center gap-2">
+                                    <Mail className="h-4 w-4 text-muted" />
+                                    Email du Bénéficiaire *
+                                </Label>
+                                <Input id="email" name="email" type="email" placeholder="ex: jeanne@example.com" className="h-12 input-soft" value={seniorData.email} onChange={handleSeniorChange} required />
                             </div>
                             <div className="space-y-3 pt-2">
                                 <Label className="flex items-center gap-2"><Stethoscope className="w-4 h-4 text-primary" /> Pathologies / Risques <span className="text-secondary text-xs font-normal">(optionnel)</span></Label>
