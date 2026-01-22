@@ -3,7 +3,6 @@ import db from '../config/db.js';
 import crypto from 'crypto';
 import { generateBlobSASUrl } from '../utils/azureStorage.js';
 import { BlobServiceClient } from '@azure/storage-blob';
-import admin from '../config/firebase.js';
 import { notifyCircle } from '../utils/notifications.js';
 import { logAudit, AUDIT_ACTIONS } from '../utils/audits.js';
 import { Router } from 'express';
@@ -143,7 +142,7 @@ export async function createJournalEntry(req, res) {
             souvenirId: newSouvenir.id.toString(),
             circleId: resolvedCircleId.toString()
         },
-        null
+        author_id // Exclure l'auteur
     );
 
   } catch (err) {
