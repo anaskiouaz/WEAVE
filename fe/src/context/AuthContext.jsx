@@ -107,7 +107,9 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     setLoading(true);
     try {
-      const data = await apiPost('/users', userData);
+      // ✅ APRÈS (Correction : on pointe vers la bonne route d'auth)
+      const data = await apiPost('/auth/register', userData); 
+      
       return { success: data.success };
     } catch (error) {
       return { success: false, error: error.message };

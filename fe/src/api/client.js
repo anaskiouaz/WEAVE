@@ -1,20 +1,20 @@
 import { Capacitor } from '@capacitor/core';
 
-const IP_LOCALE = '10.138.43.170'; 
-const PORT = '4000';
+const PROD_URL = 'https://weave-be-server-d8badmaafzdvc8aq.swedencentral-01.azurewebsites.net';
 
 // Détection Mobile vs Web
 const isNative = Capacitor.isNativePlatform();
 
-// Si Mobile -> IP Locale. Si Web -> Localhost ou Vercel.
+// --- LOGIQUE SIMPLIFIÉE ---
+// On utilise TOUJOURS l'URL de production sur mobile pour éviter les soucis de réseau local
 let baseUrl = isNative 
-  ? `http://${IP_LOCALE}:${PORT}/api`
-  : (import.meta.env.VITE_API_BASE_URL || `http://localhost:${PORT}/api`);
+  ? PROD_URL 
+  : (import.meta.env.VITE_API_BASE_URL || PROD_URL); 
 
-// Nettoyage de l'URL
+// Nettoyage de l'URL pour éviter les doublons (/api/api)
 const API_BASE_URL = baseUrl.replace(/\/$/, '').replace(/\/api$/, '') + '/api';
 
-console.log(`🔌 API Cible (${isNative ? 'Mobile' : 'Web'}): ${API_BASE_URL}`);
+console.log(`🔌 API Cible: ${API_BASE_URL}`);
 
 // --- GESTION HEADERS ---
 const getHeaders = (options = {}) => {
