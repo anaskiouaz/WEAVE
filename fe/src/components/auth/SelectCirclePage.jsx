@@ -165,8 +165,8 @@ export default function SelectCirclePage() {
     };
 
     return (
-        <div className="min-h-screen bg-blue-50/50 flex items-center justify-center p-4">
-            <Card className="w-full max-w-2xl shadow-xl border-t-6 border-blue-600 animate-in fade-in zoom-in duration-500">
+        <div className="min-h-screen bg-page flex items-center justify-center p-4" style={{ backgroundColor: 'var(--bg-primary)' }}>
+            <Card className="w-full max-w-2xl shadow-xl border-t-6 animate-in fade-in zoom-in duration-500" style={{ backgroundColor: 'var(--bg-card)', borderTopColor: 'var(--sage-green)' }}>
 
                 <CardHeader className="text-center pb-6 space-y-2">
                     {view !== 'selection' && (
@@ -174,13 +174,13 @@ export default function SelectCirclePage() {
                             <ArrowLeft className="w-4 h-4 mr-2" /> Retour
                         </Button>
                     )}
-                    <CardTitle className="text-3xl font-bold text-blue-900">
+                    <CardTitle className="text-3xl font-bold text-primary">
                         {view === 'selection' && "Bienvenue sur Weave"}
                         {view === 'create' && "Créer un Cercle de Soins"}
                         {view === 'join' && "Rejoindre un Cercle"}
                         {view === 'list' && "Vos Cercles"}
                     </CardTitle>
-                    <CardDescription className="text-lg text-gray-600">
+                    <CardDescription className="text-lg text-secondary">
                         {view === 'selection' && "Choisissez votre espace de travail."}
                         {view === 'list' && "Sélectionnez le senior dont vous voulez voir le suivi."}
                     </CardDescription>
@@ -195,28 +195,28 @@ export default function SelectCirclePage() {
 
                     {view === 'selection' && (
                         <div className="grid md:grid-cols-3 gap-4">
-                            <button onClick={handleViewList} className="flex flex-col items-center justify-center p-6 border-2 border-blue-100 rounded-xl bg-white hover:border-blue-500 hover:shadow-lg hover:-translate-y-1 transition-all group">
-                                <div className="p-3 bg-blue-50 rounded-full text-blue-600 mb-3 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                            <button onClick={handleViewList} className="flex flex-col items-center justify-center p-6 border-2 rounded-xl bg-card hover:shadow-lg hover:-translate-y-1 transition-all group border-subtle" style={{ backgroundColor: 'var(--bg-card)' }}>
+                                <div className="p-3 rounded-full mb-3 transition-colors" style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--sage-green)' }}>
                                     <LogIn className="w-8 h-8" />
                                 </div>
-                                <h3 className="text-lg font-bold text-gray-800 mb-1">Continuer</h3>
-                                <p className="text-center text-xs text-gray-500">Mes cercles existants.</p>
+                                <h3 className="text-lg font-bold text-primary mb-1">Continuer</h3>
+                                <p className="text-center text-xs text-secondary">Mes cercles existants.</p>
                             </button>
 
-                            <button onClick={() => setView('create')} className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:border-green-500 hover:bg-green-50 hover:shadow-lg hover:-translate-y-1 transition-all group">
-                                <div className="p-3 bg-white rounded-full text-gray-500 mb-3 border border-gray-200 group-hover:border-green-500 group-hover:bg-green-500 group-hover:text-white transition-colors">
+                            <button onClick={() => setView('create')} className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl bg-card hover:shadow-lg hover:-translate-y-1 transition-all group border-subtle" style={{ backgroundColor: 'var(--bg-card)' }}>
+                                <div className="p-3 rounded-full mb-3 border transition-colors" style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-secondary)', borderColor: 'var(--border-light)' }}>
                                     <UserPlus className="w-8 h-8" />
                                 </div>
-                                <h3 className="text-lg font-bold text-gray-800 mb-1">Nouveau</h3>
-                                <p className="text-center text-xs text-gray-500">Je crée un dossier pour un proche.</p>
+                                <h3 className="text-lg font-bold text-primary mb-1">Nouveau</h3>
+                                <p className="text-center text-xs text-secondary">Je crée un dossier pour un proche.</p>
                             </button>
 
-                            <button onClick={() => setView('join')} className="flex flex-col items-center justify-center p-6 border-2 border-dashed border-gray-300 rounded-xl bg-gray-50 hover:border-purple-500 hover:bg-purple-50 hover:shadow-lg hover:-translate-y-1 transition-all group">
-                                <div className="p-3 bg-white rounded-full text-gray-500 mb-3 border border-gray-200 group-hover:border-purple-500 group-hover:bg-purple-500 group-hover:text-white transition-colors">
+                            <button onClick={() => setView('join')} className="flex flex-col items-center justify-center p-6 border-2 border-dashed rounded-xl bg-card hover:shadow-lg hover:-translate-y-1 transition-all group border-subtle" style={{ backgroundColor: 'var(--bg-card)' }}>
+                                <div className="p-3 rounded-full mb-3 border transition-colors" style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-secondary)', borderColor: 'var(--border-light)' }}>
                                     <Users className="w-8 h-8" />
                                 </div>
-                                <h3 className="text-lg font-bold text-gray-800 mb-1">Invité</h3>
-                                <p className="text-center text-xs text-gray-500">J'ai un code.</p>
+                                <h3 className="text-lg font-bold text-primary mb-1">Invité</h3>
+                                <p className="text-center text-xs text-secondary">J'ai un code.</p>
                             </button>
                         </div>
                     )}
@@ -224,23 +224,23 @@ export default function SelectCirclePage() {
                     {view === 'list' && (
                         <div className="space-y-4">
                             {loading ? (
-                                <div className="flex justify-center py-8"><Loader2 className="animate-spin text-blue-600 w-8 h-8" /></div>
+                                <div className="flex justify-center py-8"><Loader2 className="animate-spin text-primary w-8 h-8" /></div>
                             ) : myCircles.length === 0 ? (
-                                <div className="text-center py-8 text-gray-500">Aucun cercle trouvé.</div>
+                                <div className="text-center py-8 text-secondary">Aucun cercle trouvé.</div>
                             ) : (
                                 <div className="grid gap-3 max-h-[400px] overflow-y-auto pr-2">
                                     {myCircles.map((circle) => (
-                                        <div key={circle.id} onClick={() => selectExistingCircle(circle)} className="flex items-center justify-between p-4 border rounded-lg hover:bg-blue-50 hover:border-blue-300 cursor-pointer transition-all bg-white shadow-sm group">
+                                        <div key={circle.id} onClick={() => selectExistingCircle(circle)} className="flex items-center justify-between p-4 border rounded-lg cursor-pointer transition-all bg-card shadow-sm group border-subtle hover:shadow-lg">
                                             <div className="flex items-center gap-3">
-                                                <div className="bg-blue-100 p-2 rounded-full text-blue-700 group-hover:bg-blue-600 group-hover:text-white transition-colors">
+                                                <div className="p-2 rounded-full transition-colors" style={{ backgroundColor: 'var(--bg-elevated)', color: 'var(--sage-green)' }}>
                                                     <Users className="w-5 h-5" />
                                                 </div>
                                                 <div>
-                                                    <h4 className="font-bold text-gray-800">{circle.name || circle.senior_name}</h4>
-                                                    <p className="text-xs text-gray-500">Rôle: {circle.role || 'Membre'}</p>
+                                                    <h4 className="font-bold text-primary">{circle.name || circle.senior_name}</h4>
+                                                    <p className="text-xs text-secondary">Rôle: {circle.role || 'Membre'}</p>
                                                 </div>
                                             </div>
-                                            <ArrowRight className="w-5 h-5 text-gray-400 group-hover:text-blue-600 group-hover:translate-x-1 transition-all" />
+                                            <ArrowRight className="w-5 h-5 text-secondary group-hover:text-primary group-hover:translate-x-1 transition-all" />
                                         </div>
                                     ))}
                                 </div>
@@ -252,43 +252,49 @@ export default function SelectCirclePage() {
                         <form onSubmit={handleCreate} className="space-y-4 max-w-lg mx-auto">
                             <div className="space-y-2">
                                 <Label htmlFor="name">Nom du Bénéficiaire *</Label>
-                                <div className="relative">
-                                    <Users className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                                    <Input id="name" name="name" placeholder="ex: Mamie Jeanne" className="pl-10 h-12 bg-white" value={seniorData.name} onChange={handleSeniorChange} required autoFocus />
-                                </div>
-                            </div>
+                             <div className="space-y-2">
+                                <Label htmlFor="name" className="flex items-center gap-2">
+                                    <Users className="h-4 w-4 text-muted" />
+                                    Nom du Bénéficiaire *
+                                </Label>
+                                <Input id="name" name="name" placeholder="ex: Mamie Jeanne" className="h-12 input-soft" value={seniorData.name} onChange={handleSeniorChange} required autoFocus />
+                            </div>                            </div>
                             {/* ... (Reste du formulaire identique) ... */}
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div className="space-y-2">
                                     <Label htmlFor="birth_date">Date de naissance</Label>
                                     <div className="relative">
-                                        <Calendar className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                                        <Input id="birth_date" name="birth_date" type="date" className="pl-10 h-12 bg-white w-full" value={seniorData.birth_date} onChange={handleSeniorChange} />
+                                        <Calendar className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
+                                        <Input id="birth_date" name="birth_date" type="date" className="pl-16 h-12 input-soft w-full" value={seniorData.birth_date} onChange={handleSeniorChange} />
                                     </div>
                                 </div>
                                 <div className="space-y-2">
                                     <Label htmlFor="phone">Téléphone</Label>
                                     <div className="relative">
-                                        <Phone className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                                        <Input id="phone" name="phone" placeholder="06..." className="pl-10 h-12 bg-white" value={seniorData.phone} onChange={handleSeniorChange} />
+                                        <Phone className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
+                                        <Input id="phone" name="phone" placeholder="06..." className="pl-16 h-12 input-soft" value={seniorData.phone} onChange={handleSeniorChange} />
                                     </div>
                                 </div>
                             </div>
                             <div className="space-y-2">
                                 <Label htmlFor="email">Email du Bénéficiaire *</Label>
                                 <div className="relative">
-                                    <Mail className="absolute left-3 top-3 h-5 w-5 text-gray-400" />
-                                    <Input id="email" name="email" type="email" placeholder="ex: jeanne@example.com" className="pl-10 h-12 bg-white" value={seniorData.email} onChange={handleSeniorChange} required />
+                                    <Mail className="absolute left-4 top-1/2 -translate-y-1/2 h-5 w-5 text-muted pointer-events-none" />
+                                    <Input id="email" name="email" type="email" placeholder="ex: jeanne@example.com" className="pl-16 h-12 input-soft" value={seniorData.email} onChange={handleSeniorChange} required />
                                 </div>
                             </div>
                             <div className="space-y-3 pt-2">
-                                <Label className="flex items-center gap-2"><Stethoscope className="w-4 h-4 text-blue-600" /> Pathologies / Risques <span className="text-gray-400 text-xs font-normal">(optionnel)</span></Label>
-                                <div className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm">
+                                <Label className="flex items-center gap-2"><Stethoscope className="w-4 h-4 text-primary" /> Pathologies / Risques <span className="text-secondary text-xs font-normal">(optionnel)</span></Label>
+                                <div className="p-4 rounded-lg border shadow-sm bg-card border-subtle">
                                     <div className="flex flex-wrap gap-2">
                                         {MEDICAL_OPTIONS.map((option) => {
                                             const isSelected = seniorData.medical_select.includes(option);
                                             return (
-                                                <button key={option} type="button" onClick={() => toggleMedicalOption(option)} className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all flex items-center gap-1.5 ${isSelected ? 'bg-blue-100 text-blue-800 border-blue-300' : 'bg-gray-50 text-gray-600 border-gray-200 hover:bg-gray-100'}`}>
+                                                <button
+                                                    key={option}
+                                                    type="button"
+                                                    onClick={() => toggleMedicalOption(option)}
+                                                    className={`px-3 py-1.5 rounded-full text-xs font-medium border transition-all flex items-center gap-1.5 ${isSelected ? 'bg-elevated text-primary border-subtle' : 'bg-card text-secondary border-subtle hover:bg-elevated'}`}>
                                                     {isSelected && <Check className="w-3 h-3" />} {option}
                                                 </button>
                                             )
@@ -296,20 +302,20 @@ export default function SelectCirclePage() {
                                     </div>
                                 </div>
                             </div>
-                            <Button type="submit" size="lg" disabled={loading} className="w-full h-12 bg-blue-700 hover:bg-blue-800 text-white mt-4">
-                                {loading ? <Loader2 className="animate-spin mr-2" /> : "Créer le cercle"}
+                            <Button type="submit" size="lg" disabled={loading} className="w-full h-12 btn-sage mt-4">
+                                {loading ? <Loader2 className="animate-spin mr-2 text-primary" /> : "Créer le cercle"}
                             </Button>
                         </form>
                     )}
 
                     {view === 'join' && (
                         <form onSubmit={handleJoin} className="space-y-6 max-w-md mx-auto mt-4">
-                            <div className="space-y-3">
+                                <div className="space-y-3">
                                 <Label htmlFor="inviteCode">Code d'invitation</Label>
-                                <Input id="inviteCode" placeholder="ex: W-7X9B2" className="h-14 text-lg bg-white text-center font-mono tracking-widest uppercase" value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} autoFocus />
+                                <Input id="inviteCode" placeholder="ex: W-7X9B2" className="h-14 text-lg input-soft text-center font-mono tracking-widest uppercase" value={inviteCode} onChange={(e) => setInviteCode(e.target.value.toUpperCase())} autoFocus />
                             </div>
-                            <Button type="submit" size="lg" disabled={loading} className="w-full h-14 bg-blue-700 hover:bg-blue-800 shadow-md text-white">
-                                {loading ? <Loader2 className="animate-spin mr-2" /> : "Rejoindre"}
+                            <Button type="submit" size="lg" disabled={loading} className="w-full h-14 btn-sage shadow-md">
+                                {loading ? <Loader2 className="animate-spin mr-2 text-primary" /> : "Rejoindre"}
                             </Button>
                         </form>
                     )}

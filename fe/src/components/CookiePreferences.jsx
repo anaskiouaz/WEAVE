@@ -174,15 +174,9 @@ export default function CookiePreferences() {
                       ) : (
                         <button
                           onClick={() => handleToggle(category)}
-                          className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                            isEnabled ? 'bg-blue-600' : 'bg-gray-300'
-                          }`}
+                          className={`w-12 h-7 flex items-center rounded-full p-1 transition-colors duration-300 focus:outline-none ${isEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}
                         >
-                          <span
-                            className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform ${
-                              isEnabled ? 'translate-x-6' : 'translate-x-1'
-                            }`}
-                          />
+                          <div className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-300 ${isEnabled ? 'translate-x-2.5' : 'translate-x-0'}`}></div>
                         </button>
                       )}
                     </div>

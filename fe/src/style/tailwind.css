@@ -222,14 +222,14 @@ body {
   box-shadow: var(--shadow-lg);
 }
 
-/* ─── Switch de thème ─── */
+/* ─── Switch de thème (harmonisé: 12x7 outer, 5x5 inner) ─── */
 .theme-switch {
-  @apply relative w-14 h-8 rounded-full cursor-pointer transition-all duration-300;
+  @apply relative w-12 h-7 rounded-full cursor-pointer transition-all duration-300;
   background-color: var(--border-input);
 }
 .theme-switch::after {
   content: '';
-  @apply absolute top-1 left-1 w-6 h-6 rounded-full transition-all duration-300;
+  @apply absolute top-1 left-1 w-5 h-5 rounded-full transition-all duration-300;
   background-color: var(--bg-elevated);
   box-shadow: var(--shadow-sm);
 }
@@ -237,7 +237,7 @@ body {
   background-color: var(--soft-coral);
 }
 [data-theme="dark"] .theme-switch::after {
-  transform: translateX(24px);
+  transform: translateX(10px);
 }
 
 /* ─── Scrollbar personnalisée ─── */

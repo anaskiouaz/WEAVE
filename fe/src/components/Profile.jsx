@@ -512,16 +512,15 @@ export default function Profile() {
                   <p className="text-xs" style={{ color: 'var(--text-muted)' }}>{isDark ? 'Cocon nocturne activé' : 'Lumière douce activée'}</p>
                 </div>
               </div>
-              <button 
-                onClick={toggleTheme}
-                className={`w-14 h-8 flex items-center rounded-full p-1 transition-all duration-300 focus:outline-none`}
-                style={{ backgroundColor: isDark ? 'var(--soft-coral)' : 'var(--border-input)' }}
-              >
-                <div 
-                  className={`w-6 h-6 rounded-full shadow-md transform transition-transform duration-300 ${isDark ? 'translate-x-6' : 'translate-x-0'}`}
-                  style={{ backgroundColor: 'white' }}
-                ></div>
-              </button>
+            <button 
+  onClick={toggleTheme}
+  className={`w-12 h-7 flex items-center rounded-full p-1 transition-colors duration-300 focus:outline-none`}
+  style={{ backgroundColor: isDark ? 'var(--soft-coral)' : 'var(--border-input)' }}
+>
+  <div 
+    className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-300 ${isDark ? 'translate-x-2.5' : 'translate-x-0'}`}
+  ></div>
+</button>
             </div>
             
             {/* NOTIFICATIONS */}
@@ -530,15 +529,15 @@ export default function Profile() {
                 <Bell size={20} style={{ color: 'var(--sage-green)' }} />
                 <span className="font-semibold" style={{ color: 'var(--text-primary)' }}>Notifications</span>
               </div>
-              <button 
-                onClick={handleNotificationToggle}
-                className={`w-12 h-7 flex items-center rounded-full p-1 transition-colors duration-300 focus:outline-none`}
-                style={{ backgroundColor: notificationsEnabled ? 'var(--sage-green)' : 'var(--border-input)' }}
-              >
-                <div 
-                  className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-300 ${notificationsEnabled ? 'translate-x-5' : 'translate-x-0'}`}
-                ></div>
-              </button>
+            <button 
+              onClick={handleNotificationToggle}
+              className={`w-12 h-7 flex items-center rounded-full p-1 transition-colors duration-300 focus:outline-none`}
+              style={{ backgroundColor: notificationsEnabled ? 'var(--sage-green)' : 'var(--border-input)' }}
+            >
+              <div 
+                className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-300 ${notificationsEnabled ? 'translate-x-2.5' : 'translate-x-0'}`}
+              ></div>
+            </button>
             </div>
 
             {/* PERSONNES AIDÉES */}

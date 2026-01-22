@@ -109,12 +109,12 @@ export default function CookieBanner() {
                   ) : (
                     <button
                       onClick={() => handleToggle(category)}
-                      className={`w-6 h-6 rounded border-2 flex items-center justify-center transition-all duration-200 ${preferences[category]
-                          ? 'bg-blue-600 border-blue-600 text-white'
-                          : 'bg-white border-gray-300 text-transparent hover:border-blue-400'
-                        }`}
+                      className={`w-12 h-7 flex items-center rounded-full p-1 transition-colors duration-300 focus:outline-none`}
+                      style={{ backgroundColor: preferences[category] ? 'var(--sage-green)' : 'var(--border-input)' }}
                     >
-                      <Check className="w-4 h-4" strokeWidth={3} />
+                      <div
+                        className={`bg-white w-5 h-5 rounded-full shadow-md transform transition-transform duration-300 ${preferences[category] ? 'translate-x-2.5' : 'translate-x-0'}`}
+                      ></div>
                     </button>
                   )}
                 </div>

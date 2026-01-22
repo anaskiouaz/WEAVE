@@ -19,6 +19,9 @@ export function ThemeProvider({ children }) {
   // Appliquer le thème au document
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
+    // Synchronise également la classe `dark` pour activer les variantes Tailwind `dark:`
+    if (theme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
     localStorage.setItem('weave_theme', theme);
     
     // Mettre à jour la meta theme-color pour mobile

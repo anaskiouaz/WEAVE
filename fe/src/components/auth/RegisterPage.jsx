@@ -129,26 +129,27 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 py-8 relative">
+    <div className="min-h-screen bg-page flex items-center justify-center p-4 py-8 relative" style={{ backgroundColor: 'var(--bg-primary)' }}>
 
       {/* ================= MODALE RGPD (Privacy Policy) ================= */}
       {showPrivacyModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-          <div className="bg-white w-full max-w-2xl rounded-xl shadow-2xl flex flex-col max-h-[85vh]">
-            <div className="p-4 border-b flex justify-between items-center bg-blue-50 rounded-t-xl">
-              <h3 className="font-bold text-blue-900 flex items-center gap-2">
-                <FileText className="w-5 h-5" /> Politique de confidentialité
-              </h3>
-              <button onClick={() => setShowPrivacyModal(false)} className="text-gray-500 hover:text-gray-700">
-                <X className="w-6 h-6" />
-              </button>
-            </div>
-            <div
-              className="p-6 overflow-y-auto flex-1 text-sm text-gray-700 space-y-4 bg-gray-50/30 text-justify leading-relaxed"
-              onScroll={handleScroll}
-            >
+          <div className="w-full max-w-2xl rounded-xl shadow-2xl flex flex-col max-h-[85vh]" style={{ backgroundColor: 'var(--bg-card)' }}>
+              <div className="p-4 border-b flex justify-between items-center rounded-t-xl" style={{ backgroundColor: 'var(--bg-elevated)' }}>
+                <h3 className="font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                  <FileText className="w-5 h-5" /> Politique de confidentialité
+                </h3>
+                <button onClick={() => setShowPrivacyModal(false)} style={{ color: 'var(--text-secondary)' }}>
+                  <X className="w-6 h-6" />
+                </button>
+              </div>
+              <div
+                className="p-6 overflow-y-auto flex-1 text-sm space-y-4 text-justify leading-relaxed"
+                onScroll={handleScroll}
+                style={{ color: 'var(--text-primary)', backgroundColor: 'var(--bg-card)' }}
+              >
               {!hasScrolledToBottom && (
-                <div className="sticky top-0 bg-blue-50 border-l-4 border-blue-500 p-3 mb-4 text-xs text-blue-800 shadow-sm z-10">
+                <div className="sticky top-0 p-3 mb-4 text-xs shadow-sm z-10" style={{ backgroundColor: 'rgba(167,201,167,0.08)', borderLeft: '4px solid var(--sage-green)', color: 'var(--sage-green)' }}>
                   ⬇️ Veuillez faire défiler ce document jusqu'en bas pour valider votre lecture.
                 </div>
               )}
@@ -249,12 +250,13 @@ export default function RegisterPage() {
                 --- Fin du document ---
               </div>
             </div>
-            <div className="p-4 border-t bg-white rounded-b-xl flex justify-end gap-3">
+            <div className="p-4 border-t rounded-b-xl flex justify-end gap-3" style={{ backgroundColor: 'var(--bg-card)', borderTop: '1px solid var(--border-light)' }}>
               <Button variant="outline" onClick={() => setShowPrivacyModal(false)}>Annuler</Button>
               <Button
                 onClick={handleAcceptPrivacy}
                 disabled={!hasScrolledToBottom}
-                className={`transition-all duration-300 ${hasScrolledToBottom ? 'bg-green-600 hover:bg-green-700 text-white' : 'bg-gray-300 text-gray-500 cursor-not-allowed'}`}
+                className="transition-all duration-300"
+                style={hasScrolledToBottom ? { backgroundColor: 'var(--sage-green)', color: 'var(--text-inverse)' } : { backgroundColor: 'var(--border-input)', color: 'var(--text-secondary)', cursor: 'not-allowed' }}
               >
                 {hasScrolledToBottom ? "J'accepte la politique" : "Lisez jusqu'en bas..."}
               </Button>
@@ -265,12 +267,12 @@ export default function RegisterPage() {
 
 
       {/* ================= CARTE D'INSCRIPTION ================= */}
-      <Card className="w-full max-w-lg shadow-xl border-t-6 border-blue-600">
+      <Card className="w-full max-w-lg shadow-xl" style={{ backgroundColor: 'var(--bg-card)', borderTopColor: 'var(--sage-green)' }}>
         <CardHeader className="space-y-2 pb-6">
-          <Link to="/" className="flex items-center text-lg text-gray-600 hover:text-blue-700 mb-4">
+          <Link to="/" className="flex items-center text-lg mb-4" style={{ color: 'var(--text-secondary)' }}>
             <ArrowLeft className="w-6 h-6 mr-2" /> Retour
           </Link>
-          <CardTitle className="text-3xl font-bold text-blue-900">Créer mon compte</CardTitle>
+          <CardTitle className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>Créer mon compte</CardTitle>
         </CardHeader>
 
         <CardContent>
@@ -286,18 +288,18 @@ export default function RegisterPage() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="firstname">Prénom *</Label>
-                <Input id="firstname" name="firstname" required className="h-12 bg-white" value={formData.firstname} onChange={handleChange} />
+                <Input id="firstname" name="firstname" required className="h-12" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }} value={formData.firstname} onChange={handleChange} />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="lastname">Nom *</Label>
-                <Input id="lastname" name="lastname" required className="h-12 bg-white" value={formData.lastname} onChange={handleChange} />
+                <Input id="lastname" name="lastname" required className="h-12" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }} value={formData.lastname} onChange={handleChange} />
               </div>
             </div>
 
             {/* --- EMAIL --- */}
             <div className="space-y-2">
               <Label htmlFor="email">Email *</Label>
-              <Input id="email" name="email" type="email" required className="h-12 bg-white" value={formData.email} onChange={handleChange} />
+              <Input id="email" name="email" type="email" required className="h-12" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }} value={formData.email} onChange={handleChange} />
             </div>
 
             {/* --- TÉLÉPHONE & DATE DE NAISSANCE --- */}
@@ -306,7 +308,8 @@ export default function RegisterPage() {
                 <Label htmlFor="phone">Téléphone *</Label>
                 <Input
                   id="phone" name="phone" type="tel" placeholder="06 12 34 56 78"
-                  required className="h-12 bg-white"
+                  required className="h-12"
+                  style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
                   value={formData.phone} onChange={handleChange}
                 />
               </div>
@@ -314,7 +317,8 @@ export default function RegisterPage() {
                 <Label htmlFor="birth_date">Date de naissance *</Label>
                 <Input
                   id="birth_date" name="birth_date" type="date"
-                  required className="h-12 bg-white block w-full"
+                  required className="h-12 block w-full"
+                  style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
                   value={formData.birth_date} onChange={handleChange}
                 />
               </div>
@@ -326,14 +330,15 @@ export default function RegisterPage() {
               <div className="relative">
                 <Input
                   id="password" name="password" type={showPassword ? "text" : "password"}
-                  required className="h-12 bg-white pr-12"
+                  required className="h-12 pr-12"
+                  style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
                   value={formData.password} onChange={handleChange}
                 />
-                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">
+                <button type="button" onClick={() => setShowPassword(!showPassword)} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-secondary)' }}>
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
-              <p className="text-xs text-gray-500">Min. 8 car., 1 majuscule, 1 chiffre, 1 spécial.</p>
+              <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>Min. 8 car., 1 majuscule, 1 chiffre, 1 spécial.</p>
             </div>
 
             <div className="space-y-2">
@@ -342,42 +347,43 @@ export default function RegisterPage() {
                 <Input
                   id="confirmPassword" name="confirmPassword" type={showConfirmPassword ? "text" : "password"}
                   required
-                  className={`h-12 bg-white pr-12 ${formData.confirmPassword && formData.password !== formData.confirmPassword ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                  className={`h-12 pr-12 ${formData.confirmPassword && formData.password !== formData.confirmPassword ? "border-red-500 focus-visible:ring-red-500" : ""}`}
+                  style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
                   value={formData.confirmPassword} onChange={handleChange}
                 />
-                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700">
+                <button type="button" onClick={() => setShowConfirmPassword(!showConfirmPassword)} className="absolute right-3 top-1/2 -translate-y-1/2" style={{ color: 'var(--text-secondary)' }}>
                   {showConfirmPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
               </div>
             </div>
 
-            <hr className="border-gray-200 my-4" />
+            <hr className="my-4" style={{ borderColor: 'var(--border-light)' }} />
 
             {/* --- SECTION RGPD --- */}
-            <div className="space-y-3 bg-blue-50/50 p-4 rounded-lg border border-blue-100">
-              <h3 className="font-bold text-blue-900 text-sm flex items-center gap-2 mb-2">
+            <div className="space-y-3 p-4 rounded-lg" style={{ backgroundColor: 'rgba(167,201,167,0.06)', border: '1px solid var(--border-light)' }}>
+              <h3 className="font-bold text-sm flex items-center gap-2 mb-2" style={{ color: 'var(--text-primary)' }}>
                 <ShieldCheck className="w-4 h-4" /> Consentements obligatoires
               </h3>
 
               {/* 1. CGU */}
               <div className="flex items-start space-x-3">
-                <input type="checkbox" id="acceptCGU" name="acceptCGU" checked={consents.acceptCGU} onChange={handleConsentChange} className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600" />
-                <label htmlFor="acceptCGU" className="text-sm text-gray-700">J'accepte les <Link to="/cgu" className="text-blue-700 underline font-medium">CGU</Link>.</label>
+                <input type="checkbox" id="acceptCGU" name="acceptCGU" checked={consents.acceptCGU} onChange={handleConsentChange} className="mt-1 h-4 w-4 rounded border-gray-300" />
+                <label htmlFor="acceptCGU" className="text-sm" style={{ color: 'var(--text-primary)' }}>J'accepte les <Link to="/cgu" className="font-medium" style={{ color: 'var(--soft-coral)' }}>CGU</Link>.</label>
               </div>
 
               {/* 2. POLITIQUE DE CONFIDENTIALITÉ (Avec Scroll Wall) */}
-              <div className="flex items-start space-x-3 bg-white p-2.5 rounded border border-blue-200 shadow-sm relative">
+              <div className="flex items-start space-x-3 p-2.5 rounded border shadow-sm relative" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-light)', boxShadow: 'var(--shadow-sm)' }}>
                 <input
                   type="checkbox" id="acknowledgePrivacy" name="acknowledgePrivacy"
                   checked={consents.acknowledgePrivacy} disabled
-                  className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600 disabled:opacity-50 cursor-not-allowed"
+                  className="mt-1 h-4 w-4 rounded disabled:opacity-50 cursor-not-allowed"
                 />
                 <div className="flex-1">
-                  <label htmlFor="acknowledgePrivacy" className="text-sm text-gray-700 block mb-1">
+                  <label htmlFor="acknowledgePrivacy" className="text-sm block mb-1" style={{ color: 'var(--text-primary)' }}>
                     J'ai lu la politique de confidentialité. *
                   </label>
                   {!consents.acknowledgePrivacy ? (
-                    <button type="button" onClick={() => setShowPrivacyModal(true)} className="text-xs bg-blue-100 text-blue-700 px-3 py-1.5 rounded font-medium hover:bg-blue-200 flex items-center gap-1 w-fit">
+                    <button type="button" onClick={() => setShowPrivacyModal(true)} className="text-xs px-3 py-1.5 rounded font-medium flex items-center gap-1 w-fit" style={{ backgroundColor: 'rgba(167,201,167,0.08)', color: 'var(--sage-green)' }}>
                       <Eye className="w-3 h-3" /> Lire pour valider
                     </button>
                   ) : (
@@ -390,19 +396,19 @@ export default function RegisterPage() {
 
               {/* 3. Données sensibles */}
               <div className="flex items-start space-x-3">
-                <input type="checkbox" id="consentSensitive" name="consentSensitive" checked={consents.consentSensitive} onChange={handleConsentChange} className="mt-1 h-4 w-4 rounded border-gray-300 text-blue-600" />
-                <label htmlFor="consentSensitive" className="text-sm text-gray-700">Je consens au traitement de mes <strong>données de santé</strong>.</label>
+                <input type="checkbox" id="consentSensitive" name="consentSensitive" checked={consents.consentSensitive} onChange={handleConsentChange} className="mt-1 h-4 w-4 rounded" />
+                <label htmlFor="consentSensitive" className="text-sm" style={{ color: 'var(--text-primary)' }}>Je consens au traitement de mes <strong>données de santé</strong>.</label>
               </div>
             </div>
 
-            <Button type="submit" size="lg" disabled={loading} className="w-full h-14 text-lg font-bold bg-blue-700 hover:bg-blue-800 text-white shadow-md mt-4">
+            <Button type="submit" size="lg" disabled={loading} className="w-full h-14 text-lg font-bold shadow-md mt-4" style={{ backgroundColor: 'var(--soft-coral)', color: 'var(--text-inverse)' }}>
               {loading ? <Loader2 className="animate-spin mr-2" /> : "Créer mon compte"}
             </Button>
 
           </form>
         </CardContent>
-        <CardFooter className="justify-center py-4 bg-gray-50/50 rounded-b-xl border-t border-gray-100">
-          <p className="text-base text-gray-600">Déjà inscrit ? <Link to="/login" className="font-bold text-blue-700 hover:underline">Se connecter</Link></p>
+        <CardFooter className="justify-center py-4 rounded-b-xl" style={{ backgroundColor: 'var(--bg-secondary)', borderTop: '1px solid var(--border-light)' }}>
+          <p className="text-base" style={{ color: 'var(--text-secondary)' }}>Déjà inscrit ? <Link to="/login" className="font-bold" style={{ color: 'var(--soft-coral)' }}>Se connecter</Link></p>
         </CardFooter>
       </Card>
     </div>
