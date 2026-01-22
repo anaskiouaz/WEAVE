@@ -5,17 +5,19 @@ import { useAuth } from '../context/AuthContext';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
-// Configuration d'affichage des logs d'activité
-// Chaque action du backend (AUDIT_ACTIONS) a son style ici
-// Pour ajouter une action: 1) l'ajouter dans audits.js, 2) l'ajouter ici
+/*
+ * Config d'affichage des logs d'activité
+ * Chaque action du backend (AUDIT_ACTIONS) a son style ici
+ * Pour ajouter une action : 1) l'ajouter dans audits.js 2) l'ajouter ici
+ */
 const ACTION_CONFIG = {
-  MEMBER_JOINED: { icon: UserPlus, color: 'bg-green-100 text-green-600', label: 'Nouveau membre' },
-  MEMBER_REMOVED: { icon: UserMinus, color: 'bg-red-100 text-red-600', label: 'Membre retiré' },
-  SOUVENIR_CREATED: { icon: Image, color: 'bg-purple-100 text-purple-600', label: 'Souvenir ajouté' },
-  SOUVENIR_DELETED: { icon: Image, color: 'bg-orange-100 text-orange-600', label: 'Souvenir supprimé' },
-  COMMENT_ADDED: { icon: MessageSquare, color: 'bg-blue-100 text-blue-600', label: 'Commentaire' },
-  COMMENT_DELETED: { icon: MessageSquare, color: 'bg-gray-100 text-gray-600', label: 'Commentaire supprimé' },
-  TASK_VOLUNTEERED: { icon: Calendar, color: 'bg-indigo-100 text-indigo-600', label: 'Engagement activité' },
+  MEMBER_JOINED: { icon: UserPlus, color: 'bg-[#A7C9A7]/20 text-[#4A6A8A]', label: 'Nouveau membre' },
+  MEMBER_REMOVED: { icon: UserMinus, color: 'bg-[#F08080]/20 text-[#F08080]', label: 'Membre retiré' },
+  SOUVENIR_CREATED: { icon: Image, color: 'bg-[#4A6A8A]/15 text-[#4A6A8A]', label: 'Souvenir ajouté' },
+  SOUVENIR_DELETED: { icon: Image, color: 'bg-[#F08080]/15 text-[#F08080]', label: 'Souvenir supprimé' },
+  COMMENT_ADDED: { icon: MessageSquare, color: 'bg-[#6B8AAA]/20 text-[#4A6A8A]', label: 'Commentaire' },
+  COMMENT_DELETED: { icon: MessageSquare, color: 'bg-gray-100 text-[#6B8AAA]', label: 'Commentaire supprimé' },
+  TASK_VOLUNTEERED: { icon: Calendar, color: 'bg-[#A7C9A7]/30 text-[#4A6A8A]', label: 'Engagement activité' },
 };
 
 export default function Admin() {
@@ -31,27 +33,29 @@ export default function Admin() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
 
-  // Modal notation des membres
+  // Rating modal state
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [ratingData, setRatingData] = useState({ average: 0, total: 0, my: null, skills: [] });
   const [pendingRating, setPendingRating] = useState(0);
 
-  // Récupère le cercle actuellement sélectionné
-  // L'utilisateur peut avoir un rôle différent dans chaque cercle
-  // Ex: ADMIN dans le cercle A, HELPER dans le cercle B
+  /*
+   * Récupère le cercle sélectionné dans user.circles
+   * Un user peut être ADMIN dans un cercle et HELPER dans un autre
+   * On doit donc récupérer son rôle pour LE cercle actuellement affiché
+   */
   const currentCircle = (circleId && user?.circles?.find(c => String(c.id ?? c.circle_id) === String(circleId)))
     || (Array.isArray(user?.circles) ? user.circles[0] : null);
 
   const currentCircleId = currentCircle?.id ?? currentCircle?.circle_id;
   const currentCircleName = currentCircle?.senior_name || currentCircle?.name;
 
-  // Rôle dans ce cercle: ADMIN (créateur), HELPER (aidant), PC (bénéficiaire)
+  // Rôle dans ce cercle : ADMIN (créateur), HELPER (aidant), PC (bénéficiaire)
   const currentRole = (currentCircle?.role || '').toUpperCase();
-  const isAdmin = currentRole === 'ADMIN' || currentRole === 'SUPERADMIN';
+  const isAdmin = currentRole === 'ADMIN' || currentRole === 'SUPERADMIN'; // Seuls eux peuvent gérer le cercle
   const inviteCode = currentCircle?.invite_code || '...';
 
-  // Charge les données quand on change de cercle
+  // Charge membres + logs quand on change de cercle
   useEffect(() => {
     if (currentCircleId) {
       fetchMembers(currentCircleId);
@@ -79,7 +83,7 @@ export default function Admin() {
     }
   };
 
-  // Récupère les logs d'activité du cercle
+  // Récupère les logs d'activité du cercle (GET /circles/:id/logs)
   const fetchActivityLogs = async (circleId) => {
     try {
       const token = localStorage.getItem('weave_token');
@@ -179,10 +183,10 @@ export default function Admin() {
   // Si aucun cercle sélectionné ou disponible
   if (!currentCircle) {
     return (
-      <div className="p-10 flex flex-col items-center justify-center text-center h-full">
-        <Shield className="w-16 h-16 text-gray-300 mb-4" />
-        <h2 className="text-xl font-bold text-gray-600">Aucun cercle sélectionné</h2>
-        <p className="text-gray-500">Choisissez un cercle pour voir ses membres.</p>
+      <div className="p-10 flex flex-col items-center justify-center text-center h-full" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <Shield className="w-16 h-16 mb-4" style={{ color: 'var(--text-secondary)' }} />
+        <h2 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Aucun cercle sélectionné</h2>
+        <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>Choisissez un cercle pour voir ses membres.</p>
       </div>
     );
   }
@@ -191,66 +195,69 @@ export default function Admin() {
   const activeMembers = members.filter(m => m.role !== 'PC').length; // On exclut le bénéficiaire des aidants actifs
 
   return (
-    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-8 pb-24 animate-in fade-in duration-500">
+    <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-8 pb-24 animate-in fade-in duration-500 min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
 
-      {/* En-tête de la page */}
+      {/* --- EN-TÊTE --- */}
       <div>
-        <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Administration</h1>
-        <p className="text-gray-600">
-          Gérez le cercle de soin de <span className="font-semibold text-blue-600">{currentCircle?.senior_name}</span>
+        <h1 className="text-2xl md:text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Administration</h1>
+        <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>
+          Gérez le cercle de soin de <span className="font-bold" style={{ color: 'var(--soft-coral)' }}>{currentCircle?.senior_name}</span>
         </p>
       </div>
 
-      {/* Statistiques du cercle */}
+      {/* --- STATS --- */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center justify-between">
+        <div className="rounded-3xl p-6 flex items-center justify-between hover:-translate-y-1 transition-all duration-200" style={{ backgroundColor: 'var(--bg-card)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--border-light)' }}>
           <div>
-            <p className="text-gray-500 text-sm font-medium mb-1">Aidants actifs</p>
-            <p className="text-3xl font-bold text-gray-900">{activeMembers}</p>
+            <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-secondary)' }}>Aidants actifs</p>
+            <p className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>{activeMembers}</p>
           </div>
-          <div className="w-12 h-12 bg-blue-50 rounded-full flex items-center justify-center">
-            <Users className="w-6 h-6 text-blue-600" />
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: 'rgba(74, 106, 138, 0.1)' }}>
+            <Users className="w-7 h-7" style={{ color: 'var(--text-primary)' }} />
           </div>
         </div>
 
-        <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center justify-between">
+        <div className="rounded-3xl p-6 flex items-center justify-between hover:-translate-y-1 transition-all duration-200" style={{ backgroundColor: 'var(--bg-card)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--border-light)' }}>
           <div>
-            <p className="text-gray-500 text-sm font-medium mb-1">Actions récentes</p>
-            <p className="text-3xl font-bold text-gray-900">{activityLogs.length}</p>
+            <p className="text-sm font-semibold mb-1" style={{ color: 'var(--text-secondary)' }}>Actions récentes</p>
+            <p className="text-3xl font-bold" style={{ color: 'var(--text-primary)' }}>{activityLogs.length}</p>
           </div>
-          <div className="w-12 h-12 bg-green-50 rounded-full flex items-center justify-center">
-            <Activity className="w-6 h-6 text-green-600" />
+          <div className="w-14 h-14 rounded-2xl flex items-center justify-center" style={{ backgroundColor: 'rgba(167, 201, 167, 0.2)' }}>
+            <Activity className="w-7 h-7" style={{ color: 'var(--sage-green)' }} />
           </div>
         </div>
       </div>
 
           {isAdmin && (
-            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+            <div className="rounded-3xl p-6" style={{ backgroundColor: 'var(--bg-card)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--border-light)' }}>
               <div className="flex items-center justify-between mb-4">
-                <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-                  <Share2 className="w-5 h-5 text-blue-600" />
+                <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+                  <Share2 className="w-5 h-5" style={{ color: 'var(--sage-green)' }} />
                   Inviter un nouveau membre
                 </h2>
               </div>
 
-              <div className="bg-blue-50/50 rounded-xl p-6 border border-blue-100 flex flex-col md:flex-row gap-6 items-center">
+              <div className="rounded-2xl p-6 flex flex-col md:flex-row gap-6 items-center" style={{ backgroundColor: 'rgba(240, 128, 128, 0.05)', border: '1px solid rgba(240, 128, 128, 0.2)' }}>
                 <div className="flex-1 space-y-1">
-                  <p className="text-sm font-semibold text-gray-900">Code d'accès unique</p>
-                  <p className="text-sm text-gray-600">
+                  <p className="text-sm font-bold" style={{ color: 'var(--text-primary)' }}>Code d'accès unique</p>
+                  <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
                     Transmettez ce code à un proche ou un professionnel. Il devra le saisir lors de son inscription en cliquant sur "Rejoindre un cercle".
                   </p>
                 </div>
 
-                <div className="flex gap-2 w-full md:w-auto">
-                  <div className="flex-1 md:w-48 bg-white border border-gray-200 rounded-lg px-4 py-3 text-gray-900 font-mono text-xl tracking-wider text-center font-bold">
+                <div className="flex gap-3 w-full md:w-auto">
+                  <div className="flex-1 md:w-48 border-2 rounded-2xl px-4 py-3 font-mono text-xl tracking-wider text-center font-bold" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-input)', color: 'var(--text-primary)' }}>
                     {inviteCode}
                   </div>
                   <button
                     onClick={handleCopyLink}
-                    className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 min-w-[110px] ${copied
-                      ? 'bg-green-100 text-green-700 border border-green-200'
-                      : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
-                      }`}
+                    className={`px-5 py-2.5 rounded-full font-semibold transition-all flex items-center justify-center gap-2 min-w-[110px]`}
+                    style={{ 
+                      backgroundColor: copied ? 'rgba(167, 201, 167, 0.2)' : 'var(--soft-coral)',
+                      color: copied ? 'var(--text-primary)' : 'white',
+                      border: copied ? '2px solid var(--sage-green)' : 'none',
+                      boxShadow: copied ? 'none' : '0 4px 16px rgba(240, 128, 128, 0.25)'
+                    }}
                   >
                     {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
                     {copied ? 'Copié' : 'Copier'}
@@ -260,52 +267,56 @@ export default function Admin() {
             </div>
           )}
 
-      {/* Liste des membres du cercle */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-lg font-bold text-gray-900">Membres du cercle</h2>
+      {/* --- LISTE DES MEMBRES --- */}
+      <div className="rounded-3xl overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--border-light)' }}>
+        <div className="p-6" style={{ borderBottom: '1px solid var(--border-light)' }}>
+          <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Membres du cercle</h2>
         </div>
 
         {loading ? (
-          <div className="p-10 text-center text-gray-400">Chargement des membres...</div>
+          <div className="p-10 text-center font-medium" style={{ color: 'var(--text-secondary)' }}>Chargement des membres...</div>
         ) : (
-          <div className="divide-y divide-gray-100">
+          <div className="divide-y" style={{ borderColor: 'var(--border-light)' }}>
             {members.map((member) => (
-              <div key={member.id} className="p-6 hover:bg-gray-50 transition-colors group">
+              <div key={member.id} className="p-6 transition-all duration-200 group">
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-4">
 
-                    {/* Avatar avec l'initiale du prénom */}
-                    <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 text-lg font-bold ${member.role === 'ADMIN' ? 'bg-purple-100 text-purple-600' :
-                      member.role === 'PC' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'
-                      }`}>
+                    {/* Avatar (Initiale) */}
+                    <div 
+                      className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0 text-lg font-bold"
+                      style={{ 
+                        backgroundColor: member.role === 'ADMIN' ? 'rgba(74, 106, 138, 0.15)' : member.role === 'PC' ? 'rgba(240, 128, 128, 0.15)' : 'rgba(167, 201, 167, 0.2)',
+                        color: member.role === 'ADMIN' ? 'var(--text-primary)' : member.role === 'PC' ? 'var(--soft-coral)' : 'var(--text-primary)'
+                      }}
+                    >
                       {member.name.charAt(0).toUpperCase()}
                     </div>
 
-                    {/* Informations du membre */}
+                    {/* Infos */}
                     <div>
                       <div className="flex items-center gap-2 mb-1">
-                        <p className="font-semibold text-gray-900">{member.name}</p>
+                        <p className="font-semibold" style={{ color: 'var(--text-primary)' }}>{member.name}</p>
 
-                        {/* Rôle du membre */}
+                        {/* Badge Rôle */}
                         {member.role === 'ADMIN' && (
-                          <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full border border-purple-200 flex items-center gap-1">
+                          <span className="px-2.5 py-1 text-xs rounded-full flex items-center gap-1 font-semibold" style={{ backgroundColor: 'rgba(74, 106, 138, 0.1)', color: 'var(--text-primary)', border: '1px solid rgba(74, 106, 138, 0.2)' }}>
                             <Crown className="w-3 h-3" /> Admin
                           </span>
                         )}
                         {member.role === 'PC' && (
-                          <span className="px-2 py-0.5 bg-orange-100 text-orange-700 text-xs rounded-full border border-orange-200">
+                          <span className="px-2.5 py-1 text-xs rounded-full font-semibold" style={{ backgroundColor: 'rgba(240, 128, 128, 0.15)', color: 'var(--soft-coral)', border: '1px solid rgba(240, 128, 128, 0.2)' }}>
                             Bénéficiaire
                           </span>
                         )}
                         {member.role === 'HELPER' && (
-                          <span className="px-2 py-0.5 bg-blue-100 text-blue-700 text-xs rounded-full border border-blue-200">
+                          <span className="px-2.5 py-1 text-xs rounded-full font-semibold" style={{ backgroundColor: 'rgba(167, 201, 167, 0.2)', color: 'var(--text-primary)', border: '1px solid rgba(167, 201, 167, 0.3)' }}>
                             Aidant
                           </span>
                         )}
                       </div>
 
-                      <div className="text-sm text-gray-500 space-y-0.5">
+                      <div className="text-sm space-y-1" style={{ color: 'var(--text-secondary)' }}>
                         <div className="flex items-center gap-2">
                           <Mail className="w-3.5 h-3.5" /> {member.email}
                         </div>
@@ -316,14 +327,14 @@ export default function Admin() {
                         )}
                         {/* Skills preview */}
                         {Array.isArray(member.skills) && member.skills.length > 0 && (
-                          <div className="flex flex-wrap gap-1 pt-1">
+                          <div className="flex flex-wrap gap-1.5 pt-2">
                             {member.skills.slice(0,4).map(s => (
-                              <span key={s} className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full border border-gray-200">{s}</span>
+                              <span key={s} className="text-xs px-2.5 py-1 rounded-full font-medium" style={{ backgroundColor: 'rgba(167, 201, 167, 0.15)', color: 'var(--text-primary)', border: '1px solid rgba(167, 201, 167, 0.3)' }}>{s}</span>
                             ))}
-                            {member.skills.length > 4 && <span className="text-xs text-gray-400">+{member.skills.length-4}</span>}
+                            {member.skills.length > 4 && <span className="text-xs font-medium" style={{ color: 'var(--text-secondary)' }}>+{member.skills.length-4}</span>}
                           </div>
                         )}
-                        {/* Notation: seulement entre aidants/admins */}
+                        {/* Afficher le bouton de notation uniquement si l'utilisateur courant est admin ou aidant et cible admin ou aidant, et pas pour soi-même */}
                         {(currentRole === 'ADMIN' || currentRole === 'HELPER') && (member.role === 'ADMIN' || member.role === 'HELPER') && member.id !== user.id && (
                           <button
                             onClick={async () => {
@@ -345,7 +356,8 @@ export default function Admin() {
                                 setRatingData({ average: 0, total: 0, my: null, skills: member.skills || [] });
                               }
                             }}
-                            className="mt-2 inline-flex items-center gap-1 text-blue-600 hover:text-blue-700 text-xs font-medium"
+                            className="mt-2 inline-flex items-center gap-1.5 text-xs font-semibold transition-colors"
+                            style={{ color: 'var(--soft-coral)' }}
                           >
                             <Star className="w-3.5 h-3.5" /> Voir compétences & noter
                           </button>
@@ -354,11 +366,11 @@ export default function Admin() {
                     </div>
                   </div>
 
-                  {/* Supprimer un membre (aidants uniquement) */}
+                  {/* Actions (Supprimer) - Sauf pour l'admin lui-même et le senior */}
                   {isAdmin && member.role === 'HELPER' && (
                     <button
                       onClick={() => handleRemoveMember(member.id, member.name)}
-                      className="text-gray-300 hover:text-red-600 p-2 rounded-lg hover:bg-red-50 transition-colors"
+                      className="text-gray-300 hover:text-red-500 p-2.5 rounded-xl hover:bg-red-50 transition-all duration-200"
                       title="Retirer du cercle"
                     >
                       <Trash2 className="w-5 h-5" />
@@ -371,54 +383,54 @@ export default function Admin() {
         )}
       </div>
 
-      {/* Journal d'activité du cercle */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-        <div className="p-6 border-b border-gray-100">
-          <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
-            <Clock className="w-5 h-5 text-blue-600" />
+      {/* --- JOURNAL D'ACTIVITÉ --- */}
+      <div className="rounded-xl overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', boxShadow: 'var(--shadow-sm)', border: '1px solid var(--border-light)' }}>
+        <div className="p-6" style={{ borderBottom: '1px solid var(--border-light)' }}>
+          <h2 className="text-lg font-bold flex items-center gap-2" style={{ color: 'var(--text-primary)' }}>
+            <Clock className="w-5 h-5" style={{ color: 'var(--sage-green)' }} />
             Journal d'activité
           </h2>
-          <p className="text-sm text-gray-500 mt-1">Historique des actions récentes dans le cercle</p>
+          <p className="text-sm mt-1" style={{ color: 'var(--text-secondary)' }}>Historique des actions récentes dans le cercle</p>
         </div>
 
         {logsLoading ? (
-          <div className="p-10 text-center text-gray-400">Chargement de l'historique...</div>
+          <div className="p-10 text-center font-medium" style={{ color: 'var(--text-secondary)' }}>Chargement de l'historique...</div>
         ) : activityLogs.length === 0 ? (
-          <div className="p-10 text-center text-gray-400">
-            <Activity className="w-12 h-12 mx-auto mb-3 text-gray-300" />
-            <p>Aucune activité enregistrée pour le moment</p>
+          <div className="p-10 text-center" style={{ color: 'var(--text-secondary)' }}>
+            <Activity className="w-12 h-12 mx-auto mb-3" style={{ color: 'rgba(167, 201, 167, 0.5)' }} />
+            <p className="font-medium">Aucune activité enregistrée pour le moment</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-100 max-h-96 overflow-y-auto">
+          <div className="divide-y max-h-96 overflow-y-auto" style={{ borderColor: 'var(--border-light)' }}>
             {activityLogs.map((log) => {
               const config = ACTION_CONFIG[log.action] || {
                 icon: Activity,
-                color: 'bg-gray-100 text-gray-600',
+                color: 'bg-[#4A6A8A]/10 text-[#4A6A8A]',
                 label: log.action
               };
               const IconComponent = config.icon;
 
               return (
-                <div key={log.id} className="p-4 hover:bg-gray-50 transition-colors">
+                <div key={log.id} className="p-4 transition-all duration-200">
                   <div className="flex items-start gap-3">
-                    {/* Icône d'action */}
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${config.color}`}>
+                    {/* Icône */}
+                    <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${config.color}`}>
                       <IconComponent className="w-5 h-5" />
                     </div>
 
-                    {/* Détails de l'action */}
+                    {/* Contenu */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
-                        <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
+                        <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: 'rgba(74, 106, 138, 0.1)', color: 'var(--text-primary)' }}>
                           {config.label}
                         </span>
-                        <span className="text-xs text-gray-400 flex-shrink-0">
+                        <span className="text-xs flex-shrink-0 font-medium" style={{ color: 'var(--text-secondary)' }}>
                           {formatTimeAgo(log.created_at)}
                         </span>
                       </div>
-                      <p className="text-sm text-gray-700 mt-1">{log.details}</p>
+                      <p className="text-sm mt-1 font-medium" style={{ color: 'var(--text-primary)' }}>{log.details}</p>
                       {log.user_name && (
-                        <p className="text-xs text-gray-400 mt-0.5">par {log.user_name}</p>
+                        <p className="text-xs mt-0.5" style={{ color: 'var(--text-secondary)' }}>par {log.user_name}</p>
                       )}
                     </div>
                   </div>
@@ -430,27 +442,27 @@ export default function Admin() {
       </div>
 
       {isAdmin && (
-        <div className="bg-white rounded-xl shadow-sm border border-red-200 overflow-hidden">
-          <div className="p-6 border-b border-red-100 bg-red-50">
-            <h2 className="text-lg font-bold text-red-700 flex items-center gap-2">
+        <div className="bg-white rounded-3xl shadow-[0_4px_24px_rgba(74,106,138,0.08)] border border-red-100/50 overflow-hidden">
+          <div className="p-6 border-b border-red-100/50 bg-red-50/50">
+            <h2 className="text-lg font-bold text-red-600 flex items-center gap-2">
               <AlertTriangle className="w-5 h-5" />
-              Actions dangereuses
+              Zone de danger
             </h2>
-            <p className="text-sm text-red-600 mt-1">Ces actions sont irréversibles</p>
+            <p className="text-sm text-red-500/80 mt-1 font-medium">Ces actions sont irréversibles</p>
           </div>
 
           <div className="p-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div>
-                <h3 className="font-semibold text-gray-900">Supprimer le cercle</h3>
-                <p className="text-sm text-gray-600 mt-1">
+                <h3 className="font-bold text-[#4A6A8A]">Supprimer le cercle</h3>
+                <p className="text-sm text-[#6B8AAA] mt-1">
                   Cette action supprimera définitivement le cercle, tous ses membres, souvenirs, messages et tâches. 
                   Cette action est irréversible.
                 </p>
               </div>
               <button
                 onClick={() => setShowDeleteModal(true)}
-                className="px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium flex items-center gap-2 whitespace-nowrap"
+                className="px-5 py-2.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-all duration-200 font-semibold flex items-center gap-2 whitespace-nowrap shadow-md hover:-translate-y-0.5"
               >
                 <Trash2 className="w-4 h-4" />
                 Supprimer le cercle
@@ -460,30 +472,30 @@ export default function Admin() {
         </div>
       )}
 
-      {/* Modal de confirmation avant suppression du cercle */}
+      {/* --- MODAL DE CONFIRMATION --- */}
       {isAdmin && showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 bg-red-50 border-b border-red-100">
+          <div className="bg-white rounded-3xl shadow-xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 bg-red-50/50 border-b border-red-100/50">
               <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-red-100 rounded-full flex items-center justify-center">
-                  <AlertTriangle className="w-6 h-6 text-red-600" />
+                <div className="w-12 h-12 bg-red-100/70 rounded-2xl flex items-center justify-center">
+                  <AlertTriangle className="w-6 h-6 text-red-500" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-red-700">Supprimer le cercle ?</h3>
-                  <p className="text-sm text-red-600">Cette action est définitive</p>
+                  <h3 className="text-lg font-bold text-red-600">Supprimer le cercle ?</h3>
+                  <p className="text-sm text-red-500/80 font-medium">Cette action est définitive</p>
                 </div>
               </div>
             </div>
 
             <div className="p-6 space-y-4">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-4">
-                <p className="text-sm text-red-800">
+              <div className="bg-red-50/50 border border-red-100 rounded-2xl p-4">
+                <p className="text-sm text-red-700">
                   <strong>Attention :</strong> Vous êtes sur le point de supprimer définitivement le cercle 
                   <span className="font-bold"> "{currentCircleName}"</span>. 
                   Toutes les données seront perdues :
                 </p>
-                <ul className="text-sm text-red-700 mt-2 list-disc list-inside space-y-1">
+                <ul className="text-sm text-red-600 mt-2 list-disc list-inside space-y-1">
                   <li>Tous les membres seront retirés</li>
                   <li>Tous les souvenirs et commentaires</li>
                   <li>Toutes les conversations et messages</li>
@@ -492,33 +504,33 @@ export default function Admin() {
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Pour confirmer, tapez <span className="font-bold text-red-600">"{currentCircleName}"</span>
+                <label className="block text-sm font-semibold text-[#4A6A8A] mb-2">
+                  Pour confirmer, tapez <span className="font-bold text-red-500">"{currentCircleName}"</span>
                 </label>
                 <input
                   type="text"
                   value={deleteConfirmText}
                   onChange={(e) => setDeleteConfirmText(e.target.value)}
                   placeholder="Nom du cercle"
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none"
+                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-red-200 focus:border-red-300 outline-none transition-all text-[#4A6A8A]"
                 />
               </div>
             </div>
 
-            <div className="p-6 bg-gray-50 border-t border-gray-100 flex gap-3">
+            <div className="p-6 bg-[#FDFBF7] border-t border-gray-100/50 flex gap-3">
               <button
                 onClick={() => {
                   setShowDeleteModal(false);
                   setDeleteConfirmText('');
                 }}
-                className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
+                className="flex-1 px-4 py-2.5 border-2 border-gray-200 text-[#4A6A8A] rounded-full hover:bg-white transition-all duration-200 font-semibold"
               >
                 Annuler
               </button>
               <button
                 onClick={handleDeleteCircle}
                 disabled={deleteConfirmText !== currentCircleName || deleting}
-                className="flex-1 px-4 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
               >
                 {deleting ? (
                   <>
@@ -537,47 +549,47 @@ export default function Admin() {
         </div>
       )}
 
-      {/* Modal de notation d'un membre */}
+      {/* --- MODAL NOTE MEMBRE --- */}
       {showRatingModal && selectedMember && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 border-b border-gray-100">
-              <h3 className="text-lg font-bold text-gray-900">Compétences & appréciation</h3>
-              <p className="text-sm text-gray-500">{selectedMember.name}</p>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 backdrop-blur-sm p-4">
+          <div className="bg-white rounded-3xl shadow-xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
+            <div className="p-6 border-b border-gray-100/50">
+              <h3 className="text-lg font-bold text-[#4A6A8A]">Compétences & appréciation</h3>
+              <p className="text-sm text-[#6B8AAA] font-medium">{selectedMember.name}</p>
             </div>
             <div className="p-6 space-y-4">
               {/* Skills */}
               {Array.isArray(ratingData.skills) && ratingData.skills.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {ratingData.skills.map(s => (
-                    <span key={s} className="text-xs bg-gray-100 text-gray-700 px-2 py-0.5 rounded-full border border-gray-200">{s}</span>
+                    <span key={s} className="text-xs bg-[#A7C9A7]/15 text-[#4A6A8A] px-2.5 py-1 rounded-full border border-[#A7C9A7]/30 font-medium">{s}</span>
                   ))}
                 </div>
               ) : (
-                <div className="text-sm text-gray-400">Aucune compétence renseignée</div>
+                <div className="text-sm text-[#6B8AAA] font-medium">Aucune compétence renseignée</div>
               )}
 
               {/* Average */}
-              <div className="flex items-center gap-2 text-sm text-gray-700">
-                <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
-                <span className="font-medium">{ratingData.average?.toFixed ? ratingData.average.toFixed(1) : ratingData.average} / 5</span>
-                <span className="text-gray-400">({ratingData.total} avis)</span>
+              <div className="flex items-center gap-2 text-sm text-[#4A6A8A]">
+                <Star className="w-4 h-4 text-[#F08080] fill-[#F08080]" />
+                <span className="font-semibold">{ratingData.average?.toFixed ? ratingData.average.toFixed(1) : ratingData.average} / 5</span>
+                <span className="text-[#6B8AAA]">({ratingData.total} avis)</span>
               </div>
 
               {/* Your rating */}
               <div>
-                <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Votre note</label>
+                <label className="block text-xs font-bold text-[#4A6A8A] uppercase mb-2">Votre note</label>
                 <div className="flex items-center gap-1">
                   {[1,2,3,4,5].map(n => (
-                    <button key={n} onClick={() => setPendingRating(n)} className="p-1" aria-label={`Note ${n}`}>
-                      <Star className={`w-6 h-6 ${pendingRating >= n ? 'text-yellow-500 fill-yellow-500' : 'text-gray-300'}`} />
+                    <button key={n} onClick={() => setPendingRating(n)} className="p-1 hover:scale-110 transition-transform" aria-label={`Note ${n}`}>
+                      <Star className={`w-7 h-7 ${pendingRating >= n ? 'text-[#F08080] fill-[#F08080]' : 'text-gray-200'}`} />
                     </button>
                   ))}
                 </div>
               </div>
             </div>
-            <div className="p-6 bg-gray-50 border-t border-gray-100 flex gap-3">
-              <button onClick={() => { setShowRatingModal(false); setSelectedMember(null); }} className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium">Fermer</button>
+            <div className="p-6 bg-[#FDFBF7] border-t border-gray-100/50 flex gap-3">
+              <button onClick={() => { setShowRatingModal(false); setSelectedMember(null); }} className="flex-1 px-4 py-2.5 border-2 border-gray-200 text-[#4A6A8A] rounded-full hover:bg-white transition-all duration-200 font-semibold">Fermer</button>
               <button
                 onClick={async () => {
                   try {
@@ -606,7 +618,7 @@ export default function Admin() {
                   }
                 }}
                 disabled={!pendingRating}
-                className="flex-1 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50 disabled:cursor-not-allowed"
+                className="flex-1 px-4 py-2.5 bg-[#F08080] text-white rounded-full hover:bg-[#E06B6B] transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed shadow-md hover:-translate-y-0.5"
               >
                 Enregistrer
               </button>

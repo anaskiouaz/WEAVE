@@ -374,9 +374,9 @@ export default function Memories() {
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-2" />
-        <p className="text-gray-600">Chargement du journal de bord...</p>
+      <div className="flex flex-col items-center justify-center h-64" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <Loader2 className="w-8 h-8 animate-spin mb-3" style={{ color: 'var(--soft-coral)' }} />
+        <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>Chargement du journal de bord...</p>
       </div>
     );
   }
@@ -411,16 +411,17 @@ export default function Memories() {
       </div>
 
       {/* Version desktop */}
-      <div className="hidden md:block p-8">
+      <div className="hidden md:block p-8 min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
         <div className="max-w-4xl mx-auto">
           <div className="flex justify-between items-center mb-8">
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Journal de bord</h1>
-              <p className="text-gray-600">Les moments précieux partagés au sein du cercle</p>
+              <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Journal de bord</h1>
+              <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>Les moments précieux partagés au sein du cercle</p>
             </div>
             <button
               onClick={handleDownloadPDF}
-              className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
+              className="flex items-center gap-2 px-6 py-3 text-white rounded-full transition-all duration-200 hover:-translate-y-0.5 font-semibold"
+              style={{ backgroundColor: 'var(--soft-coral)', boxShadow: '0 4px 16px rgba(240, 128, 128, 0.25)' }}
             >
               <Download className="w-5 h-5" />
               Télécharger PDF
@@ -428,23 +429,29 @@ export default function Memories() {
           </div>
 
           {error && (
-            <div className="p-4 mb-6 bg-red-50 text-red-600 rounded-lg border border-red-100">
+            <div className="p-4 mb-6 bg-red-50/50 text-red-600 rounded-2xl border border-red-100/50 font-medium">
               {error}
             </div>
           )}
               
           {/* Formulaire pour créer un nouveau souvenir */}
-          <div className="mb-8 bg-white rounded-lg shadow-sm border p-6">
+          <div className="mb-8 rounded-3xl p-6" style={{ backgroundColor: 'var(--bg-card)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--border-light)' }}>
             <div className="flex gap-4">
-              <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-                <span className="text-blue-600 font-bold">{user?.name?.charAt(0) || 'U'}</span>
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, var(--text-primary), var(--sage-green))' }}>
+                <span className="text-white font-bold text-lg">{user?.name?.charAt(0) || 'U'}</span>
               </div>
               <div className="flex-1">
                 <textarea
                   value={newText}
                   onChange={(e) => setNewText(e.target.value)}
                   placeholder="Partagez une nouvelle ou un souvenir..."
-                  className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
+                  className="w-full px-4 py-3 border-2 rounded-2xl focus:outline-none focus:ring-2 resize-none transition-all"
+                  style={{ 
+                    backgroundColor: 'var(--bg-input)', 
+                    borderColor: 'var(--border-input)', 
+                    color: 'var(--text-primary)',
+                    '--tw-ring-color': 'rgba(167, 201, 167, 0.3)'
+                  }}
                   rows={3}
                 />
                 
@@ -453,7 +460,7 @@ export default function Memories() {
                     <img 
                       src={newPhotoUrl} 
                       alt="Aperçu" 
-                      className="w-full max-h-48 object-cover rounded-lg border"
+                      className="w-full max-h-48 object-cover rounded-2xl border-2 border-gray-100"
                     />
                   </div>
                 )}
@@ -473,22 +480,24 @@ export default function Memories() {
                   id="photo-input"
                 />
 
-                <div className="flex justify-between items-center mt-3">
+                <div className="flex justify-between items-center mt-4">
                   <div className="flex gap-4">
                     <button 
                       onClick={() => document.getElementById('photo-input').click()}
-                      className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors text-sm"
+                      className="flex items-center gap-2 transition-colors text-sm font-medium"
+                      style={{ color: 'var(--text-secondary)' }}
                     >
                       <ImageIcon className="w-5 h-5" />
                       <span>{newPhotoFile ? "Photo sélectionnée" : "Ajouter une photo"}</span>
                     </button>
                     
-                    <div className="flex items-center gap-2 text-gray-600 text-sm">
+                    <div className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
                       <Smile className="w-4 h-4" />
                       <select 
                         value={newMood} 
                         onChange={(e) => setNewMood(parseInt(e.target.value))}
-                        className="bg-transparent outline-none cursor-pointer border-b border-gray-300"
+                        className="bg-transparent outline-none cursor-pointer border-b-2 font-medium"
+                        style={{ borderColor: 'rgba(167, 201, 167, 0.3)', color: 'var(--text-primary)' }}
                       >
                         {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>Humeur: {n}/10</option>)}
                       </select>
@@ -498,7 +507,8 @@ export default function Memories() {
                   <button 
                     onClick={handleAddMemory}
                     disabled={isPublishing || !newText.trim() || !user}
-                    className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
+                    className="px-6 py-2.5 text-white rounded-full transition-all duration-200 font-semibold disabled:opacity-50 hover:-translate-y-0.5"
+                    style={{ backgroundColor: 'var(--soft-coral)', boxShadow: '0 4px 16px rgba(240, 128, 128, 0.25)' }}
                   >
                     {isPublishing ? "Publication..." : "Publier"}
                   </button>
@@ -510,44 +520,45 @@ export default function Memories() {
           {/* Affichage des souvenirs */}
           <div className="space-y-6">
             {memories.length === 0 ? (
-              <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
-                <p className="text-gray-500">Aucun souvenir n'a encore été partagé.</p>
+              <div className="text-center py-12 rounded-3xl border-2 border-dashed" style={{ backgroundColor: 'rgba(var(--bg-card-rgb), 0.5)', borderColor: 'var(--border-light)' }}>
+                <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>Aucun souvenir n'a encore été partagé.</p>
               </div>
             ) : (
               memories.map((memory) => (
-                <div key={memory.id} className="bg-white rounded-lg shadow-sm border p-6">
+                <div key={memory.id} className="rounded-3xl p-6 hover:-translate-y-1 transition-all duration-200" style={{ backgroundColor: 'var(--bg-card)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--border-light)' }}>
                   <div className="flex items-center gap-3 mb-4">
-                    <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                      <span className="text-blue-600 font-bold">
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--text-primary), var(--sage-green))' }}>
+                      <span className="text-white font-bold text-lg">
                         {memory.author_name ? memory.author_name.charAt(0).toUpperCase() : '?'}
                       </span>
                     </div>
                     <div>
-                      <p className="text-gray-900 font-semibold">{memory.author_name || "Membre du cercle"}</p>
-                      <div className="flex items-center gap-2 text-gray-500 text-sm">
+                      <p className="font-bold" style={{ color: 'var(--text-primary)' }}>{memory.author_name || "Membre du cercle"}</p>
+                      <div className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
                         <Calendar className="w-4 h-4" />
                         <span>{new Date(memory.created_at).toLocaleDateString('fr-FR')}</span>
                       </div>
                     </div>
                   </div>
 
-                  <p className="text-gray-700 mb-4 whitespace-pre-wrap">{memory.text_content}</p>
+                  <p className="mb-4 whitespace-pre-wrap font-medium leading-relaxed" style={{ color: 'var(--text-primary)' }}>{memory.text_content}</p>
 
                   {memory.photo_data && (
-                    <div className="mb-4 rounded-lg overflow-hidden border">
+                    <div className="mb-4 rounded-2xl overflow-hidden border-2 border-gray-100">
                       <img src={getPhotoUrl(memory.photo_data)} alt="Souvenir" className="w-full h-auto max-h-96 object-cover"/>
                     </div>
                   )}
 
-                  <div className="flex items-center gap-6 pt-4 border-t border-gray-100">
-                    <button className="flex items-center gap-2 text-gray-600 hover:text-pink-600 transition-colors">
+                  <div className="flex items-center gap-6 pt-4" style={{ borderTop: '1px solid var(--border-light)' }}>
+                    <button className="flex items-center gap-2 transition-colors font-medium" style={{ color: 'var(--text-secondary)' }}>
                       <Heart className="w-5 h-5" />
                       <span>{memory.mood ? `Humeur: ${memory.mood}/10` : 'Aimer'}</span>
                     </button>
                     
                     <button 
                       onClick={() => setActiveCommentId(activeCommentId === memory.id ? null : memory.id)}
-                      className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors"
+                      className="flex items-center gap-2 transition-colors font-medium"
+                      style={{ color: 'var(--text-secondary)' }}
                     >
                       <MessageCircle className="w-5 h-5" />
                       <span>Commenter ({memory.comments?.length || 0})</span>
@@ -556,7 +567,8 @@ export default function Memories() {
                     {user && memory.author_id === user.id && (
                       <button 
                         onClick={() => handleDeleteMemory(memory.id)}
-                        className="flex items-center gap-2 text-gray-600 hover:text-red-600 transition-colors"
+                        className="flex items-center gap-2 transition-colors font-medium"
+                        style={{ color: 'var(--text-secondary)' }}
                         title="Supprimer ce souvenir"
                       >
                         <Trash2 className="w-5 h-5" />
@@ -567,45 +579,48 @@ export default function Memories() {
 
                   {/* Commentaires */}
                   {activeCommentId === memory.id && (
-                    <div className="mt-4 pt-4 border-t border-gray-50">
+                    <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border-light)' }}>
                       <div className="space-y-3 mb-4 max-h-60 overflow-y-auto pr-2">
                         {memory.comments && memory.comments.length > 0 ? (
                           memory.comments.map((comment, idx) => (
-                            <div key={idx} className="bg-gray-50 p-3 rounded-lg text-sm shadow-sm border border-gray-100">
+                            <div key={idx} className="p-4 rounded-2xl text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-light)' }}>
                               <div className="flex justify-between items-start mb-1">
-                                <p className="font-semibold text-blue-700">{comment.author}</p>
+                                <p className="font-bold" style={{ color: 'var(--text-primary)' }}>{comment.author}</p>
                                 {user && (comment.author === user.name || memory.author_name === user.name) && (
                                   <button 
                                     onClick={() => handleDeleteComment(memory.id, comment.id, comment.author, memory.author_name)}
-                                    className="text-gray-400 hover:text-red-600 transition-colors p-1"
+                                    className="transition-colors p-1"
+                                    style={{ color: 'var(--text-muted)' }}
                                   >
                                     <Trash2 className="w-4 h-4" />
                                   </button>
                                 )}
                               </div>
-                              <p className="text-gray-700">{comment.content}</p>
+                              <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>{comment.content}</p>
                             </div>
                           ))
                         ) : (
-                          <p className="text-center text-gray-400 text-sm py-2">Soyez le premier à commenter ce souvenir.</p>
+                          <p className="text-center text-sm py-2 font-medium" style={{ color: 'var(--text-secondary)' }}>Soyez le premier à commenter ce souvenir.</p>
                         )}
                       </div>
                       
-                      <div className="flex gap-2">
+                      <div className="flex gap-3">
                         <input
                           type="text"
                           value={commentText}
                           onChange={(e) => setCommentText(e.target.value)}
                           placeholder="Écrire un message..."
-                          className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
+                          className="flex-1 px-4 py-3 border-2 rounded-2xl text-sm focus:outline-none focus:ring-2 transition-all"
+                          style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-input)', color: 'var(--text-primary)' }}
                           onKeyDown={(e) => e.key === 'Enter' && handleSendComment(memory.id)}
                         />
                         <button 
                           onClick={() => handleSendComment(memory.id)}
                           disabled={isSending || !commentText.trim()}
-                          className="p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
+                          className="p-3 text-white rounded-xl disabled:opacity-50 transition-all duration-200 hover:-translate-y-0.5"
+                          style={{ backgroundColor: 'var(--soft-coral)', boxShadow: '0 4px 16px rgba(240, 128, 128, 0.25)' }}
                         >
-                          <Send className="w-4 h-4" />
+                          <Send className="w-5 h-5" />
                         </button>
                       </div>
                     </div>
