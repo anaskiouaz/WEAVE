@@ -29,7 +29,7 @@ services:
       - /app/node_modules
     command: sh -c "npm install && npm start"
     env_file:
-      - .env
+      - ./be/.env
     environment:
       PORT: "4000"
       PGHOST: "postgres"

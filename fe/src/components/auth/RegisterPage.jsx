@@ -6,14 +6,12 @@ import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
-import { ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
+import { ArrowLeft, Loader2, Eye, EyeOff, ShieldCheck, X, FileText } from 'lucide-react';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const { register, login, loading } = useAuth();
+  const { register, loading } = useAuth(); // removed 'login' as we don't use it here anymore
   const [error, setError] = useState('');
-  const [showPassword, setShowPassword] = useState(false);
-  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
 
   // Ajout du champ confirmPassword dans l'état
   const [formData, setFormData] = useState({
@@ -79,49 +77,34 @@ export default function RegisterPage() {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setError('');
-
-    // 1. Vérification : Les mots de passe correspondent
+    
     if (formData.password !== formData.confirmPassword) {
-      setError("Les mots de passe ne correspondent pas.");
+      setError("Les mots de passe ne correspondent pas");
       return;
     }
+    setError("");
 
-    // 2. Vérification : Complexité du mot de passe
-    const passwordError = validatePassword(formData.password);
-    if (passwordError) {
-      setError(passwordError);
-      return;
-    }
-
-    // 3. Vérification : Numéro de téléphone
-    const phoneError = validatePhone(formData.phone);
-    if (phoneError) {
-      setError(phoneError);
-      return;
-    }
-
-    // Préparation des données (on retire confirmPassword avant l'envoi)
-    const { confirmPassword, ...payload } = formData;
-
-    // 3. Inscription
-    const resRegister = await register(payload);
-
-    if (resRegister.success) {
-      // Réinitialiser le flag du tour pour les nouveaux utilisateurs
-      localStorage.removeItem('weave_onboarding_seen');
+    try {
+      const { confirmPassword, ...dataToSend } = formData;
       
-      // 4. Connexion automatique après inscription
-      const resLogin = await login(formData.email, formData.password);
-      if (resLogin.success) {
-        navigate('/select-circle');
+      // Now that AuthContext throws on error, this line will actually fail if 409/500 occurs
+      await register(dataToSend); 
+
+      // This will ONLY run if register succeeded
+      navigate('/verify-email', { 
+        state: { email: formData.email } 
+      });
+
+    } catch (err) {
+      console.error("Registration Error:", err);
+      // Handle the error (don't redirect)
+      if (err.message?.includes("409") || err.message?.toLowerCase().includes("exist")) {
+        setError("Cet email est déjà utilisé.");
       } else {
-        navigate('/login'); // Fallback si le login auto échoue
+        setError(err.message || "Échec de l'inscription");
       }
-    } else {
-      setError(resRegister.error || "Une erreur est survenue.");
     }
-  };
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4 py-8">

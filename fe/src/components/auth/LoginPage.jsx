@@ -100,6 +100,13 @@ export default function LoginPage() {
               {loading ? <Loader2 className="animate-spin mr-2" /> : "Me connecter"}
             </Button>
 
+            <Link 
+              to="/forgot-password" 
+              className="text-sm font-medium text-blue-600 hover:text-blue-800 hover:underline"
+            >
+              Mot de passe oublié ?
+            </Link>
+
           </form>
         </CardContent>
         <CardFooter className="justify-center py-6 bg-gray-50/50 rounded-b-xl">

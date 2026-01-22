@@ -3,34 +3,57 @@ import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
 import db from '../config/db.js';
 import { authenticateToken } from '../middleware/auth.js';
+import crypto from 'crypto';
+import { sendVerificationEmail, sendPasswordResetEmail } from '../services/emailService.js';
 
 const router = Router();
 
-// --- INSCRIPTION (REGISTER) ---
+// ============================================================
+// 1. INSCRIPTION (REGISTER)
+// ============================================================
 router.post('/register', async (req, res) => {
   const { name, email, password, onboarding_role, phone, birth_date } = req.body;
 
   try {
-    // 1. Vérifier si l'email existe déjà
+    // A. Check if user exists
     const userCheck = await db.query('SELECT * FROM users WHERE email = $1', [email]);
     if (userCheck.rows.length > 0) {
-      return res.status(400).json({ success: false, error: "Cet email est déjà utilisé par un autre compte." });
+      return res.status(409).json({ success: false, error: "Cet email est déjà utilisé." });
     }
 
-    // 2. Hacher le mot de passe
+    // B. Hash password
     const salt = await bcrypt.genSalt(10);
     const passwordHash = await bcrypt.hash(password, salt);
 
-    // 3. Insérer le nouvel utilisateur
-    // On met aussi 'role_global' à 'USER' par défaut si c'est null, pour la compatibilité
+    // C. Generate Code
+    const verificationCode = crypto.randomInt(100000, 999999).toString();
+    const verificationExpires = new Date(Date.now() + 24 * 60 * 60 * 1000); // 24 hours
+
+    // LOG for Devs
+    console.log("==========================================");
+    console.log(`🔑 NEW CODE FOR ${email}: ${verificationCode}`);
+    console.log("==========================================");
+
+    // D. Insert User
     const newUser = await db.query(
-      `INSERT INTO users (name, email, password_hash, onboarding_role, role_global, phone, birth_date) 
-       VALUES ($1, $2, $3, $4, 'USER', $5, $6) 
-       RETURNING id, name, email, onboarding_role, role_global`,
-      [name, email, passwordHash, onboarding_role, phone, birth_date]
+      `INSERT INTO users (
+          name, email, password_hash, onboarding_role, role_global, phone, birth_date,
+          verification_token, verification_token_expires, is_verified
+       ) 
+       VALUES ($1, $2, $3, $4, 'USER', $5, $6, $7, $8, FALSE) 
+       RETURNING id, name, email`,
+      [name, email, passwordHash, onboarding_role, phone, birth_date, verificationCode, verificationExpires]
     );
 
-    res.status(201).json({ success: true, user: newUser.rows[0] });
+    // E. Send Email (Fire & Forget - No await)
+    sendVerificationEmail(email, verificationCode)
+        .catch(err => console.error("Background Email Error:", err));
+
+    res.status(201).json({ 
+        success: true, 
+        message: "Inscription réussie. Vérifiez votre code.", 
+        user: newUser.rows[0] 
+    });
 
   } catch (error) {
     console.error('ERREUR REGISTER:', error);
@@ -38,28 +61,26 @@ router.post('/register', async (req, res) => {
   }
 });
 
-// --- CONNEXION (LOGIN) ---
+// ============================================================
+// 2. CONNEXION (LOGIN)
+// ============================================================
 router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   
   try {
-    // 1. Chercher l'utilisateur
     const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
-    
     if (result.rows.length === 0) {
-      return res.status(404).json({ success: false, error: "Aucun compte associé à cet email." });
+      return res.status(404).json({ success: false, error: "Compte inexistant." });
     }
 
     const user = result.rows[0];
 
-    // 2. Vérifier le mot de passe
     const isMatch = await bcrypt.compare(password, user.password_hash);
-    
     if (!isMatch) {
       return res.status(401).json({ success: false, error: "Mot de passe incorrect." });
     }
 
-    // 3. Récupérer les cercles
+    // Get Circles for Context
     const circlesResult = await db.query(`
       SELECT cc.id, cc.invite_code, u.name AS senior_name, ur.role
       FROM care_circles cc
@@ -68,19 +89,7 @@ router.post('/login', async (req, res) => {
       WHERE ur.user_id = $1
     `, [user.id]);
 
-    const circles = circlesResult.rows;
-    let mainCircleId = null;
-    let mainCircleNom = null;
-
-    if (circles.length > 0) {
-        mainCircleId = circles[0].id;           
-        mainCircleNom = circles[0].senior_name; 
-    }
-
-    // 4. Génération du token
-    // On utilise role_global s'il existe, sinon onboarding_role
     const activeRole = user.role_global || user.onboarding_role;
-
     const token = jwt.sign(
         { id: user.id, role: activeRole }, 
         process.env.JWT_SECRET || 'secret', 
@@ -89,52 +98,131 @@ router.post('/login', async (req, res) => {
     
     delete user.password_hash; 
 
-
     res.json({ 
         success: true, 
         token, 
-        user: { ...user, circles }, 
-        circle_id: mainCircleId,    
-        circle_nom: mainCircleNom   
+        user: { ...user, circles: circlesResult.rows }, 
+        circle_id: circlesResult.rows[0]?.id || null
     });
 
   } catch (error) {
     console.error('ERREUR LOGIN:', error);
-    res.status(500).json({ success: false, error: "Erreur serveur lors de la connexion." });
+    res.status(500).json({ success: false, error: "Erreur serveur." });
   }
 });
 
-router.get('/check-role', authenticateToken, async (req, res) => {
-  try {
-    const userId = req.user?.id;
-    const circleId = req.query.circle_id;
-    if (!userId) return res.status(401).json({ success: false, error: 'Token invalide.' });
-    if (!circleId) return res.status(400).json({ success: false, error: 'Paramètre circle_id manquant.' });
+// ============================================================
+// 3. VERIFY EMAIL
+// ============================================================
+router.post('/verify-email', async (req, res) => {
+    const { email, code } = req.body; 
 
-    const q = 'SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2 LIMIT 1';
-    const result = await db.query(q, [userId, circleId]);
-    if (result.rows.length === 0) {
-      return res.json({ success: true, role: null });
+    try {
+        const result = await db.query(
+            `UPDATE users 
+             SET is_verified = TRUE, verification_token = NULL, verification_token_expires = NULL 
+             WHERE email = $1 AND verification_token = $2 
+             RETURNING id`,
+            [email, code]
+        );
+        
+        if (result.rowCount === 0) {
+            return res.status(400).json({ error: "Lien invalide ou code expiré." });
+        }
+        
+        res.json({ success: true, message: "Email vérifié !" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Erreur serveur" });
     }
-    return res.json({ success: true, role: result.rows[0].role });
-  } catch (err) {
-    console.error('ERREUR /auth/check-role:', err);
-    return res.status(500).json({ success: false, error: 'Erreur serveur.' });
-  }
 });
 
+// ============================================================
+// 4. FORGOT PASSWORD
+// ============================================================
+router.post('/forgot-password', async (req, res) => {
+    try {
+      const rawEmail = req.body.email;
+      if (!rawEmail) return res.status(400).json({ error: "Email manquant." });
+  
+      const cleanEmail = rawEmail.trim().toLowerCase();
+      const user = await db.query('SELECT * FROM users WHERE LOWER(email) = $1', [cleanEmail]);
+  
+      if (user.rows.length === 0) {
+        return res.status(404).json({ error: "Email inconnu." });
+      }
+  
+      const token = crypto.randomBytes(20).toString('hex');
+      const expires = new Date(Date.now() + 3600000); // 1 hour
+  
+      await db.query(
+        'UPDATE users SET reset_password_token = $1, reset_password_expires = $2 WHERE id = $3',
+        [token, expires, user.rows[0].id]
+      );
+  
+      // Fire and forget email
+      sendPasswordResetEmail(cleanEmail, token)
+        .catch(e => console.error("Reset Email Error:", e));
+
+      res.json({ success: true, message: "Email envoyé." });
+  
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Erreur serveur." });
+    }
+});
+
+router.post('/reset-password', async (req, res) => {
+    const { token, newPassword } = req.body;
+    try {
+      const user = await db.query(
+        'SELECT * FROM users WHERE reset_password_token = $1 AND reset_password_expires > NOW()',
+        [token]
+      );
+  
+      if (user.rows.length === 0) return res.status(400).json({ error: "Lien invalide." });
+  
+      const salt = await bcrypt.genSalt(10);
+      const hash = await bcrypt.hash(newPassword, salt);
+  
+      await db.query(
+        'UPDATE users SET password_hash = $1, reset_password_token = NULL, reset_password_expires = NULL WHERE id = $2',
+        [hash, user.rows[0].id]
+      );
+  
+      res.json({ success: true, message: "Mot de passe modifié." });
+    } catch (err) {
+      console.error(err);
+      res.status(500).json({ error: "Erreur serveur." });
+    }
+});
+
+// ============================================================
+// 5. UTILS (ME, CHECK-ROLE)
+// ============================================================
+router.get('/check-role', authenticateToken, async (req, res) => {
+    try {
+      const userId = req.user?.id;
+      const circleId = req.query.circle_id;
+      if (!userId || !circleId) return res.status(400).json({ success: false });
+  
+      const q = 'SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2 LIMIT 1';
+      const result = await db.query(q, [userId, circleId]);
+      return res.json({ success: true, role: result.rows[0]?.role || null });
+    } catch (err) {
+      return res.status(500).json({ success: false });
+    }
+});
+  
 router.get('/me', authenticateToken, async (req, res) => {
     try {
         const userId = req.user?.id;
-        if (!userId) return res.status(401).json({ success: false, error: 'Token invalide.' });
-
-        // SQL HYBRIDE : On demande TOUS les champs (les tiens + ceux de tes collègues)
         const userRes = await db.query(
             'SELECT id, name, email, onboarding_role, role_global, profile_photo, phone, birth_date FROM users WHERE id = $1', 
             [userId]
         );
         
-        if (userRes.rows.length === 0) return res.status(404).json({ success: false, message: "Utilisateur introuvable" });
+        if (userRes.rows.length === 0) return res.status(404).json({ success: false });
         const user = userRes.rows[0];
 
         const circlesResult = await db.query(`
@@ -145,20 +233,14 @@ router.get('/me', authenticateToken, async (req, res) => {
             WHERE ur.user_id = $1
         `, [userId]);
 
-        const circles = circlesResult.rows;
-        let mainCircleId = null;
-        if (circles.length > 0) mainCircleId = circles[0].id;
-
-        // RÉPONSE : On garde TA structure JSON qui renvoie circle_id à la racine
         res.json({ 
             success: true, 
-            user: { ...user, circles },
-            circle_id: mainCircleId 
+            user: { ...user, circles: circlesResult.rows },
+            circle_id: circlesResult.rows[0]?.id || null 
         });
 
     } catch (error) {
-        console.error('ERREUR /me:', error);
-        res.status(500).json({ success: false, error: "Erreur récupération session." });
+        res.status(500).json({ success: false });
     }
 });
 

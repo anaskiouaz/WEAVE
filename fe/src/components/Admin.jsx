@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Copy, Check, Share2, Crown, Mail, Phone, Trash2, Shield, Clock, UserPlus, UserMinus, Image, MessageSquare, Calendar, Activity, AlertTriangle, Star } from 'lucide-react';
+import { 
+  Users, Copy, Check, Share2, Crown, Mail, Phone, Trash2, 
+  Shield, Clock, UserPlus, UserMinus, Image, MessageSquare, 
+  Calendar, Activity, AlertTriangle, Star, Send // <--- Added Send icon
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
@@ -19,6 +23,8 @@ const ACTION_CONFIG = {
 export default function Admin() {
   const { user, circleId, logout } = useAuth();
   const navigate = useNavigate();
+  
+  // Existing State
   const [copied, setCopied] = useState(false);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -28,22 +34,23 @@ export default function Admin() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
 
+  // New State for Email Invitation
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [sendingInvite, setSendingInvite] = useState(false);
+
   // Rating modal state
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [ratingData, setRatingData] = useState({ average: 0, total: 0, my: null, skills: [] });
   const [pendingRating, setPendingRating] = useState(0);
 
-  // Déterminer le cercle courant :
-  // - si un `circleId` est sélectionné dans le contexte, on l'utilise
-  // - sinon on prend le premier cercle où l'utilisateur est ADMIN/SUPERADMIN
+  // Determine current circle
   const currentCircle = (circleId && user?.circles?.find(c => String(c.id) === String(circleId)))
     || user?.circles?.find(c => c.role?.toUpperCase() === 'ADMIN' || c.role?.toUpperCase() === 'SUPERADMIN');
 
-  // Récupérer le code d'invitation du cercle courant
   const inviteCode = currentCircle?.invite_code || '...';
 
-  // 2. Récupérer la vraie liste des membres au chargement
+  // Fetch Logic
   useEffect(() => {
     if (currentCircle?.id) {
       fetchMembers(currentCircle.id);
@@ -92,8 +99,6 @@ export default function Admin() {
     const date = new Date(dateString);
     const now = new Date();
     const diffInSeconds = Math.floor((now - date) / 1000);
-
-    // Formater l'heure
     const timeStr = date.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' });
 
     if (diffInSeconds < 60) return `À l'instant (${timeStr})`;
@@ -110,12 +115,45 @@ export default function Admin() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // --- NEW: Handle Email Invite ---
+  const handleSendInvite = async (e) => {
+    e.preventDefault();
+    if (!inviteEmail) return;
+
+    setSendingInvite(true);
+    try {
+      const token = localStorage.getItem('weave_token');
+      const res = await fetch(`${API_BASE_URL}/circles/${currentCircle.id}/invite`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ email: inviteEmail })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        alert("Invitation envoyée avec succès !");
+        setInviteEmail(''); // Clear input
+      } else {
+        alert(`Erreur: ${data.error || "Impossible d'envoyer l'email"}`);
+      }
+    } catch (err) {
+      console.error("Erreur envoi invite", err);
+      alert("Erreur réseau lors de l'envoi de l'invitation.");
+    } finally {
+      setSendingInvite(false);
+    }
+  };
+  // --------------------------------
+
   const handleDeleteCircle = async () => {
     if (deleteConfirmText !== currentCircle?.senior_name) {
       alert("Le nom saisi ne correspond pas.");
       return;
     }
-
     setDeleting(true);
     try {
       const token = localStorage.getItem('weave_token');
@@ -126,7 +164,6 @@ export default function Admin() {
 
       if (res.ok) {
         alert("Le cercle a été supprimé définitivement.");
-        // Rediriger vers la page de sélection de cercle
         navigate('/select-circle');
       } else {
         const error = await res.json();
@@ -142,7 +179,6 @@ export default function Admin() {
   };
 
   const handleRemoveMember = async (memberId, memberName) => {
-    // Demander confirmation
     const confirmDelete = window.confirm(`Êtes-vous sûr de vouloir retirer "${memberName}" du cercle ?`);
     if (!confirmDelete) return;
 
@@ -154,7 +190,6 @@ export default function Admin() {
       });
 
       if (res.ok) {
-        // Rafraîchir la liste des membres
         await fetchMembers(currentCircle.id);
         alert(`${memberName} a été retiré du cercle.`);
       } else {
@@ -167,7 +202,6 @@ export default function Admin() {
     }
   };
 
-  // Si l'utilisateur n'est pas admin, on affiche un message simple
   if (!currentCircle) {
     return (
       <div className="p-10 flex flex-col items-center justify-center text-center h-full">
@@ -178,8 +212,7 @@ export default function Admin() {
     );
   }
 
-  // Calcul des stats
-  const activeMembers = members.filter(m => m.role !== 'PC').length; // On exclut le bénéficiaire des aidants actifs
+  const activeMembers = members.filter(m => m.role !== 'PC').length;
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-8 pb-24 animate-in fade-in duration-500">
@@ -215,7 +248,7 @@ export default function Admin() {
         </div>
       </div>
 
-      {/* --- ZONE D'INVITATION --- */}
+      {/* --- ZONE D'INVITATION (UPDATED) --- */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -224,29 +257,73 @@ export default function Admin() {
           </h2>
         </div>
 
-        <div className="bg-blue-50/50 rounded-xl p-6 border border-blue-100 flex flex-col md:flex-row gap-6 items-center">
-          <div className="flex-1 space-y-1">
-            <p className="text-sm font-semibold text-gray-900">Code d'accès unique</p>
-            <p className="text-sm text-gray-600">
-              Transmettez ce code à un proche ou un professionnel. Il devra le saisir lors de son inscription en cliquant sur "Rejoindre un cercle".
-            </p>
+        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+          
+          {/* Option 1: Manuel (Copy Code) */}
+          <div className="bg-blue-50/50 rounded-xl p-6 border border-blue-100 flex flex-col justify-between">
+            <div className="mb-4">
+              <p className="text-sm font-semibold text-gray-900 mb-1">Option A : Partager le code</p>
+              <p className="text-sm text-gray-600">
+                Copiez ce code et envoyez-le par SMS ou WhatsApp à votre proche.
+              </p>
+            </div>
+            <div className="flex gap-2">
+              <div className="flex-1 bg-white border border-gray-200 rounded-lg px-4 py-3 text-gray-900 font-mono text-xl tracking-wider text-center font-bold">
+                {inviteCode}
+              </div>
+              <button
+                onClick={handleCopyLink}
+                className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 min-w-[100px] ${copied
+                  ? 'bg-green-100 text-green-700 border border-green-200'
+                  : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
+                  }`}
+              >
+                {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
+                {copied ? 'Copié' : 'Copier'}
+              </button>
+            </div>
           </div>
 
-          <div className="flex gap-2 w-full md:w-auto">
-            <div className="flex-1 md:w-48 bg-white border border-gray-200 rounded-lg px-4 py-3 text-gray-900 font-mono text-xl tracking-wider text-center font-bold">
-              {inviteCode}
+          {/* Option 2: Email Invitation (NEW) */}
+          <div className="bg-gray-50/50 rounded-xl p-6 border border-gray-200 flex flex-col justify-between">
+            <div className="mb-4">
+              <p className="text-sm font-semibold text-gray-900 mb-1">Option B : Envoyer par email</p>
+              <p className="text-sm text-gray-600">
+                Nous enverrons un email contenant le lien d'activation et le code.
+              </p>
             </div>
-            <button
-              onClick={handleCopyLink}
-              className={`px-4 py-2 rounded-lg font-medium transition-all flex items-center justify-center gap-2 min-w-[110px] ${copied
-                ? 'bg-green-100 text-green-700 border border-green-200'
-                : 'bg-blue-600 text-white hover:bg-blue-700 shadow-sm'
-                }`}
-            >
-              {copied ? <Check className="w-5 h-5" /> : <Copy className="w-5 h-5" />}
-              {copied ? 'Copié' : 'Copier'}
-            </button>
+            
+            <form onSubmit={handleSendInvite} className="flex gap-2">
+              <div className="relative flex-1">
+                <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                  <Mail className="h-5 w-5 text-gray-400" />
+                </div>
+                <input
+                  type="email"
+                  required
+                  value={inviteEmail}
+                  onChange={(e) => setInviteEmail(e.target.value)}
+                  placeholder="exemple@email.com"
+                  className="pl-10 block w-full rounded-lg border-gray-300 py-3 text-base shadow-sm focus:border-blue-500 focus:ring-blue-500 border px-3"
+                />
+              </div>
+              <button
+                type="submit"
+                disabled={sendingInvite || !inviteEmail}
+                className="bg-gray-900 text-white px-4 py-2 rounded-lg hover:bg-black transition-colors font-medium flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed min-w-[120px] justify-center"
+              >
+                {sendingInvite ? (
+                   <span className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <>
+                    <Send className="w-4 h-4" />
+                    Envoyer
+                  </>
+                )}
+              </button>
+            </form>
           </div>
+
         </div>
       </div>
 
@@ -265,7 +342,7 @@ export default function Admin() {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-4">
 
-                    {/* Avatar (Initiale) */}
+                    {/* Avatar */}
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 text-lg font-bold ${member.role === 'ADMIN' ? 'bg-purple-100 text-purple-600' :
                       member.role === 'PC' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'
                       }`}>
@@ -304,7 +381,8 @@ export default function Admin() {
                             <Phone className="w-3.5 h-3.5" /> {member.phone}
                           </div>
                         )}
-                        {/* Skills preview */}
+                        
+                        {/* Skills & Rating Button */}
                         {Array.isArray(member.skills) && member.skills.length > 0 && (
                           <div className="flex flex-wrap gap-1 pt-1">
                             {member.skills.slice(0,4).map(s => (
@@ -313,7 +391,7 @@ export default function Admin() {
                             {member.skills.length > 4 && <span className="text-xs text-gray-400">+{member.skills.length-4}</span>}
                           </div>
                         )}
-                        {/* Only show rating button for helpers (not PC/beneficiary) and not for self */}
+                        
                         {member.role === 'HELPER' && member.id !== user.id && (
                           <button
                             onClick={async () => {
@@ -344,7 +422,7 @@ export default function Admin() {
                     </div>
                   </div>
 
-                  {/* Actions (Supprimer) - Sauf pour l'admin lui-même et le senior */}
+                  {/* Actions (Supprimer) */}
                   {member.role === 'HELPER' && (
                     <button
                       onClick={() => handleRemoveMember(member.id, member.name)}
@@ -391,12 +469,9 @@ export default function Admin() {
               return (
                 <div key={log.id} className="p-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-start gap-3">
-                    {/* Icône */}
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${config.color}`}>
                       <IconComponent className="w-5 h-5" />
                     </div>
-
-                    {/* Contenu */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
@@ -434,8 +509,7 @@ export default function Admin() {
             <div>
               <h3 className="font-semibold text-gray-900">Supprimer le cercle</h3>
               <p className="text-sm text-gray-600 mt-1">
-                Cette action supprimera définitivement le cercle, tous ses membres, souvenirs, messages et tâches. 
-                Cette action est irréversible.
+                Cette action supprimera définitivement le cercle, tous ses membres et données.
               </p>
             </div>
             <button
@@ -449,7 +523,7 @@ export default function Admin() {
         </div>
       </div>
 
-      {/* --- MODAL DE CONFIRMATION --- */}
+      {/* --- MODAL DE CONFIRMATION (DELETE) --- */}
       {showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
@@ -468,21 +542,14 @@ export default function Admin() {
             <div className="p-6 space-y-4">
               <div className="bg-red-50 border border-red-200 rounded-lg p-4">
                 <p className="text-sm text-red-800">
-                  <strong>Attention :</strong> Vous êtes sur le point de supprimer définitivement le cercle 
-                  <span className="font-bold"> "{currentCircle?.senior_name}"</span>. 
-                  Toutes les données seront perdues :
+                  <strong>Attention :</strong> Vous allez supprimer <span className="font-bold">"{currentCircle?.senior_name}"</span>. 
+                  Toutes les données seront perdues.
                 </p>
-                <ul className="text-sm text-red-700 mt-2 list-disc list-inside space-y-1">
-                  <li>Tous les membres seront retirés</li>
-                  <li>Tous les souvenirs et commentaires</li>
-                  <li>Toutes les conversations et messages</li>
-                  <li>Toutes les tâches et disponibilités</li>
-                </ul>
               </div>
 
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
-                  Pour confirmer, tapez <span className="font-bold text-red-600">"{currentCircle?.senior_name}"</span>
+                  Tapez <span className="font-bold text-red-600">"{currentCircle?.senior_name}"</span> pour confirmer
                 </label>
                 <input
                   type="text"
@@ -496,10 +563,7 @@ export default function Admin() {
 
             <div className="p-6 bg-gray-50 border-t border-gray-100 flex gap-3">
               <button
-                onClick={() => {
-                  setShowDeleteModal(false);
-                  setDeleteConfirmText('');
-                }}
+                onClick={() => { setShowDeleteModal(false); setDeleteConfirmText(''); }}
                 className="flex-1 px-4 py-2 border border-gray-300 text-gray-700 rounded-lg hover:bg-gray-100 transition-colors font-medium"
               >
                 Annuler
@@ -517,7 +581,7 @@ export default function Admin() {
                 ) : (
                   <>
                     <Trash2 className="w-4 h-4" />
-                    Supprimer définitivement
+                    Supprimer
                   </>
                 )}
               </button>
@@ -535,7 +599,7 @@ export default function Admin() {
               <p className="text-sm text-gray-500">{selectedMember.name}</p>
             </div>
             <div className="p-6 space-y-4">
-              {/* Skills */}
+              {/* Skills Display */}
               {Array.isArray(ratingData.skills) && ratingData.skills.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {ratingData.skills.map(s => (
@@ -546,14 +610,14 @@ export default function Admin() {
                 <div className="text-sm text-gray-400">Aucune compétence renseignée</div>
               )}
 
-              {/* Average */}
+              {/* Average Rating */}
               <div className="flex items-center gap-2 text-sm text-gray-700">
                 <Star className="w-4 h-4 text-yellow-500 fill-yellow-500" />
                 <span className="font-medium">{ratingData.average?.toFixed ? ratingData.average.toFixed(1) : ratingData.average} / 5</span>
                 <span className="text-gray-400">({ratingData.total} avis)</span>
               </div>
 
-              {/* Your rating */}
+              {/* User Input Rating */}
               <div>
                 <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Votre note</label>
                 <div className="flex items-center gap-1">
@@ -577,7 +641,6 @@ export default function Admin() {
                       body: JSON.stringify({ raterId: user.id, circleId: currentCircle.id, rating: pendingRating })
                     });
                     if (res.ok) {
-                      // Refresh average
                       const r = await fetch(`${API_BASE_URL}/users/${selectedMember.id}/rating?circleId=${currentCircle.id}&raterId=${user.id}`, {
                         headers: { 'Authorization': `Bearer ${token}` }
                       });
