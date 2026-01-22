@@ -219,82 +219,39 @@ export default function Profile() {
 
   // --- HANDLER NOTIFICATIONS ---
   const handleNotificationToggle = async () => {
-    if (Capacitor.getPlatform() === 'web') return alert("Notifications uniquement disponibles sur mobile");
+    // 1. Sur PC (Web), on ne fait rien (bouton caché mais sécurité en plus)
+    if (!Capacitor.isNativePlatform()) return;
+
     const newStatus = !notificationsEnabled;
+    
+    // Mise à jour optimiste pour éviter le "flicker"
     setNotificationsEnabled(newStatus);
 
     try {
-      await apiPut('/users/me', { notifications_enabled: newStatus });
-      if (newStatus) {
-        let perm = await PushNotifications.checkPermissions();
-        if (perm.receive === 'prompt') perm = await PushNotifications.requestPermissions();
-        if (perm.receive !== 'granted') throw new Error("Permission refusée");
+        // 2. Sauvegarde en base
+        await apiPut('/users/me', { notifications_enabled: newStatus });
+        
+        // Met à jour le contexte global pour que l'info soit partagée
+        if (setUser) {
+            setUser(prev => ({ ...prev, notifications_enabled: newStatus }));
+        }
 
-        await PushNotifications.removeAllListeners();
-        await PushNotifications.addListener('registration', async (tokenData) => {
-          await apiPost('/users/device-token', { userId: user.id, token: tokenData.value });
-        });
-        await PushNotifications.register();
-      } else {
-        await apiPost('/users/device-token', { userId: user.id, token: '' });
-        await PushNotifications.removeAllListeners();
-      }
+        if (newStatus === true) {
+            // Activation
+            let perm = await PushNotifications.checkPermissions();
+            if (perm.receive === 'prompt') perm = await PushNotifications.requestPermissions();
+            if (perm.receive !== 'granted') throw new Error("Permission refusée");
+
+            await PushNotifications.register();
+            // L'écouteur 'registration' dans App.jsx ou ici gérera l'envoi du token
+        } else {
+            // Désactivation
+            await apiPost('/users/device-token', { userId: user.id, token: '' });
+            await PushNotifications.removeAllListeners();
+        }
     } catch (error) {
-      setNotificationsEnabled(!newStatus);
-      alert("Erreur lors de l'activation des notifications");
-    }
-  };
-
-  // --- HANDLER SUPPRESSION CERCLE (Admin) ---
-  const handleDeleteCircle = async () => {
-    if (deleteCircleConfirmText !== currentCircleName) return alert("Le nom saisi ne correspond pas.");
-    setIsDeletingCircle(true);
-    try {
-      const token = localStorage.getItem('weave_token');
-      const res = await fetch(buildApiUrl(`/circles/${currentCircle.id}`), {
-        method: 'DELETE',
-        headers: { 'Authorization': token ? `Bearer ${token}` : '' }
-      });
-      if (res.ok) {
-        alert("Cercle supprimé définitivement.");
-        navigate('/select-circle');
-      } else {
-        const err = await res.json().catch(() => null);
-        alert(err?.error || "Erreur lors de la suppression");
-      }
-    } catch (e) { console.error(e); alert("Erreur technique lors de la suppression"); }
-    finally { setIsDeletingCircle(false); setShowDeleteCircleModal(false); }
-  };
-
-  // --- HANDLER SUPPRESSION COMPTE (User) ---
-  const handleConfirmDeleteAccount = async () => {
-    if (deleteAccountInput.toLowerCase() !== 'supprimer') return;
-
-    setIsDeletingAccount(true);
-    try {
-      const token = localStorage.getItem('weave_token');
-      // Tentative de suppression via endpoint de consentement (RGPD erasure)
-      const res = await fetch(buildApiUrl(`/users/${USER_ID}/consent`), {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-          ...(token ? { 'Authorization': `Bearer ${token}` } : {}),
-        },
-        body: JSON.stringify({ consent: false })
-      });
-
-      if (!res.ok) {
-        const err = await res.json().catch(() => null);
-        throw new Error(err?.error || 'Erreur serveur');
-      }
-
-      alert('Compte supprimé avec succès.');
-      logout();
-      navigate('/login');
-    } catch (error) {
-      console.error('Erreur suppression compte:', error);
-      alert(`Impossible de supprimer le compte : ${error.message}`);
-      setIsDeletingAccount(false);
+        console.error("Erreur notifs:", error);
+        setNotificationsEnabled(!newStatus); // Revert en cas d'erreur
     }
   };
 
@@ -472,7 +429,7 @@ export default function Profile() {
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
                 <Bell className="text-gray-500" size={20} />
-                <span className="text-gray-700 font-medium">Notifications</span>
+                <span className="text-gray-700 font-medium">Notifications Push</span>
               </div>
               <button onClick={handleNotificationToggle} className={`w-11 h-6 flex items-center rounded-full p-1 transition-colors ${notificationsEnabled ? 'bg-blue-600' : 'bg-gray-300'}`}>
                 <div className={`bg-white w-4 h-4 rounded-full shadow-md transform transition-transform ${notificationsEnabled ? 'translate-x-5' : 'translate-x-0'}`}></div>

@@ -14,11 +14,9 @@ export default function LegalNotice() {
       Email : contact@weave-app.fr
       Téléphone : XX XX XX XX XX
       
-      Directeur de la publication : Goku 
+      Directeur de la publication : Weave Team
       
-      Forme juridique : [SAS / SARL / Association / etc.]
-      Capital social : trop riche €
-      RCS : Grenoble 38100
+      
       `
     },
     {
@@ -57,7 +55,7 @@ export default function LegalNotice() {
       consultez notre Politique de confidentialité.
       
       Délégué à la Protection des Données (DPO) :
-      Email : dpo@weave-app.fr`
+      Email : weave@weave-app.fr`
     },
     {
       icon: Scale,
@@ -83,7 +81,7 @@ export default function LegalNotice() {
       compétence est attribuée aux tribunaux français compétents.
       
       Pour toute question relative aux présentes mentions légales, vous pouvez 
-      nous contacter à l'adresse : legal@weave-app.fr`
+      nous contacter à l'adresse : weave@weave-app.fr`
     }
   ];
 

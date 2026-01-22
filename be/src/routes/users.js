@@ -7,11 +7,43 @@ import { authenticateToken } from '../middleware/auth.js';
 
 const router = Router();
 
-// =============================================================================
-// ⚠️ ZONE 1 : ROUTES SPÉCIFIQUES (DOIVENT ÊTRE EN PREMIER)
-// =============================================================================
+// GET /me (Récupérer profil)
+router.get('/me', authenticateToken, async (req, res) => { // <--- AJOUT du middleware
+    try {
+        // req.user est maintenant garanti par authenticateToken
+        const result = await db.query(
+            'SELECT id, name, email, role_global, fcm_token, notifications_enabled, picture, bio FROM users WHERE id = $1', 
+            [req.user.id]
+        );
+        
+        if (result.rows.length === 0) {
+            return res.status(404).json({ success: false, error: 'Utilisateur introuvable' });
+        }
+        
+        res.json(result.rows[0]);
+    } catch (error) {
+        console.error('Erreur GET /me:', error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
 
-// 2. AUDIT LOGS (GET)
+// PUT /me (Mettre à jour les préférences)
+router.put('/me', authenticateToken, async (req, res) => { // <--- AJOUT du middleware
+    try {
+        const userId = req.user.id;
+        const { notifications_enabled } = req.body;
+
+        if (notifications_enabled !== undefined) {
+            await db.query('UPDATE users SET notifications_enabled = $1 WHERE id = $2', [notifications_enabled, userId]);
+        }
+        
+        res.json({ success: true });
+    } catch (error) {
+        console.error("Erreur PUT /me:", error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 router.get('/audit-logs', async (req, res) => {
     try {
         const { userId } = req.query; 
