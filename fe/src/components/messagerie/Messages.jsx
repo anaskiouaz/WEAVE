@@ -3,12 +3,13 @@ import { Send, Plus, Users, MessageSquare, Settings, X, Trash2 } from 'lucide-re
 import { apiGet, apiPost, apiDelete, apiPut } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { io } from 'socket.io-client';
+import { fetchUnreadMessagesCount } from '../../utils/unreadMessages';
 
 // Import du composant Mobile
 import MobileMessages from './../ui-mobile/messages/MobileMessages';
 
 const Messages = () => {
-  const { user, circleId } = useAuth();
+  const { user, circleId, setUnreadMessages } = useAuth();
   const [conversations, setConversations] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -68,7 +69,7 @@ const Messages = () => {
       const roomId = String(activeConversation.id);
       socketRef.current.emit('join_conversation', roomId);
 
-      const handleReceiveMessage = (message) => {
+      const handleReceiveMessage = async (message) => {
         if (message.auteur_id === user?.id) {
           loadConversations();
           return;
@@ -77,7 +78,11 @@ const Messages = () => {
         if (String(message.conversation_id) === String(activeConversation.id)) {
           setMessages((prev) => [...prev, message]);
           scrollToBottom();
-          markAsRead(activeConversation.id);
+          await markAsRead(activeConversation.id);
+        } else {
+          // Message reçu dans une autre conversation, rafraîchir le compteur
+          const count = await fetchUnreadMessagesCount(circleId);
+          setUnreadMessages(count);
         }
         loadConversations();
       };
@@ -85,9 +90,12 @@ const Messages = () => {
       socketRef.current.on('receive_message', handleReceiveMessage);
 
     } else {
-      const handleGlobalMessage = (message) => {
+      const handleGlobalMessage = async (message) => {
         if (message.auteur_id !== user?.id) {
           loadConversations();
+          // Rafraîchir le compteur de messages non lus
+          const count = await fetchUnreadMessagesCount(circleId);
+          setUnreadMessages(count);
         }
       };
       socketRef.current.on('receive_message', handleGlobalMessage);
@@ -111,6 +119,9 @@ const Messages = () => {
       setConversations(prev => prev.map(c =>
         c.id === convId ? { ...c, unread_count: 0 } : c
       ));
+      // Rafraîchir le compteur global de messages non lus
+      const count = await fetchUnreadMessagesCount(circleId);
+      setUnreadMessages(count);
     } catch (e) { console.error("Erreur lecture", e); }
   };
 

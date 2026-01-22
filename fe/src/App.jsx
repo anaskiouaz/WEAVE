@@ -3,6 +3,7 @@ import { Home, Calendar, Heart, MessageSquare, User, Settings, AlertCircle, LogO
 import { useState, useEffect } from 'react'; // Ajout de useEffect
 import { Capacitor } from '@capacitor/core'; // Ajout pour les notifs
 import { PushNotifications } from '@capacitor/push-notifications'; // Ajout pour les notifs
+import { fetchUnreadMessagesCount } from './utils/unreadMessages';
 
 // Composants
 import Dashboard from './components/Dashboard';
@@ -36,8 +37,25 @@ function ProtectedLayout() {
   const [emergencyOpen, setEmergencyOpen] = useState(false);
 
   // 1. On récupère 'user' ici pour vérifier le rôle
-  const { token, logout, user } = useAuth();
+  const { token, logout, user, unreadMessages, setUnreadMessages, circleId } = useAuth();
   const navigate = useNavigate();
+
+  // --- RAFRAÎCHISSEMENT DES MESSAGES NON LUS ---
+  useEffect(() => {
+    const refreshUnreadMessages = async () => {
+      if (user) {
+        const count = await fetchUnreadMessagesCount(circleId);
+        setUnreadMessages(count);
+      }
+    };
+    
+    refreshUnreadMessages();
+    
+    // Rafraîchir toutes les 30 secondes
+    const interval = setInterval(refreshUnreadMessages, 30000);
+    
+    return () => clearInterval(interval);
+  }, [location.pathname, user, circleId, setUnreadMessages]);
 
   // --- INITIALISATION DES NOTIFICATIONS (Déplacé ici pour être actif partout) ---
   useEffect(() => {
@@ -117,12 +135,19 @@ function ProtectedLayout() {
                 key={path}
                 to={path}
                 data-tour={`nav-${label.toLowerCase().replace(/\s+/g, '-')}`}
-                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-lg ${location.pathname === path
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-lg relative ${location.pathname === path
                   ? 'bg-blue-50 text-blue-600 font-medium'
                   : 'text-gray-700 hover:bg-gray-50'
                   }`}
               >
-                <Icon className="w-6 h-6" />
+                <div className="relative">
+                  <Icon className="w-6 h-6" />
+                  {label === 'Messages' && unreadMessages > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold">
+                      {unreadMessages > 9 ? '9+' : unreadMessages}
+                    </span>
+                  )}
+                </div>
                 <span>{label}</span>
               </Link>
             ))}

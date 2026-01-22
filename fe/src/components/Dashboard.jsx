@@ -13,7 +13,7 @@ export default function Dashboard() {
   
   // Récupération du cercle via le contexte et les paramètres URL
   // Priorité: param URL > contexte
-  const { circleId: contextCircleId, setCircle, user } = useAuth();
+  const { circleId: contextCircleId, setCircle, user, setUnreadMessages } = useAuth();
   
   const circleIdFromUrl = searchParams.get('circle_id');
   const activeCircleId = circleIdFromUrl || contextCircleId;
@@ -44,6 +44,10 @@ export default function Dashboard() {
         console.log('📊 Dashboard Stats reçues:', response.data.stats);
         setUpcomingTasks(response.data.upcomingTasks);
         setDashboardStats(response.data.stats);
+        // Mettre à jour le contexte avec le nombre de messages non lus
+        if (response.data.stats && response.data.stats.unread_messages !== undefined) {
+          setUnreadMessages(response.data.stats.unread_messages);
+        }
       }
     } catch (err) {
       console.error("Erreur chargement dashboard:", err);
