@@ -5,11 +5,9 @@ import { useAuth } from '../context/AuthContext';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
-/*
- * Config d'affichage des logs d'activité
- * Chaque action du backend (AUDIT_ACTIONS) a son style ici
- * Pour ajouter une action : 1) l'ajouter dans audits.js 2) l'ajouter ici
- */
+// Configuration d'affichage des logs d'activité
+// Chaque action du backend (AUDIT_ACTIONS) a son style ici
+// Pour ajouter une action: 1) l'ajouter dans audits.js, 2) l'ajouter ici
 const ACTION_CONFIG = {
   MEMBER_JOINED: { icon: UserPlus, color: 'bg-green-100 text-green-600', label: 'Nouveau membre' },
   MEMBER_REMOVED: { icon: UserMinus, color: 'bg-red-100 text-red-600', label: 'Membre retiré' },
@@ -33,29 +31,27 @@ export default function Admin() {
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
 
-  // Rating modal state
+  // Modal notation des membres
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [selectedMember, setSelectedMember] = useState(null);
   const [ratingData, setRatingData] = useState({ average: 0, total: 0, my: null, skills: [] });
   const [pendingRating, setPendingRating] = useState(0);
 
-  /*
-   * Récupère le cercle sélectionné dans user.circles
-   * Un user peut être ADMIN dans un cercle et HELPER dans un autre
-   * On doit donc récupérer son rôle pour LE cercle actuellement affiché
-   */
+  // Récupère le cercle actuellement sélectionné
+  // L'utilisateur peut avoir un rôle différent dans chaque cercle
+  // Ex: ADMIN dans le cercle A, HELPER dans le cercle B
   const currentCircle = (circleId && user?.circles?.find(c => String(c.id ?? c.circle_id) === String(circleId)))
     || (Array.isArray(user?.circles) ? user.circles[0] : null);
 
   const currentCircleId = currentCircle?.id ?? currentCircle?.circle_id;
   const currentCircleName = currentCircle?.senior_name || currentCircle?.name;
 
-  // Rôle dans ce cercle : ADMIN (créateur), HELPER (aidant), PC (bénéficiaire)
+  // Rôle dans ce cercle: ADMIN (créateur), HELPER (aidant), PC (bénéficiaire)
   const currentRole = (currentCircle?.role || '').toUpperCase();
-  const isAdmin = currentRole === 'ADMIN' || currentRole === 'SUPERADMIN'; // Seuls eux peuvent gérer le cercle
+  const isAdmin = currentRole === 'ADMIN' || currentRole === 'SUPERADMIN';
   const inviteCode = currentCircle?.invite_code || '...';
 
-  // Charge membres + logs quand on change de cercle
+  // Charge les données quand on change de cercle
   useEffect(() => {
     if (currentCircleId) {
       fetchMembers(currentCircleId);
@@ -83,7 +79,7 @@ export default function Admin() {
     }
   };
 
-  // Récupère les logs d'activité du cercle (GET /circles/:id/logs)
+  // Récupère les logs d'activité du cercle
   const fetchActivityLogs = async (circleId) => {
     try {
       const token = localStorage.getItem('weave_token');
@@ -197,7 +193,7 @@ export default function Admin() {
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-8 pb-24 animate-in fade-in duration-500">
 
-      {/* --- EN-TÊTE --- */}
+      {/* En-tête de la page */}
       <div>
         <h1 className="text-2xl md:text-3xl font-bold text-gray-900 mb-2">Administration</h1>
         <p className="text-gray-600">
@@ -205,7 +201,7 @@ export default function Admin() {
         </p>
       </div>
 
-      {/* --- STATS --- */}
+      {/* Statistiques du cercle */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6 flex items-center justify-between">
           <div>
@@ -264,7 +260,7 @@ export default function Admin() {
             </div>
           )}
 
-      {/* --- LISTE DES MEMBRES --- */}
+      {/* Liste des membres du cercle */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100">
           <h2 className="text-lg font-bold text-gray-900">Membres du cercle</h2>
@@ -279,19 +275,19 @@ export default function Admin() {
                 <div className="flex items-start justify-between">
                   <div className="flex items-center gap-4">
 
-                    {/* Avatar (Initiale) */}
+                    {/* Avatar avec l'initiale du prénom */}
                     <div className={`w-12 h-12 rounded-full flex items-center justify-center flex-shrink-0 text-lg font-bold ${member.role === 'ADMIN' ? 'bg-purple-100 text-purple-600' :
                       member.role === 'PC' ? 'bg-orange-100 text-orange-600' : 'bg-blue-100 text-blue-600'
                       }`}>
                       {member.name.charAt(0).toUpperCase()}
                     </div>
 
-                    {/* Infos */}
+                    {/* Informations du membre */}
                     <div>
                       <div className="flex items-center gap-2 mb-1">
                         <p className="font-semibold text-gray-900">{member.name}</p>
 
-                        {/* Badge Rôle */}
+                        {/* Rôle du membre */}
                         {member.role === 'ADMIN' && (
                           <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-xs rounded-full border border-purple-200 flex items-center gap-1">
                             <Crown className="w-3 h-3" /> Admin
@@ -327,7 +323,7 @@ export default function Admin() {
                             {member.skills.length > 4 && <span className="text-xs text-gray-400">+{member.skills.length-4}</span>}
                           </div>
                         )}
-                        {/* Afficher le bouton de notation uniquement si l'utilisateur courant est admin ou aidant et cible admin ou aidant, et pas pour soi-même */}
+                        {/* Notation: seulement entre aidants/admins */}
                         {(currentRole === 'ADMIN' || currentRole === 'HELPER') && (member.role === 'ADMIN' || member.role === 'HELPER') && member.id !== user.id && (
                           <button
                             onClick={async () => {
@@ -358,7 +354,7 @@ export default function Admin() {
                     </div>
                   </div>
 
-                  {/* Actions (Supprimer) - Sauf pour l'admin lui-même et le senior */}
+                  {/* Supprimer un membre (aidants uniquement) */}
                   {isAdmin && member.role === 'HELPER' && (
                     <button
                       onClick={() => handleRemoveMember(member.id, member.name)}
@@ -375,7 +371,7 @@ export default function Admin() {
         )}
       </div>
 
-      {/* --- JOURNAL D'ACTIVITÉ --- */}
+      {/* Journal d'activité du cercle */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
         <div className="p-6 border-b border-gray-100">
           <h2 className="text-lg font-bold text-gray-900 flex items-center gap-2">
@@ -405,12 +401,12 @@ export default function Admin() {
               return (
                 <div key={log.id} className="p-4 hover:bg-gray-50 transition-colors">
                   <div className="flex items-start gap-3">
-                    {/* Icône */}
+                    {/* Icône d'action */}
                     <div className={`w-10 h-10 rounded-full flex items-center justify-center flex-shrink-0 ${config.color}`}>
                       <IconComponent className="w-5 h-5" />
                     </div>
 
-                    {/* Contenu */}
+                    {/* Détails de l'action */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-medium px-2 py-0.5 rounded-full bg-gray-100 text-gray-600">
@@ -438,7 +434,7 @@ export default function Admin() {
           <div className="p-6 border-b border-red-100 bg-red-50">
             <h2 className="text-lg font-bold text-red-700 flex items-center gap-2">
               <AlertTriangle className="w-5 h-5" />
-              Zone de danger
+              Actions dangereuses
             </h2>
             <p className="text-sm text-red-600 mt-1">Ces actions sont irréversibles</p>
           </div>
@@ -464,7 +460,7 @@ export default function Admin() {
         </div>
       )}
 
-      {/* --- MODAL DE CONFIRMATION --- */}
+      {/* Modal de confirmation avant suppression du cercle */}
       {isAdmin && showDeleteModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
@@ -541,7 +537,7 @@ export default function Admin() {
         </div>
       )}
 
-      {/* --- MODAL NOTE MEMBRE --- */}
+      {/* Modal de notation d'un membre */}
       {showRatingModal && selectedMember && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">

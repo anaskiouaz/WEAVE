@@ -13,7 +13,7 @@ export default function EmergencyDialog({ open, onClose }) {
 
   if (!open) return null;
 
-  // --- Logique d'envoi du rapport ---
+  // Logique d'envoi du rapport
   const handleSubmitReport = async () => {
     if (!description.trim()) {
       alert("Veuillez décrire l'incident.");

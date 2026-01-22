@@ -25,6 +25,7 @@ export const AuthProvider = ({ children }) => {
   // si local storage est vide, ce sera null par défaut
 
   const [loading, setLoading] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   // 2. FONCTION UTILITAIRE (Pour éviter de répéter le code)
   // Sert à sauvegarder les infos du cercle partout en même temps
@@ -139,6 +140,7 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider value={{
       user, token, circleId, circleNom,
       login, register, logout, loading,
+      unreadMessages, setUnreadMessages,
       // Expose a combined setter that updates both values atomically
       setCircle: (id, nom) => {
         if (id) {

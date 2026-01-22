@@ -5,7 +5,7 @@ import { logAudit, AUDIT_ACTIONS } from '../utils/audits.js';
 
 const router = Router();
 
-// --- UTILITAIRES DE DATE & HEURE ---
+// Utilitaires de formatage et validation des dates/heures
 
 const DAY_MAPPING = {
     'Monday': 'Lundi',
@@ -22,7 +22,7 @@ function getDayNameEn(dateStr) {
     return date.toLocaleDateString('en-US', { weekday: 'long' }); 
 }
 
-// CORRECTION : Prise en charge du format string "08:00 - 18:00" ET du format JSON array
+// Corrects la validation des créneaux horaires (formats string et array)
 function isTimeInSlots(timeStr, slots) {
     if (!slots) return false;
     const time = timeStr.substring(0, 5); // "14:00"
@@ -56,7 +56,7 @@ function isTimeInSlots(timeStr, slots) {
     return false;
 }
 
-// --- NOTIFICATION CIBLÉE INTELLIGENTE ---
+// Envoie les notifications intelligentes aux membres du cercle en fonction de leurs disponibilités
 async function notifyCircle(circleId, title, body, data, excludeUserId, taskTime = null, taskDate = null, requiredSkill = null) {
     try {
         const seniorRes = await db.query(
@@ -168,7 +168,7 @@ async function notifyCircle(circleId, title, body, data, excludeUserId, taskTime
     }
 }
 
-// --- ROUTES ---
+// Routes principales pour gérer les tâches et la participation des bénévoles
 
 // Inscription
 router.post('/:id/volunteer', async (req, res) => {

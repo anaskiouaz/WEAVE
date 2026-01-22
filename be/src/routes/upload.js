@@ -37,7 +37,7 @@ if (connectionString) {
   console.warn('Azure Storage credentials not set, uploads will fail');
 }
 
-// Function to generate SAS token for blob access
+// Génère un URL SAS pour l'accès temporaire aux fichiers stockés
 function generateBlobSASUrl(containerName, blobName) {
   if (!sharedKeyCredential) {
     throw new Error('Storage credentials not available for SAS generation');
@@ -221,7 +221,7 @@ router.post('/image', processFileUpload, (req, res) => {
   }
 });
 
-// --- Azure Blob proxy to serve images via API (avoids browser CORS) ---
+// Proxy Azure Blob pour servir les images via API (contourne CORS)
 // Note: This route relies on configured Azure credentials and the container name.
 // It streams the blob content with the original content type.
 router.get('/blob/:blobName', async (req, res) => {

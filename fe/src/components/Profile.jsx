@@ -16,10 +16,10 @@ export default function Profile() {
   const { openPreferences } = useCookieConsent();
   const navigate = useNavigate();
 
-  // --- ID DYNAMIQUE ---
+  // ID utilisateur dynamique
   const USER_ID = user?.id;
 
-  // --- ETATS DE DONNEES ---
+  // Données utilisateur et statistiques
   const [isLoading, setIsLoading] = useState(false);
   const fileInputRef = useRef(null);
 
@@ -28,18 +28,18 @@ export default function Profile() {
   const [stats, setStats] = useState({ interventions: 0, moments: 0, messagesSent: 0, rating: 0 });
   const [skills, setSkills] = useState([]);
 
-  // --- ETATS UI D'EDITION ---
+  // États d'édition des sections
   const [isEditingProfile, setIsEditingProfile] = useState(false);
   const [isEditingAvailability, setIsEditingAvailability] = useState(false);
   const [isEditingSkills, setIsEditingSkills] = useState(false);
   const [isUploadingPhoto, setIsUploadingPhoto] = useState(false);
 
-  // --- FORMULAIRES ---
+  // Données des formulaires
   const [profileForm, setProfileForm] = useState({});
   const [availForm, setAvailForm] = useState([]);
   const [skillsForm, setSkillsForm] = useState([]);
 
-  // --- ETATS SETTINGS & MODALS ---
+  // Paramètres et modales
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
 
   // Modal suppression Cercle (Admin)
@@ -57,7 +57,7 @@ export default function Profile() {
   const hours = Array.from({ length: 24 }, (_, i) => `${String(i).padStart(2, '0')}:00`);
   const availableSkillsList = ['Courses', 'Cuisine', 'Accompagnement médical', 'Promenade', 'Lecture', 'Jardinage', 'Bricolage'];
 
-  // --- HELPERS API ---
+  // Constructeur d'URL API
   const buildApiUrl = (p) => {
     const raw = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
     let host = raw.replace(/\/$/, '');
@@ -66,7 +66,7 @@ export default function Profile() {
     return `${host}/api/${path}`;
   };
 
-  // --- INITIALISATION ---
+  // Initialisation et chargement des données
   useEffect(() => {
     if (USER_ID) {
       setIsLoading(true);
@@ -132,7 +132,7 @@ export default function Profile() {
     }
   };
 
-  // --- HANDLERS PHOTO ---
+  // Gestion des photos de profil
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -162,7 +162,7 @@ export default function Profile() {
     }
   };
 
-  // --- HANDLERS UPDATE PROFILE ---
+  // Mise à jour du profil
   const saveProfile = async () => {
     try {
       const options = { headers: { 'x-user-id': USER_ID } };
@@ -184,7 +184,7 @@ export default function Profile() {
     else setSkillsForm([...skillsForm, skill]);
   };
 
-  // --- HANDLERS AVAILABILITY ---
+  // Gestion des disponibilités
   const updateAvailRow = (index, field, value) => {
     const newAvail = [...availForm];
     newAvail[index][field] = value;
@@ -217,7 +217,7 @@ export default function Profile() {
     } catch (err) { console.error(err); alert('Erreur lors de la sauvegarde'); }
   };
 
-  // --- HANDLER NOTIFICATIONS ---
+  // Gestion des notifications push
   const handleNotificationToggle = async () => {
     // 1. Sur PC (Web), on ne fait rien (bouton caché mais sécurité en plus)
     if (!Capacitor.isNativePlatform()) return;
@@ -420,7 +420,7 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* --- PARAMÈTRES GÉNÉRAUX --- */}
+        {/* Paramètres généraux du profil */}
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8">
           <h2 className="text-lg font-bold text-gray-900 mb-6">Paramètres</h2>
           <div className="space-y-6">
@@ -452,7 +452,7 @@ export default function Profile() {
           </div>
         </div>
 
-        {/* --- ZONE DE DANGER (Suppression Cercle & Compte) --- */}
+        {/* Actions dangereuses (suppressions) */}
         <div className="bg-white rounded-xl shadow-sm border border-red-100 p-8 overflow-hidden">
           <div className="flex items-center gap-2 mb-6 text-red-700">
             <AlertTriangle size={24} />
@@ -473,7 +473,7 @@ export default function Profile() {
         </div>
       </div>
 
-      {/* --- MODAL SUPPRESSION CERCLE --- */}
+      {/* Modal de confirmation avant suppression du cercle */}
       {showDeleteCircleModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden">
@@ -498,7 +498,7 @@ export default function Profile() {
         </div>
       )}
 
-      {/* --- MODAL SUPPRESSION COMPTE (NEW) --- */}
+      {/* Modal de confirmation avant suppression du compte */}
       {showDeleteAccountModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-xl max-w-md w-full overflow-hidden transform transition-all">

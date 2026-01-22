@@ -2,9 +2,11 @@ import { Link, useLocation } from 'react-router-dom';
 import { Home, Calendar, Heart, MessageSquare, Settings } from 'lucide-react';
 // On importe Framer Motion
 import { motion } from 'framer-motion';
+import { useAuth } from '../../context/AuthContext';
 
 export default function MobileNavigation() {
   const location = useLocation();
+  const { unreadMessages } = useAuth();
   
   // Petite fonction pour vérifier si un chemin est actif (y compris les sous-routes)
   const isActive = (path) => {
@@ -56,6 +58,12 @@ export default function MobileNavigation() {
                       active ? 'text-blue-600 stroke-[2.5px]' : 'text-gray-400 stroke-2'
                     }`} 
                   />
+                  {/* Badge de messages non lus */}
+                  {item.label === 'Messages' && unreadMessages > 0 && (
+                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold">
+                      {unreadMessages > 9 ? '9+' : unreadMessages}
+                    </span>
+                  )}
                 </motion.div>
               </div>
 

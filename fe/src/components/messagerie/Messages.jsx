@@ -3,12 +3,13 @@ import { Send, Plus, Users, MessageSquare, Settings, X, Trash2 } from 'lucide-re
 import { apiGet, apiPost, apiDelete, apiPut } from '../../api/client';
 import { useAuth } from '../../context/AuthContext';
 import { io } from 'socket.io-client';
+import { fetchUnreadMessagesCount } from '../../utils/unreadMessages';
 
 // Import du composant Mobile
 import MobileMessages from './../ui-mobile/messages/MobileMessages';
 
 const Messages = () => {
-  const { user, circleId } = useAuth();
+  const { user, circleId, setUnreadMessages } = useAuth();
   const [conversations, setConversations] = useState([]);
   const [activeConversation, setActiveConversation] = useState(null);
   const [messages, setMessages] = useState([]);
@@ -29,7 +30,7 @@ const Messages = () => {
   const socketRef = useRef();
   const messagesEndRef = useRef(null);
 
-  // --- 1. INITIALISATION SOCKET ---
+  // Initialisation Socket.IO
   useEffect(() => {
     if (!user) return;
 
@@ -54,7 +55,7 @@ const Messages = () => {
     };
   }, [user]);
 
-  // --- 2. GESTION ÉVÉNEMENTS & CONV ACTIVE ---
+  // Gestion des événements et conversation active
   useEffect(() => {
     if (!socketRef.current) return;
 
@@ -68,7 +69,7 @@ const Messages = () => {
       const roomId = String(activeConversation.id);
       socketRef.current.emit('join_conversation', roomId);
 
-      const handleReceiveMessage = (message) => {
+      const handleReceiveMessage = async (message) => {
         if (message.auteur_id === user?.id) {
           loadConversations();
           return;
@@ -77,7 +78,11 @@ const Messages = () => {
         if (String(message.conversation_id) === String(activeConversation.id)) {
           setMessages((prev) => [...prev, message]);
           scrollToBottom();
-          markAsRead(activeConversation.id);
+          await markAsRead(activeConversation.id);
+        } else {
+          // Message reçu dans une autre conversation, rafraîchir le compteur
+          const count = await fetchUnreadMessagesCount(circleId);
+          setUnreadMessages(count);
         }
         loadConversations();
       };
@@ -85,9 +90,12 @@ const Messages = () => {
       socketRef.current.on('receive_message', handleReceiveMessage);
 
     } else {
-      const handleGlobalMessage = (message) => {
+      const handleGlobalMessage = async (message) => {
         if (message.auteur_id !== user?.id) {
           loadConversations();
+          // Rafraîchir le compteur de messages non lus
+          const count = await fetchUnreadMessagesCount(circleId);
+          setUnreadMessages(count);
         }
       };
       socketRef.current.on('receive_message', handleGlobalMessage);
@@ -96,7 +104,7 @@ const Messages = () => {
 
   const scrollToBottom = () => setTimeout(() => messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 100);
 
-  // --- API CALLS ---
+  // Appels API pour charger les conversations et messages
   const loadConversations = async () => {
     try {
       const data = await apiGet('/conversations');
@@ -111,6 +119,9 @@ const Messages = () => {
       setConversations(prev => prev.map(c =>
         c.id === convId ? { ...c, unread_count: 0 } : c
       ));
+      // Rafraîchir le compteur global de messages non lus
+      const count = await fetchUnreadMessagesCount(circleId);
+      setUnreadMessages(count);
     } catch (e) { console.error("Erreur lecture", e); }
   };
 
@@ -141,7 +152,7 @@ const Messages = () => {
     } catch (err) { console.error("Erreur participants:", err); }
   };
 
-  // --- ACTIONS ---
+  // Actions de l'utilisateur (envoyer, archiver, etc.)
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -231,10 +242,10 @@ const Messages = () => {
     else setSelectedMembers(prev => [...prev, id]);
   };
 
-  // --- RENDER ---
+  // Rendu du composant
   return (
     <>
-      {/* --- VERSION MOBILE --- */}
+      {/* Version mobile */}
       <div className="md:hidden">
         <MobileMessages 
           user={user}
@@ -269,7 +280,7 @@ const Messages = () => {
         />
       </div>
 
-      {/* --- VERSION DESKTOP --- */}
+      {/* Version desktop */}
       <div className="hidden md:flex h-[calc(100vh-100px)] bg-white rounded-xl shadow-sm overflow-hidden border border-gray-100 relative">
         {/* GAUCHE : LISTE */}
         <div className="w-1/3 border-r bg-gray-50 flex flex-col">
@@ -356,7 +367,7 @@ const Messages = () => {
           )}
         </div>
 
-        {/* --- MODALE CRÉATION DESKTOP --- */}
+        {/* Modal de création de conversation (desktop) */}
         {showNewConvModal && (
           <div className="absolute inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
             <div className="bg-white rounded-xl shadow-xl w-full max-w-md p-6 animate-in zoom-in-95">
@@ -380,7 +391,7 @@ const Messages = () => {
           </div>
         )}
 
-        {/* --- MODALE INFO GROUPE DESKTOP --- */}
+        {/* Modal d'infos du groupe (desktop) */}
         {showInfo && activeConversation && (
           <div className="absolute inset-0 bg-black/50 z-50 flex justify-end">
             <div className="w-80 bg-white h-full shadow-2xl p-6 overflow-y-auto animate-in slide-in-from-right">
