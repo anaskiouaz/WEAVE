@@ -351,10 +351,10 @@ const Messages = () => {
                       <div 
                         className={`max-w-[70%] px-4 py-3 rounded-3xl ${isMe ? 'rounded-br-lg' : 'rounded-bl-lg'}`}
                         style={{ 
-                          backgroundColor: isMe ? 'var(--text-primary)' : 'var(--bg-card)',
+                          backgroundColor: isMe ? 'var(--soft-coral)' : 'var(--bg-card)',
                           color: isMe ? 'white' : 'var(--text-primary)',
-                          border: isMe ? 'none' : '1px solid var(--border-light)',
-                          boxShadow: 'var(--shadow-sm)'
+                          border: isMe ? 'none' : '2px solid var(--border-medium)',
+                          boxShadow: isMe ? '0 4px 12px rgba(240, 128, 128, 0.3)' : 'var(--shadow-sm)'
                         }}
                       >
                         {!isMe && activeConversation.type === 'GROUPE' && <p className="text-[10px] font-bold mb-1" style={{ color: 'var(--soft-coral)' }}>{msg.sender_name}</p>}

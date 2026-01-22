@@ -154,21 +154,25 @@ export default function MobileMessages({
             </div>
 
             {/* Messages */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-[#e5ddd5]/10">
+            <div className="flex-1 overflow-y-auto p-4 space-y-3" style={{ backgroundColor: 'var(--bg-secondary)' }}>
               {messages.map((msg, idx) => {
                 const isMe = msg.auteur_id === user?.id;
                 return (
                   <div key={idx} className={`flex ${isMe ? 'justify-end' : 'justify-start'} mb-1`}>
-                    <div className={`max-w-[80%] px-3 py-2 rounded-xl shadow-sm relative ${
-                      isMe 
-                        ? 'bg-blue-600 text-white rounded-tr-none' 
-                        : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'
-                    }`}>
+                    <div 
+                      className={`max-w-[80%] px-3 py-2 rounded-xl relative ${isMe ? 'rounded-tr-none' : 'rounded-tl-none'}`}
+                      style={{
+                        backgroundColor: isMe ? 'var(--soft-coral)' : 'var(--bg-card)',
+                        color: isMe ? 'white' : 'var(--text-primary)',
+                        border: isMe ? 'none' : '2px solid var(--border-medium)',
+                        boxShadow: isMe ? '0 4px 12px rgba(240, 128, 128, 0.3)' : 'var(--shadow-sm)'
+                      }}
+                    >
                       {!isMe && activeConversation.type === 'GROUPE' && (
-                         <p className="text-[10px] font-bold text-orange-600 mb-0.5">{msg.sender_name}</p>
+                         <p className="text-[10px] font-bold mb-0.5" style={{ color: 'var(--soft-coral)' }}>{msg.sender_name}</p>
                       )}
                       <p className="text-sm leading-relaxed whitespace-pre-wrap">{msg.contenu}</p>
-                      <span className={`text-[9px] block text-right mt-1 ${isMe ? 'text-blue-200' : 'text-gray-400'}`}>
+                      <span className="text-[9px] block text-right mt-1" style={{ color: isMe ? 'rgba(255,255,255,0.7)' : 'var(--text-muted)' }}>
                          {new Date(msg.date_envoi).toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}
                       </span>
                     </div>

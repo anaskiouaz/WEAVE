@@ -1,5 +1,6 @@
 import db from '../config/db.js';
 import { getIo } from '../services/socketService.js';
+import { moderateMessage } from '../utils/moderation.js';
 
 // 1. Récupérer les membres du cercle (pour créer une conversation)
 export const getMembresCercle = async (req, res) => {
@@ -140,10 +141,15 @@ export const envoyerMessage = async (req, res) => {
     if (!contenu || !contenu.trim()) return res.status(400).json({ error: "Message vide" });
 
     try {
-        // A. Sauvegarder le message
+        // 🛡️ Modération du contenu
+        const moderation = moderateMessage(contenu);
+        const contenuFinal = moderation.content;
+        const isModerated = moderation.isModerated;
+
+        // A. Sauvegarder le message (avec flag de modération)
         const insertResult = await db.query(
-            "INSERT INTO message (conversation_id, auteur_id, contenu) VALUES ($1, $2, $3) RETURNING id, date_envoi",
-            [conversationId, authorId, contenu]
+            "INSERT INTO message (conversation_id, auteur_id, contenu, is_moderated) VALUES ($1, $2, $3, $4) RETURNING id, date_envoi, is_moderated",
+            [conversationId, authorId, contenuFinal, isModerated]
         );
         const newMessage = insertResult.rows[0];
         
@@ -154,17 +160,24 @@ export const envoyerMessage = async (req, res) => {
         // C. WebSocket (Temps réel)
         const messageComplet = {
             id: newMessage.id,
-            contenu,
+            contenu: contenuFinal,
             date_envoi: newMessage.date_envoi,
             auteur_id: authorId,
             nom_auteur: authorName,
-            conversation_id: parseInt(conversationId)
+            conversation_id: parseInt(conversationId),
+            is_moderated: isModerated
         };
         try { 
             getIo().to(conversationId).emit('receive_message', messageComplet); 
         } catch (e) {
             console.warn("Socket non disponible");
         }
+
+        // Log si modéré
+        if (isModerated) {
+            console.log(`⚠️ Message modéré de l'utilisateur ${authorId} dans la conversation ${conversationId}`);
+        }
+
         res.status(201).json(messageComplet);
     } catch (error) {
         console.error("Erreur envoi message:", error);

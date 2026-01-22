@@ -2,6 +2,7 @@ import { Router } from 'express';
 import { pool } from '../config/db.js';
 import { authenticateToken } from '../middleware/auth.js';
 import { logAudit, AUDIT_ACTIONS } from '../utils/audits.js';
+import { moderateMessage } from '../utils/moderation.js';
 
 const router = Router();
 
@@ -39,10 +40,19 @@ router.post('/:id/messages', async (req, res) => {
   const authorId = req.user.id;
 
   try {
-    // Sauvegarde le message en BDD
+    // 🛡️ Modération du contenu
+    const moderation = moderateMessage(content);
+    const contenuFinal = moderation.content;
+    const isModerated = moderation.isModerated;
+
+    if (isModerated) {
+      console.log(`⚠️ Message modéré de l'utilisateur ${authorId} dans la conversation ${id}`);
+    }
+
+    // Sauvegarde le message en BDD (avec modération)
     const insertResult = await pool.query(
-      'INSERT INTO message (conversation_id, auteur_id, contenu) VALUES ($1, $2, $3) RETURNING *',
-      [id, authorId, content]
+      'INSERT INTO message (conversation_id, auteur_id, contenu, is_moderated) VALUES ($1, $2, $3, $4) RETURNING *',
+      [id, authorId, contenuFinal, isModerated]
     );
     const savedMessage = insertResult.rows[0];
 

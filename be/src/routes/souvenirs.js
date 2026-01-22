@@ -7,6 +7,7 @@ import admin from '../config/firebase.js';
 import { notifyCircle } from '../utils/notifications.js';
 import { logAudit, AUDIT_ACTIONS } from '../utils/audits.js';
 import { Router } from 'express';
+import { moderateMessage } from '../utils/moderation.js';
 
 // Configuration Azure pour la suppression
 const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
@@ -96,6 +97,15 @@ export async function createJournalEntry(req, res) {
       return res.status(400).json({ status: 'error', message: 'Author and content required' });
     }
 
+    // 🛡️ Modération du contenu
+    const moderation = moderateMessage(text_content);
+    const contenuFinal = moderation.content;
+    const isModerated = moderation.isModerated;
+
+    if (isModerated) {
+      console.log(`⚠️ Souvenir modéré de l'utilisateur ${author_id}`);
+    }
+
     let resolvedCircleId = circle_id;
 
     // Résolution Cercle par défaut si manquant
@@ -106,12 +116,12 @@ export async function createJournalEntry(req, res) {
     
     if (!resolvedCircleId) return res.status(400).json({ status: 'error', message: 'No circle found' });
 
-    // Insertion
+    // Insertion (avec le contenu modéré si nécessaire)
     const result = await db.query(
-      `INSERT INTO journal_entries (circle_id, author_id, mood, text_content, photo_data, comments)
-       VALUES ($1, $2, $3, $4, $5, $6)
+      `INSERT INTO journal_entries (circle_id, author_id, mood, text_content, photo_data, comments, is_moderated)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
        RETURNING *`, // On retourne tout pour récupérer l'ID et la date
-      [resolvedCircleId, author_id, mood || null, text_content, photo_data || null, '[]']
+      [resolvedCircleId, author_id, mood || null, contenuFinal, photo_data || null, '[]', isModerated]
     );
 
     // DÉFINITION DE LA VARIABLE MANQUANTE
@@ -161,11 +171,20 @@ export async function addCommentToEntry(req, res) {
       return res.status(400).json({ status: 'error', message: 'Author and content required' });
     }
 
+    // 🛡️ Modération du commentaire
+    const moderation = moderateMessage(content);
+    const contenuFinal = moderation.content;
+
+    if (moderation.isModerated) {
+      console.log(`⚠️ Commentaire modéré de ${author_name} sur le souvenir ${id}`);
+    }
+
     const newMessage = {
       id: crypto.randomUUID(),
       author: author_name,
-      content: content,
-      created_at: new Date().toISOString()
+      content: contenuFinal,
+      created_at: new Date().toISOString(),
+      is_moderated: moderation.isModerated
     };
 
     // On utilise l'opérateur || pour ajouter l'objet au tableau JSONB existant
@@ -179,7 +198,7 @@ export async function addCommentToEntry(req, res) {
 
     // 📝 Log de l'action
     const circleId = result.rows[0]?.circle_id;
-    const truncatedContent = content.length > 100 ? content.substring(0, 100) + '...' : content;
+    const truncatedContent = contenuFinal.length > 100 ? contenuFinal.substring(0, 100) + '...' : contenuFinal;
     await logAudit(
       null, // On n'a pas l'ID utilisateur ici, juste le nom
       AUDIT_ACTIONS.COMMENT_ADDED,
