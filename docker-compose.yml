@@ -27,9 +27,9 @@ services:
     volumes:
       - ./be:/app
       - /app/node_modules
-    command: sh -c "npm install && npm start"
+    command: sh -c "npm install && npm start && npm install nodemailer"
     env_file:
-      - .env
+      - ./be/.env
     environment:
       PORT: "4000"
       PGHOST: "postgres"

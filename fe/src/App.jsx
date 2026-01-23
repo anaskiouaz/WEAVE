@@ -1,9 +1,11 @@
 import { BrowserRouter, Routes, Route, Link, useLocation, Outlet, Navigate, useNavigate } from 'react-router-dom';
-import { Home, Calendar, Heart, MessageSquare, User, Settings, AlertCircle, LogOut, RefreshCw } from 'lucide-react';
 import { useState, useEffect } from 'react'; // Ajout de useEffect
 import { Capacitor } from '@capacitor/core'; // Ajout pour les notifs
 import { PushNotifications } from '@capacitor/push-notifications'; // Ajout pour les notifs
 import { fetchUnreadMessagesCount } from './utils/unreadMessages';
+import { Home, Calendar, Heart, MessageSquare, User, Settings, AlertCircle, LogOut } from 'lucide-react';
+import JoinCircle from './components/JoinCircle'; 
+
 
 // Composants
 import Dashboard from './components/Dashboard';
@@ -18,6 +20,7 @@ import Navigation from './components/ui-mobile/navigation';
 import OnboardingTour from './components/OnboardingTour';
 import ThemeToggle from './components/ui/ThemeToggle';
 
+// --- Auth Components ---
 import LandingPage from './components/LandingPage';
 import LoginPage from './components/auth/LoginPage';
 import RegisterPage from './components/auth/RegisterPage';
@@ -25,8 +28,18 @@ import SelectCirclePage from './components/auth/SelectCirclePage';
 import { useAuth } from './context/AuthContext';
 import { ThemeProvider } from './context/ThemeContext';
 import { apiPost } from './api/client'; // Ajout pour envoyer le token
+import AdminGuard from './components/auth/AdminGuard';
 
-// RGPD - Gestion des cookies
+// --- Email & Join Components (Missing in your previous version) ---
+import ForgotPasswordPage from './components/auth/ForgotPassword';
+import ResetPasswordPage from './components/auth/ResetPassword';
+import VerifyEmailPage from './components/auth/VerifyEmailPage';
+import JoinPage from './components/auth/JoinPage';
+
+// ✅ IMPORT CONTEXT
+import { useAuth, AuthProvider } from './context/AuthContext';
+
+// RGPD
 import { CookieProvider } from './context/CookieContext';
 import CookieBanner from './components/CookieBanner';
 import CookiePreferences from './components/CookiePreferences';
@@ -133,7 +146,6 @@ function ProtectedLayout() {
     <div className="flex h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
       <OnboardingTour />
 
-      {/* --- SIDEBAR (VISIBLE UNIQUEMENT SUR DESKTOP) --- */}
       {!hideNav && (
         <aside className="hidden md:flex w-64 flex-col z-50 border-r" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-light)' }}>
           <div className="p-6 border-b" style={{ borderColor: 'var(--border-light)' }}>
@@ -154,6 +166,9 @@ function ProtectedLayout() {
                 className={`flex items-center gap-3 px-4 py-3 rounded-2xl transition-all duration-200 text-lg relative ${location.pathname === path
                   ? 'font-semibold'
                   : 'hover:-translate-y-0.5'
+                className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors text-lg ${location.pathname === path
+                  ? 'bg-blue-50 text-blue-600 font-medium'
+                  : 'text-gray-700 hover:bg-gray-50'
                   }`}
                 style={{
                   backgroundColor: location.pathname === path ? 'var(--soft-coral)' : 'transparent',
@@ -264,18 +279,26 @@ function ProtectedLayout() {
 
 export default function App() {
   return (
-    <ThemeProvider>
+    // ✅ FIX: AuthProvider IS HERE NOW (Guarantees context exists)
+    <AuthProvider>
       <CookieProvider>
         <BrowserRouter>
           <Routes>
-            {/* Routes Publiques */}
+            {/* Public Routes */}
             <Route path="/" element={<LandingPage />} />
             <Route path="/login" element={<LoginPage />} />
             <Route path="/register" element={<RegisterPage />} />
             <Route path="/politique-confidentialite" element={<PrivacyPolicy />} />
             <Route path="/mentions-legales" element={<LegalNotice />} />
 
-            {/* Routes Protégées */}
+            {/* ✅ NEW: Email Verification Routes */}
+            <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+            <Route path="/reset-password" element={<ResetPasswordPage />} />
+            <Route path="/verify-email" element={<VerifyEmailPage />} />
+            <Route path="/join" element={<JoinPage />} />
+            <Route path="/join" element={<JoinCircle />} />
+
+            {/* Protected Routes */}
             <Route element={<ProtectedLayout />}>
               <Route path="/dashboard" element={<Dashboard />} />
               <Route path="/calendar" element={<CalendarView />} />
@@ -296,5 +319,6 @@ export default function App() {
         </BrowserRouter>
       </CookieProvider>
     </ThemeProvider>
+    </AuthProvider>
   );
 }

@@ -1,6 +1,10 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Users, Copy, Check, Share2, Crown, Mail, Phone, Trash2, Shield, Clock, UserPlus, UserMinus, Image, MessageSquare, Calendar, Activity, AlertTriangle, Star } from 'lucide-react';
+import { 
+  Users, Copy, Check, Share2, Crown, Mail, Phone, Trash2, 
+  Shield, Clock, UserPlus, UserMinus, Image, MessageSquare, 
+  Calendar, Activity, AlertTriangle, Star, Send // <--- Added Send icon
+} from 'lucide-react';
 import { useAuth } from '../context/AuthContext';
 
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
@@ -23,6 +27,8 @@ const ACTION_CONFIG = {
 export default function Admin() {
   const { user, circleId, logout } = useAuth();
   const navigate = useNavigate();
+  
+  // Existing State
   const [copied, setCopied] = useState(false);
   const [members, setMembers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -32,6 +38,10 @@ export default function Admin() {
   const [showDeleteModal, setShowDeleteModal] = useState(false);
   const [deleteConfirmText, setDeleteConfirmText] = useState('');
   const [deleting, setDeleting] = useState(false);
+
+  // New State for Email Invitation
+  const [inviteEmail, setInviteEmail] = useState('');
+  const [sendingInvite, setSendingInvite] = useState(false);
 
   // Rating modal state
   const [showRatingModal, setShowRatingModal] = useState(false);
@@ -122,13 +132,46 @@ export default function Admin() {
     setTimeout(() => setCopied(false), 2000);
   };
 
+  // --- NEW: Handle Email Invite ---
+  const handleSendInvite = async (e) => {
+    e.preventDefault();
+    if (!inviteEmail) return;
+
+    setSendingInvite(true);
+    try {
+      const token = localStorage.getItem('weave_token');
+      const res = await fetch(`${API_BASE_URL}/circles/${currentCircle.id}/invite`, {
+        method: 'POST',
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${token}` 
+        },
+        body: JSON.stringify({ email: inviteEmail })
+      });
+
+      const data = await res.json();
+
+      if (res.ok) {
+        alert("Invitation envoyée avec succès !");
+        setInviteEmail(''); // Clear input
+      } else {
+        alert(`Erreur: ${data.error || "Impossible d'envoyer l'email"}`);
+      }
+    } catch (err) {
+      console.error("Erreur envoi invite", err);
+      alert("Erreur réseau lors de l'envoi de l'invitation.");
+    } finally {
+      setSendingInvite(false);
+    }
+  };
+  // --------------------------------
+
   const handleDeleteCircle = async () => {
     if (!isAdmin) return;
     if (deleteConfirmText !== currentCircleName) {
       alert("Le nom saisi ne correspond pas.");
       return;
     }
-
     setDeleting(true);
     try {
       const token = localStorage.getItem('weave_token');
@@ -139,7 +182,6 @@ export default function Admin() {
 
       if (res.ok) {
         alert("Le cercle a été supprimé définitivement.");
-        // Rediriger vers la page de sélection de cercle
         navigate('/select-circle');
       } else {
         const error = await res.json();
@@ -155,7 +197,6 @@ export default function Admin() {
   };
 
   const handleRemoveMember = async (memberId, memberName) => {
-    // Demander confirmation
     const confirmDelete = window.confirm(`Êtes-vous sûr de vouloir retirer "${memberName}" du cercle ?`);
     if (!confirmDelete) return;
 
@@ -191,8 +232,7 @@ export default function Admin() {
     );
   }
 
-  // Calcul des stats
-  const activeMembers = members.filter(m => m.role !== 'PC').length; // On exclut le bénéficiaire des aidants actifs
+  const activeMembers = members.filter(m => m.role !== 'PC').length;
 
   return (
     <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-8 pb-24 animate-in fade-in duration-500 min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
@@ -325,7 +365,8 @@ export default function Admin() {
                             <Phone className="w-3.5 h-3.5" /> {member.phone}
                           </div>
                         )}
-                        {/* Skills preview */}
+                        
+                        {/* Skills & Rating Button */}
                         {Array.isArray(member.skills) && member.skills.length > 0 && (
                           <div className="flex flex-wrap gap-1.5 pt-2">
                             {member.skills.slice(0,4).map(s => (
@@ -417,8 +458,6 @@ export default function Admin() {
                     <div className={`w-10 h-10 rounded-xl flex items-center justify-center flex-shrink-0 ${config.color}`}>
                       <IconComponent className="w-5 h-5" />
                     </div>
-
-                    {/* Contenu */}
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center justify-between gap-2">
                         <span className="text-xs font-semibold px-2.5 py-1 rounded-full" style={{ backgroundColor: 'rgba(74, 106, 138, 0.1)', color: 'var(--text-primary)' }}>
@@ -540,7 +579,7 @@ export default function Admin() {
                 ) : (
                   <>
                     <Trash2 className="w-4 h-4" />
-                    Supprimer définitivement
+                    Supprimer
                   </>
                 )}
               </button>
@@ -558,7 +597,7 @@ export default function Admin() {
               <p className="text-sm text-[#6B8AAA] font-medium">{selectedMember.name}</p>
             </div>
             <div className="p-6 space-y-4">
-              {/* Skills */}
+              {/* Skills Display */}
               {Array.isArray(ratingData.skills) && ratingData.skills.length > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   {ratingData.skills.map(s => (
@@ -576,7 +615,7 @@ export default function Admin() {
                 <span className="text-[#6B8AAA]">({ratingData.total} avis)</span>
               </div>
 
-              {/* Your rating */}
+              {/* User Input Rating */}
               <div>
                 <label className="block text-xs font-bold text-[#4A6A8A] uppercase mb-2">Votre note</label>
                 <div className="flex items-center gap-1">

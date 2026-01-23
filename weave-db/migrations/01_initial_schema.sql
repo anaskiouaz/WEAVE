@@ -205,3 +205,11 @@ CREATE TABLE IF NOT EXISTS helper_ratings (
 CREATE OR REPLACE VIEW helper_rating_averages AS
 SELECT rated_user_id, ROUND(AVG(rating)::numeric, 2) as average_rating, COUNT(*) as total_ratings
 FROM helper_ratings GROUP BY rated_user_id;
+
+
+-- Modification des tables pour les mails
+ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;
+ALTER TABLE users ADD COLUMN verification_token TEXT;
+ALTER TABLE users ADD COLUMN verification_token_expires TIMESTAMP;
+ALTER TABLE users ADD COLUMN reset_password_token TEXT;
+ALTER TABLE users ADD COLUMN reset_password_expires TIMESTAMP;

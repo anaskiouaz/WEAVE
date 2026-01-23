@@ -2,6 +2,7 @@ import cron from 'node-cron';
 import db from '../config/db.js';
 import admin from '../config/firebase.js'; // Assure-toi que le chemin est bon
 import { logAudit, AUDIT_ACTIONS } from '../utils/audits.js';
+import { sendTaskNotificationEmail } from './emailService.js';
 
 const initCronJobs = () => {
     console.log("🕰️ Service de rappels (Cron) activé - Vérification chaque minute");
@@ -72,6 +73,34 @@ const initCronJobs = () => {
                         await db.query('UPDATE tasks SET reminder_sent = TRUE WHERE id = $1', [task.id]);
                     } catch (sendError) {
                         console.error("❌ Erreur envoi Firebase:", sendError);
+                    }
+                }
+
+                // ... existing code finding tasks ...
+
+                if (result.rows.length > 0) {
+                    for (const task of result.rows) {
+                        // 1. Existing Firebase Logic (Keep it)
+                        // ...
+                        
+                        // 2. NEW Email Logic
+                        // Find who is assigned to this task
+                        if (task.assigned_to && task.assigned_to.length > 0) {
+                            const volunteers = await db.query(
+                                'SELECT email FROM users WHERE id = ANY($1)', 
+                                [task.assigned_to]
+                            );
+                            
+                            // Send email to each volunteer
+                            for (const volunteer of volunteers.rows) {
+                                await sendTaskNotificationEmail(
+                                    volunteer.email, 
+                                    task.title, 
+                                    task.time, 
+                                    "le bénéficiaire" // You can fetch senior name via JOIN in the main query
+                                );
+                            }
+                        }
                     }
                 }
             }

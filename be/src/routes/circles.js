@@ -3,6 +3,7 @@ import { pool } from '../config/db.js';
 import { authenticateToken } from './../middleware/auth.js';
 import bcrypt from 'bcryptjs';
 import { logAudit, AUDIT_ACTIONS } from '../utils/audits.js';
+import { sendInvitationEmail } from '../services/emailService.js';
 
 const router = express.Router();
 
@@ -478,6 +479,38 @@ router.get('/:id', authenticateToken, async (req, res) => {
         res.json(result.rows[0]);
     } catch (e) {
         res.status(500).json({error: e.message});
+    }
+});
+
+// POST /api/circles/:id/invite
+router.post('/:id/invite', authenticateToken, async (req, res) => {
+    const { email } = req.body;
+    const circleId = req.params.id;
+    const userId = req.user.id;
+
+    try {
+        // Fetch circle and inviter info
+        const circleRes = await pool.query(
+            `SELECT c.invite_code, u.name as senior_name 
+             FROM care_circles c 
+             JOIN users u ON c.senior_id = u.id 
+             WHERE c.id = $1`, 
+            [circleId]
+        );
+        
+        const inviterRes = await pool.query('SELECT name FROM users WHERE id = $1', [userId]);
+
+        if (circleRes.rows.length === 0) return res.status(404).json({ error: "Cercle introuvable" });
+
+        const { invite_code, senior_name } = circleRes.rows[0];
+        const inviterName = inviterRes.rows[0].name;
+
+        await sendInvitationEmail(email, inviterName, senior_name, invite_code);
+
+        res.json({ success: true, message: "Invitation envoyée !" });
+    } catch (err) {
+        console.error(err);
+        res.status(500).json({ error: "Erreur lors de l'envoi de l'invitation." });
     }
 });
 

@@ -117,10 +117,12 @@ export const AuthProvider = ({ children }) => {
   const register = async (userData) => {
     setLoading(true);
     try {
+      // ✅ CHANGE 1: Use the correct endpoint that generates the code
       const data = await apiPost('/auth/register', userData);
-      return { success: data.success };
+      return { success: true, data }; 
     } catch (error) {
-      return { success: false, error: error.message };
+      // ✅ CHANGE 2: Re-throw the error so RegisterPage can catch it!
+      throw error;
     } finally {
       setLoading(false);
     }

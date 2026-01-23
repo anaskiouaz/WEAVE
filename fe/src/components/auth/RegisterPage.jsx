@@ -5,11 +5,12 @@ import { Button } from '../ui/button';
 import { Input } from '../ui/input';
 import { Label } from '../ui/label';
 import { Card, CardContent, CardHeader, CardTitle, CardFooter } from '../ui/card';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
 import { ArrowLeft, Loader2, Eye, EyeOff, ShieldCheck, X, FileText } from 'lucide-react';
 
 export default function RegisterPage() {
   const navigate = useNavigate();
-  const { register, login, loading } = useAuth();
+  const { register, loading } = useAuth(); // removed 'login' as we don't use it here anymore
   const [error, setError] = useState('');
 
   // --- ÉTATS ---
@@ -125,8 +126,35 @@ export default function RegisterPage() {
       }
     } else {
       setError(resRegister.error || "Une erreur est survenue lors de l'inscription.");
+    
+    if (formData.password !== formData.confirmPassword) {
+      setError("Les mots de passe ne correspondent pas");
+      return;
     }
-  };
+    setError("");
+
+    try {
+      const { confirmPassword, ...dataToSend } = formData;
+      
+      // Now that AuthContext throws on error, this line will actually fail if 409/500 occurs
+      await register(dataToSend); 
+
+      // This will ONLY run if register succeeded
+      // Navigate to the verification page and include the email as a query param.
+      // The verify page will not auto-verify without a code; it will instruct the user
+      // to check their inbox (prevents "Lien invalide" immediately after register).
+      navigate(`/verify-email?email=${encodeURIComponent(formData.email)}`);
+
+    } catch (err) {
+      console.error("Registration Error:", err);
+      // Handle the error (don't redirect)
+      if (err.message?.includes("409") || err.message?.toLowerCase().includes("exist")) {
+        setError("Cet email est déjà utilisé.");
+      } else {
+        setError(err.message || "Échec de l'inscription");
+      }
+    }
+  }
 
   return (
     <div className="min-h-screen bg-page flex items-center justify-center p-4 py-8 relative" style={{ backgroundColor: 'var(--bg-primary)' }}>
