@@ -24,6 +24,10 @@ export default function RegisterPage() {
     // onboarding_role removed: role is assigned via circles/user_roles
   });
 
+  // Password visibility toggles
+  const [showPassword, setShowPassword] = useState(false);
+  const [showConfirmPassword, setShowConfirmPassword] = useState(false);
+
   const handleChange = (e) => {
     const { name, value } = e.target;
     
@@ -91,9 +95,10 @@ export default function RegisterPage() {
       await register(dataToSend); 
 
       // This will ONLY run if register succeeded
-      navigate('/verify-email', { 
-        state: { email: formData.email } 
-      });
+      // Navigate to the verification page and include the email as a query param.
+      // The verify page will not auto-verify without a code; it will instruct the user
+      // to check their inbox (prevents "Lien invalide" immediately after register).
+      navigate(`/verify-email?email=${encodeURIComponent(formData.email)}`);
 
     } catch (err) {
       console.error("Registration Error:", err);

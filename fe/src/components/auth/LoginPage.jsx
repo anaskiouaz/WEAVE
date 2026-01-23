@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext'; // On importe le contexte d'auth
 import { Button } from '../ui/button';
 import { Input } from '../ui/input';
@@ -9,6 +9,7 @@ import { ArrowLeft, Loader2, Eye, EyeOff } from 'lucide-react';
 
 export default function LoginPage() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
 
   // On récupère la vraie fonction de login et l'état de chargement
   const { login, loading } = useAuth();
@@ -27,8 +28,13 @@ export default function LoginPage() {
     const result = await login(formData.email, formData.password);
 
     if (result.success) {
-      // Si le backend dit "OK", on redirige
-      navigate('/select-circle');
+      // Si le backend dit "OK", on redirige vers `next` si fourni
+      const next = searchParams.get('next');
+      if (next) {
+        navigate(next);
+      } else {
+        navigate('/select-circle');
+      }
     } else {
       // Sinon, on affiche l'erreur (ex: "Mot de passe incorrect")
       setError(result.error || "Email ou mot de passe incorrect.");

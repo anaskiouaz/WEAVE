@@ -4,16 +4,28 @@ import dotenv from 'dotenv';
 dotenv.config();
 
 // 1. Configure Transporter
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST,
-  port: Number(process.env.SMTP_PORT) || 587,
-  // If port is 465 (Gmail), secure is true. If 587 (Brevo), secure is false.
-  secure: Number(process.env.SMTP_PORT) === 465, 
-  auth: {
-    user: process.env.SMTP_USER,
-    pass: process.env.SMTP_PASS,
-  },
-});
+let transporter;
+if (process.env.SMTP_HOST) {
+  transporter = nodemailer.createTransport({
+    host: process.env.SMTP_HOST,
+    port: Number(process.env.SMTP_PORT) || 587,
+    // If port is 465 (Gmail), secure is true. If 587 (Brevo), secure is false.
+    secure: Number(process.env.SMTP_PORT) === 465,
+    auth: {
+      user: process.env.SMTP_USER,
+      pass: process.env.SMTP_PASS,
+    },
+  });
+  // Verify transporter connectivity at startup to surface config issues early
+  transporter.verify()
+    .then(() => console.log('✅ SMTP transporter verified and ready.'))
+    .catch((err) => console.warn('⚠️ SMTP transporter verification failed:', err.message));
+} else {
+  // Development fallback: avoid attempting to connect to localhost:587 when no SMTP is configured.
+  // Use JSON transport so emails are emitted as objects and logged instead of throwing ECONNREFUSED.
+  transporter = nodemailer.createTransport({ jsonTransport: true });
+  console.warn('⚠️  SMTP_HOST not set — using jsonTransport fallback (emails will be logged, not sent).');
+}
 
 // Helper to send the actual email
 const sendEmail = async (to, subject, html) => {
@@ -23,35 +35,38 @@ const sendEmail = async (to, subject, html) => {
     subject,
     html,
   };
-  return transporter.sendMail(mailOptions);
+  try {
+    const info = await transporter.sendMail(mailOptions);
+    // Log useful info for debugging; nodemailer returns different shapes depending on transport
+    console.log(`📧 Email sent to ${to}. transportInfo:`, info && info.messageId ? info.messageId : info);
+    return info;
+  } catch (err) {
+    console.error('Email Error sending to', to, err);
+    throw err;
+  }
 };
 
 // ============================================================
 // EXPORT 1: EMAIL DE VÉRIFICATION (INSCRIPTION)
 // ============================================================
 export const sendVerificationEmail = async (to, code) => {
-  const subject = 'Activez votre compte Weave';
-  const baseUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
-  
-  // Creates: http://localhost:5173/verify-email?code=123&email=abc@test.com
-  const magicLink = `${baseUrl}/verify-email?code=${code}&email=${encodeURIComponent(to)}`;
+  const subject = 'Code de vérification Weave';
 
   const html = `
     <div style="font-family: Arial, sans-serif; padding: 20px;">
-      <h2>Bienvenue !</h2>
-      <p>Cliquez ci-dessous pour valider votre compte :</p>
-      <a href="${magicLink}" style="background-color: #2563eb; color: white; padding: 10px 20px; text-decoration: none; border-radius: 5px;">
-        Vérifier mon email
-      </a>
-      <p>Ou entrez ce code : <strong>${code}</strong></p>
+      <h2>Bienvenue sur Weave</h2>
+      <p>Voici votre code de vérification à 6 chiffres :</p>
+      <div style="font-size: 28px; font-weight: bold; background:#f3f4f6; padding: 12px 16px; display:inline-block; border-radius:6px;">${code}</div>
+      <p style="margin-top:16px; color:#6b7280;">Saisissez ce code dans l'application pour activer votre compte. Le code expire sous 24 heures.</p>
     </div>
   `;
 
   try {
     await sendEmail(to, subject, html);
-    console.log(`📧 SENT VERIFY LINK: ${magicLink}`);
+    console.log(`📧 Sent verification code to: ${to}`);
   } catch (e) {
     console.error("Email Error:", e);
+    throw e;
   }
 };
 

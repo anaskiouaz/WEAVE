@@ -1,7 +1,7 @@
 import { BrowserRouter, Routes, Route, Link, useLocation, Outlet, Navigate, useNavigate } from 'react-router-dom';
 import { Home, Calendar, Heart, MessageSquare, User, Settings, AlertCircle, LogOut } from 'lucide-react';
 import { useState } from 'react';
-import JoinCircle from './pages/JoinCircle'; 
+import JoinCircle from './components/JoinCircle'; 
 
 
 // Composants

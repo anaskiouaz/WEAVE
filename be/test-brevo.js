@@ -2,8 +2,8 @@
 import nodemailer from 'nodemailer';
 
 // 👇 PASTE YOUR CREDENTIALS DIRECTLY HERE (No .env)
-const SMTP_USER = 'a09734001@smtp-brevo.com'; // Your Brevo Login Email
-const SMTP_PASS = 'xsmtpsib-a1cc06e327a538fec5efdf2dc45b2ce8eb8a4b6b389160ab416bd147842a3e60-jkKTq0p95IaSGfCk';   // Your Long API Key
+const SMTP_USER = 'a0972b001@smtp-brevo.com'; // Your Brevo Login Email
+const SMTP_PASS = 'xsmtpsib-d072753c8b13e561f78f0c54e02a50d17dc7aef6b2c42e34530547f0bdf4afc9-ze9E5YyykzjZwev2';   // Your Long API Key
 const SENDER_EMAIL = 'weave.entreprise@gmail.com'; // Must be a verified email in Brevo
 
 async function testBrevo() {

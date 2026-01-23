@@ -45,9 +45,19 @@ router.post('/register', async (req, res) => {
       [name, email, passwordHash, onboarding_role, phone, birth_date, verificationCode, verificationExpires]
     );
 
-    // E. Send Email (Fire & Forget - No await)
-    sendVerificationEmail(email, verificationCode)
-        .catch(err => console.error("Background Email Error:", err));
+    // E. Send Email — await so we ensure the verification email is actually sent.
+    try {
+      await sendVerificationEmail(email, verificationCode);
+    } catch (err) {
+      console.error('Verification email failed, rolling back user insert:', err);
+      // Rollback: remove the user we just created to avoid dangling unverified accounts when email fails
+      try {
+        await db.query('DELETE FROM users WHERE email = $1', [email]);
+      } catch (delErr) {
+        console.error('Failed to delete user after email failure:', delErr);
+      }
+      return res.status(500).json({ success: false, error: 'Échec de l\'envoi de l\'email de vérification.' });
+    }
 
     res.status(201).json({ 
         success: true, 
@@ -78,6 +88,11 @@ router.post('/login', async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return res.status(401).json({ success: false, error: "Mot de passe incorrect." });
+    }
+
+    // Block login if the user's email is not verified
+    if (user.is_verified === false) {
+      return res.status(403).json({ success: false, error: "Compte non activé. Vérifiez votre boîte mail." });
     }
 
     // Get Circles for Context
@@ -119,11 +134,11 @@ router.post('/verify-email', async (req, res) => {
 
     try {
         const result = await db.query(
-            `UPDATE users 
-             SET is_verified = TRUE, verification_token = NULL, verification_token_expires = NULL 
-             WHERE email = $1 AND verification_token = $2 
-             RETURNING id`,
-            [email, code]
+          `UPDATE users 
+           SET is_verified = TRUE, verification_token = NULL, verification_token_expires = NULL 
+           WHERE email = $1 AND verification_token = $2 AND verification_token_expires > NOW()
+           RETURNING id`,
+          [email, code]
         );
         
         if (result.rowCount === 0) {
