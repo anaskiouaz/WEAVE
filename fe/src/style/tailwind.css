@@ -1,12 +1,10 @@
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap');
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   WEAVE PREMIUM - Palette "Harmonie Chaude" / Digital Cocooning
-   Avec Mode Nuit "Cocon Nocturne"
-   ═══════════════════════════════════════════════════════════════════════════ */
-
-/* Google Font Nunito - Ronde et amicale */
-@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap');
+  WEAVE PREMIUM - Palette "Harmonie Chaude" / Digital Cocooning
+  Avec Mode Nuit "Cocon Nocturne"
+  ═══════════════════════════════════════════════════════════════════════════ */
 
 /* ═══════════════════════════════════════════════════════════════════════════
    MODE JOUR - "Lumière Douce"

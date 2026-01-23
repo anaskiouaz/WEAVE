@@ -25,14 +25,19 @@ if (connectionString) {
   const connStrParts = connectionString.split(';');
   const accountNamePart = connStrParts.find(part => part.startsWith('AccountName='));
   const accountKeyPart = connStrParts.find(part => part.startsWith('AccountKey='));
+  const endpointSuffixPart = connStrParts.find(part => part.startsWith('EndpointSuffix='));
+  const endpointSuffix = endpointSuffixPart ? endpointSuffixPart.split('=')[1] : undefined;
   if (accountNamePart && accountKeyPart) {
     const extractedAccountName = accountNamePart.split('=')[1];
     const extractedAccountKey = accountKeyPart.split('=')[1];
     sharedKeyCredential = new StorageSharedKeyCredential(extractedAccountName, extractedAccountKey);
+    // Non-sensitive debug: log which account and endpoint suffix are being used (do not log keys)
+    console.log(`Azure Storage configured. AccountName=${extractedAccountName}, EndpointSuffix=${endpointSuffix}`);
   }
 } else if (accountName && accountKey) {
   sharedKeyCredential = new StorageSharedKeyCredential(accountName, accountKey);
   blobServiceClient = new BlobServiceClient(`https://${accountName}.blob.core.windows.net`, sharedKeyCredential);
+  console.log(`Azure Storage configured from env vars. AccountName=${accountName}. Using default endpointSuffix=core.windows.net`);
 } else {
   console.warn('Azure Storage credentials not set, uploads will fail');
 }
@@ -177,7 +182,10 @@ function processFileUpload(req, res, next) {
             console.log('File uploaded to Azure:', uniqueName);
           } catch (error) {
             console.error('Error uploading to Azure:', error);
-            req.fileError = 'Erreur lors de l\'upload vers Azure';
+            // Attach a short, non-sensitive error message for the client to help debugging
+            // (avoid leaking keys or long stacks in production)
+            const shortMessage = error && error.message ? String(error.message).slice(0, 200) : 'Erreur inconnue';
+            req.fileError = `Erreur lors de l'upload vers Azure: ${shortMessage}`;
           }
           break;
         }

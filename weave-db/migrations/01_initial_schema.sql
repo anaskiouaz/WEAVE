@@ -1,6 +1,6 @@
 -- ============================================================
 -- SCHEMA COMPLET FUSIONNÉ (CARE CIRCLES)
--- AVEC INTEGRATION UUID[] POUR TASKS
+-- SÉCURISÉ, COMPLET ET SANS DOUBLONS
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -43,7 +43,7 @@ CREATE TABLE users (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     name VARCHAR(255) NOT NULL,
     email VARCHAR(255) UNIQUE NOT NULL,
-    password_hash VARCHAR(255) NOT NULL, -- Note le nom : password_hash
+    password_hash VARCHAR(255) NOT NULL,
     onboarding_role VARCHAR(50),
     phone VARCHAR(20),
     profile_photo VARCHAR(500),
@@ -55,7 +55,13 @@ CREATE TABLE users (
     notifications_enabled BOOLEAN DEFAULT FALSE,  
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     role_global global_role_type DEFAULT 'USER',
-    fcm_token TEXT                          
+    fcm_token TEXT,
+    -- Colonnes issues de la fusion (Gestion Mail/Sécurité)
+    is_verified BOOLEAN DEFAULT FALSE,
+    verification_token TEXT,
+    verification_token_expires TIMESTAMP,
+    reset_password_token TEXT,
+    reset_password_expires TIMESTAMP
 );
 
 CREATE TABLE care_circles (
@@ -100,7 +106,7 @@ CREATE TABLE tasks (
     date DATE,                  
     time TIME,                  
     required_helpers INT DEFAULT 1,
-    helper_name VARCHAR(100),
+    helper_name VARCHAR(100), -- Optionnel si on utilise assigned_to
     assigned_to UUID[] DEFAULT '{}'::uuid[],
     due_date TIMESTAMP,             
     completed BOOLEAN DEFAULT FALSE, 
@@ -141,10 +147,11 @@ CREATE TABLE message (
     conversation_id UUID REFERENCES conversation(id) ON DELETE CASCADE,
     auteur_id UUID REFERENCES users(id) ON DELETE SET NULL,
     contenu TEXT NOT NULL,
+    is_moderated BOOLEAN DEFAULT FALSE,
     date_envoi TIMESTAMP DEFAULT NOW()
 );
 
--- Index
+-- Index pour la performance
 CREATE INDEX idx_message_conversation ON message(conversation_id);
 CREATE INDEX idx_message_date ON message(date_envoi);
 CREATE INDEX idx_participant_user ON participant_conversation(utilisateur_id);
@@ -158,6 +165,7 @@ CREATE TABLE journal_entries (
     mood INT CHECK (mood BETWEEN 1 AND 10),
     text_content TEXT,
     photo_data VARCHAR, 
+    is_moderated BOOLEAN DEFAULT FALSE, -- Inclus de la 2ème version
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     comments JSONB DEFAULT '[]'::jsonb,
     CONSTRAINT fk_journal_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE,
@@ -182,11 +190,11 @@ CREATE TABLE incidents (
     description TEXT NOT NULL,
     status incident_status_type DEFAULT 'OPEN',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_role_user FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE, 
-    CONSTRAINT fk_role_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE
+    CONSTRAINT fk_incident_reporter FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE, 
+    CONSTRAINT fk_incident_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE
 );
 
-CREATE TABLE IF NOT EXISTS helper_ratings (
+CREATE TABLE helper_ratings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     rated_user_id UUID NOT NULL, 
     rater_user_id UUID NOT NULL, 
@@ -202,14 +210,11 @@ CREATE TABLE IF NOT EXISTS helper_ratings (
     CONSTRAINT chk_no_self_rating CHECK (rated_user_id != rater_user_id)
 );
 
+-- Vue pour les statistiques de notation
 CREATE OR REPLACE VIEW helper_rating_averages AS
-SELECT rated_user_id, ROUND(AVG(rating)::numeric, 2) as average_rating, COUNT(*) as total_ratings
-FROM helper_ratings GROUP BY rated_user_id;
-
-
--- Modification des tables pour les mails
-ALTER TABLE users ADD COLUMN is_verified BOOLEAN DEFAULT FALSE;
-ALTER TABLE users ADD COLUMN verification_token TEXT;
-ALTER TABLE users ADD COLUMN verification_token_expires TIMESTAMP;
-ALTER TABLE users ADD COLUMN reset_password_token TEXT;
-ALTER TABLE users ADD COLUMN reset_password_expires TIMESTAMP;
+SELECT 
+    rated_user_id, 
+    ROUND(AVG(rating)::numeric, 2) as average_rating, 
+    COUNT(*) as total_ratings
+FROM helper_ratings 
+GROUP BY rated_user_id;
