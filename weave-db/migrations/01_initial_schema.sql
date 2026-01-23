@@ -117,6 +117,7 @@ CREATE TABLE tasks (
     time TIME,                  
     required_helpers INT DEFAULT 1,
     helper_name VARCHAR(100),
+    
     assigned_to UUID[] DEFAULT '{}'::uuid[],
     due_date TIMESTAMP,              
     completed BOOLEAN DEFAULT FALSE, 
