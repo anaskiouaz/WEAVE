@@ -11,14 +11,21 @@ const generateInviteCode = () => {
   return 'W-' + Math.random().toString(36).substring(2, 7).toUpperCase();
 };
 
-// ============================================================
-// 1. RÉCUPÉRER LES MEMBRES (TA FONCTIONNALITÉ VITALE)
-// ============================================================
-// Note : J'ai adapté l'URL pour qu'elle corresponde à ce que ton Frontend appelle (/api/circles/:id/members)
+// Récupère les membres d'un cercle
+// Note: Accessible à tous les membres du cercle, pas seulement les admins
 router.get('/:id/members', authenticateToken, async (req, res) => {
   const { id } = req.params; // circleId
+  const requesterId = req.user?.id;
 
-  try {
+    // Vérifier que l'utilisateur appartient au cercle
+    try{
+    const membership = await pool.query(
+      `SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2 LIMIT 1`,
+      [requesterId, id]
+    );
+    if (membership.rows.length === 0) {
+      return res.status(403).json({ error: "Accès refusé : vous n'appartenez pas à ce cercle." });
+    }
 
     const result = await pool.query(`
       SELECT u.id, u.name, u.email, u.phone, u.profile_photo, u.onboarding_role, ur.role, u.created_at
@@ -28,8 +35,6 @@ router.get('/:id/members', authenticateToken, async (req, res) => {
       ORDER BY ur.role ASC, u.name ASC
     `, [id]);
     console.log("Récupération des membres du cercle :", id);
-    
-    console.log("Membres récupérés :", result.rows);
     res.json(result.rows);
   } catch (error) {
     console.error('Erreur récupération membres:', error);
@@ -37,9 +42,7 @@ router.get('/:id/members', authenticateToken, async (req, res) => {
   }
 });
 
-// ============================================================
-// 2. LISTER MES CERCLES (DEV - POUR DASHBOARD)
-// ============================================================
+// Liste tous les cercles de l'utilisateur connecté
 router.get('/', authenticateToken, async (req, res) => {
     try {
         const userId = req.user.id;
@@ -64,9 +67,7 @@ router.get('/', authenticateToken, async (req, res) => {
     }
 });
 
-// ============================================================
-// 3. CRÉER UN CERCLE (FONCTION ÉQUIPE)
-// ============================================================
+// Crée un nouveau cercle de soin avec le bénéficiaire
 router.post('/', authenticateToken, async (req, res) => {
   const client = await pool.connect(); 
   
@@ -274,13 +275,13 @@ router.delete('/:circleId/members/:memberId', authenticateToken, async (req, res
       return res.status(400).json({ error: "Vous ne pouvez supprimer que les aidants." });
     }
 
-    // 3. Supprimer le rôle du membre
+    // Supprime le rôle du membre dans le cercle
     await pool.query(
       `DELETE FROM user_roles WHERE user_id = $1 AND circle_id = $2`,
       [memberId, circleId]
     );
 
-    // Récupérer le nom du membre supprimé pour le log
+    // Récupère le nom du membre pour l'audit
     const memberRes = await pool.query(`SELECT name FROM users WHERE id = $1`, [memberId]);
     const memberName = memberRes.rows[0]?.name || 'Utilisateur';
 
@@ -300,8 +301,72 @@ router.delete('/:circleId/members/:memberId', authenticateToken, async (req, res
   }
 });
 
+// 6bis. TRANSFÉRER L'ADMINISTRATION À UN AUTRE MEMBRE (avant suppression de compte)
+router.post('/:circleId/transfer-admin', authenticateToken, async (req, res) => {
+  const { circleId } = req.params;
+  const { newAdminId } = req.body;
+  const currentUserId = req.user.id;
+
+  if (!newAdminId) {
+    return res.status(400).json({ error: 'Nouvel administrateur requis.' });
+  }
+
+  if (String(newAdminId) === String(currentUserId)) {
+    return res.status(400).json({ error: 'Le nouvel administrateur doit être une autre personne.' });
+  }
+
+  try {
+    // Vérifier que le demandeur est bien admin du cercle
+    const adminCheck = await pool.query(
+      `SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2`,
+      [currentUserId, circleId]
+    );
+
+    if (adminCheck.rows.length === 0 || adminCheck.rows[0].role !== 'ADMIN') {
+      return res.status(403).json({ error: "Vous n'avez pas les permissions pour cette action." });
+    }
+
+    // Vérifier que le nouveau admin est membre du cercle et n'est pas le bénéficiaire (PC)
+    const memberCheck = await pool.query(
+      `SELECT role FROM user_roles WHERE user_id = $1 AND circle_id = $2`,
+      [newAdminId, circleId]
+    );
+
+    if (memberCheck.rows.length === 0) {
+      return res.status(404).json({ error: 'Membre introuvable dans ce cercle.' });
+    }
+
+    if (memberCheck.rows[0].role === 'PC') {
+      return res.status(400).json({ error: "Impossible de nommer le bénéficiaire administrateur." });
+    }
+
+    // Promouvoir le membre en ADMIN (ou mettre à jour son rôle si déjà présent)
+    await pool.query(
+      `INSERT INTO user_roles (user_id, circle_id, role)
+       VALUES ($1, $2, 'ADMIN')
+       ON CONFLICT (user_id, circle_id) DO UPDATE SET role = 'ADMIN'`,
+      [newAdminId, circleId]
+    );
+
+    try {
+      await logAudit(
+        currentUserId,
+        AUDIT_ACTIONS.MEMBER_ROLE_CHANGED || 'MEMBER_ROLE_CHANGED',
+        `Transfert du rôle ADMIN vers l'utilisateur ${newAdminId}`,
+        circleId
+      );
+    } catch (e) {
+      console.warn('Audit transfer-admin failed', e);
+    }
+
+    return res.json({ success: true });
+  } catch (error) {
+    console.error('Erreur transfer-admin:', error);
+    return res.status(500).json({ error: "Impossible de transférer l'admin pour le moment." });
+  }
+});
+
 // 7. RÉCUPÉRER LES LOGS D'ACTIVITÉ DU CERCLE (DEPUIS DEV)
-// ============================================================
 router.get('/:circleId/logs', authenticateToken, async (req, res) => {
   const { circleId } = req.params;
   const { limit = 50 } = req.query;
@@ -343,7 +408,6 @@ router.get('/:circleId/logs', authenticateToken, async (req, res) => {
 });
 
 // 8. SUPPRIMER UN CERCLE (DEPUIS DEV - GÈRE TES MESSAGES AUSSI)
-// ============================================================
 router.delete('/:circleId', authenticateToken, async (req, res) => {
   const { circleId } = req.params;
   const userId = req.user.id;
@@ -407,7 +471,6 @@ router.delete('/:circleId', authenticateToken, async (req, res) => {
 });
 
 // 9. GET INFO CERCLE (TA ROUTE - À GARDER POUR LE FRONT)
-// ============================================================
 router.get('/:id', authenticateToken, async (req, res) => {
     const { id } = req.params;
     try {

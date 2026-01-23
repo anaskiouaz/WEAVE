@@ -14,11 +14,9 @@ export default function LegalNotice() {
       Email : contact@weave-app.fr
       Téléphone : XX XX XX XX XX
       
-      Directeur de la publication : Goku 
+      Directeur de la publication : Weave Team
       
-      Forme juridique : [SAS / SARL / Association / etc.]
-      Capital social : trop riche €
-      RCS : Grenoble 38100
+      
       `
     },
     {
@@ -57,7 +55,7 @@ export default function LegalNotice() {
       consultez notre Politique de confidentialité.
       
       Délégué à la Protection des Données (DPO) :
-      Email : dpo@weave-app.fr`
+      Email : weave@weave-app.fr`
     },
     {
       icon: Scale,
@@ -83,30 +81,30 @@ export default function LegalNotice() {
       compétence est attribuée aux tribunaux français compétents.
       
       Pour toute question relative aux présentes mentions légales, vous pouvez 
-      nous contacter à l'adresse : legal@weave-app.fr`
+      nous contacter à l'adresse : weave@weave-app.fr`
     }
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
       {/* Header */}
-      <div className="text-white" style={{ background: 'linear-gradient(to right, #2563eb, #1d4ed8)' }}>
+      <div className="text-white" style={{ background: 'linear-gradient(135deg, var(--soft-coral) 0%, #E06B6B 100%)' }}>
         <div className="max-w-4xl mx-auto px-6 py-8">
           <button 
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors"
+            className="flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors font-medium"
           >
             <ArrowLeft size={20} />
             <span>Retour</span>
           </button>
           
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-white/10 rounded-xl">
+            <div className="p-3 bg-white/15 rounded-2xl backdrop-blur-sm">
               <Scale className="w-8 h-8" />
             </div>
             <div>
               <h1 className="text-3xl font-bold">Mentions légales</h1>
-              <p className="text-blue-100 mt-1">Informations légales obligatoires</p>
+              <p className="text-white/80 mt-1 font-medium">Informations légales obligatoires</p>
             </div>
           </div>
         </div>
@@ -118,15 +116,23 @@ export default function LegalNotice() {
           {sections.map(({ icon: Icon, title, content }, index) => (
             <div 
               key={index}
-              className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm"
+              className="rounded-3xl p-6 transition-all duration-200 hover:-translate-y-1"
+              style={{ 
+                backgroundColor: 'var(--bg-card)', 
+                border: '1px solid var(--border-light)',
+                boxShadow: 'var(--shadow-md)'
+              }}
             >
               <div className="flex items-start gap-4">
-                <div className="p-2 bg-blue-50 rounded-lg flex-shrink-0">
-                  <Icon className="w-5 h-5 text-blue-600" />
+                <div 
+                  className="p-2.5 rounded-xl flex-shrink-0"
+                  style={{ backgroundColor: 'rgba(167, 201, 167, 0.15)' }}
+                >
+                  <Icon className="w-5 h-5" style={{ color: 'var(--sage-green)' }} />
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-3">{title}</h2>
-                  <div className="text-gray-600 whitespace-pre-line leading-relaxed">
+                  <h2 className="text-lg font-bold mb-3" style={{ color: 'var(--text-primary)' }}>{title}</h2>
+                  <div className="whitespace-pre-line leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                     {content}
                   </div>
                 </div>
@@ -136,7 +142,7 @@ export default function LegalNotice() {
         </div>
 
         {/* Footer */}
-        <div className="mt-12 pt-8 border-t border-gray-200 text-center text-gray-500 text-sm">
+        <div className="mt-12 pt-8 text-center text-sm" style={{ borderTop: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>
           <p>© 2026 Weave - Tous droits réservés</p>
         </div>
       </div>

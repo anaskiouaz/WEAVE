@@ -94,25 +94,26 @@ export default function PrivacyPolicy() {
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
       {/* Header */}
-      <div className="bg-blue-600 text-white" style={{ background: 'linear-gradient(to right, #2563eb, #1d4ed8)' }}>
+      <div className="text-white" style={{ background: 'linear-gradient(135deg, var(--soft-coral) 0%, #E06B6B 100%)' }}>
         <div className="max-w-4xl mx-auto px-6 py-8">
           <button 
             onClick={() => navigate(-1)}
-            className="flex items-center gap-2 text-white/80 hover:text-white mb-6 transition-colors"
+            className="flex items-center gap-2 mb-6 transition-colors"
+            style={{ color: 'rgba(255,255,255,0.8)' }}
           >
             <ArrowLeft size={20} />
             <span>Retour</span>
           </button>
           
           <div className="flex items-center gap-4">
-            <div className="p-3 bg-white/10 rounded-xl">
+            <div className="p-3 rounded-xl" style={{ backgroundColor: 'rgba(255,255,255,0.15)' }}>
               <Shield className="w-8 h-8" />
             </div>
             <div>
               <h1 className="text-3xl font-bold">Politique de confidentialité</h1>
-              <p className="text-blue-100 mt-1">Dernière mise à jour : Janvier 2026</p>
+              <p className="mt-1" style={{ color: 'rgba(255,255,255,0.7)' }}>Dernière mise à jour : Janvier 2026</p>
             </div>
           </div>
         </div>
@@ -120,8 +121,8 @@ export default function PrivacyPolicy() {
 
       {/* Contenu */}
       <div className="max-w-4xl mx-auto px-6 py-8">
-        <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-8">
-          <p className="text-blue-800">
+        <div className="rounded-xl p-6 mb-8" style={{ backgroundColor: 'rgba(240, 128, 128, 0.1)', border: '1px solid var(--soft-coral)' }}>
+          <p style={{ color: 'var(--text-primary)' }}>
             <strong>En résumé :</strong> Weave collecte uniquement les données nécessaires au 
             fonctionnement du service. Vos données restent privées et ne sont jamais vendues. 
             Vous gardez le contrôle total sur vos informations.
@@ -132,15 +133,16 @@ export default function PrivacyPolicy() {
           {sections.map(({ icon: Icon, title, content }, index) => (
             <div 
               key={index}
-              className="bg-white rounded-xl border border-gray-200 p-6 shadow-sm"
+              className="rounded-xl p-6 shadow-sm"
+              style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-light)' }}
             >
               <div className="flex items-start gap-4">
-                <div className="p-2 bg-blue-50 rounded-lg flex-shrink-0">
-                  <Icon className="w-5 h-5 text-blue-600" />
+                <div className="p-2 rounded-lg flex-shrink-0" style={{ backgroundColor: 'rgba(240, 128, 128, 0.15)' }}>
+                  <Icon className="w-5 h-5" style={{ color: 'var(--soft-coral)' }} />
                 </div>
                 <div className="flex-1">
-                  <h2 className="text-lg font-semibold text-gray-900 mb-3">{title}</h2>
-                  <div className="text-gray-600 whitespace-pre-line leading-relaxed">
+                  <h2 className="text-lg font-semibold mb-3" style={{ color: 'var(--text-primary)' }}>{title}</h2>
+                  <div className="whitespace-pre-line leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
                     {content}
                   </div>
                 </div>
@@ -150,7 +152,7 @@ export default function PrivacyPolicy() {
         </div>
 
         {/* Footer */}
-        <div className="mt-12 pt-8 border-t border-gray-200 text-center text-gray-500 text-sm">
+        <div className="mt-12 pt-8 text-center text-sm" style={{ borderTop: '1px solid var(--border-light)', color: 'var(--text-muted)' }}>
           <p>© 2026 Weave - Tous droits réservés</p>
           <p className="mt-1">
             Cette politique de confidentialité peut être mise à jour. 

@@ -1,1 +1,258 @@
 @import "tailwindcss";
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   WEAVE PREMIUM - Palette "Harmonie Chaude" / Digital Cocooning
+   Avec Mode Nuit "Cocon Nocturne"
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Google Font Nunito - Ronde et amicale */
+@import url('https://fonts.googleapis.com/css2?family=Nunito:wght@400;500;600;700;800&display=swap');
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODE JOUR - "Lumière Douce"
+   Blancs chauds tendant vers le beige/lin
+   ═══════════════════════════════════════════════════════════════════════════ */
+:root, [data-theme="light"] {
+  /* ─── Palette Principale ─── */
+  --soft-coral: #F08080;
+  --soft-coral-hover: #E06B6B;
+  --sage-green: #A7C9A7;
+  --sage-green-dark: #8FB98F;
+  
+  /* ─── Fonds & Surfaces (beige chaleureux) ─── */
+  --bg-primary: #EDE4D8;       /* Fond page - Beige sable */
+  --bg-secondary: #E4D9CB;     /* Zones secondaires - Beige caramel */
+  --bg-card: #F5EFE6;          /* Cartes - Beige clair */
+  --bg-elevated: #FAF7F2;      /* Modals - Beige très clair */
+  --bg-input: #F7F2EA;         /* Inputs - Beige crème */
+  
+  /* ─── Textes ─── */
+  --text-primary: #3D5A73;     /* Titres - Bleu profond */
+  --text-secondary: #6B8AAA;   /* Corps - Bleu doux */
+  --text-muted: #94A8B8;       /* Placeholders */
+  --text-inverse: #FFFFFF;
+  
+  /* ─── Bordures & Séparateurs ─── */
+  --border-light: rgba(74, 106, 138, 0.08);
+  --border-medium: rgba(74, 106, 138, 0.15);
+  --border-input: #E5DDD3;     /* Bordures inputs - Beige chaud */
+  
+  /* ─── Ombres ─── */
+  --shadow-sm: 0 2px 8px rgba(74, 106, 138, 0.06);
+  --shadow-md: 0 4px 24px rgba(74, 106, 138, 0.08);
+  --shadow-lg: 0 8px 32px rgba(74, 106, 138, 0.12);
+  --shadow-glow: 0 0 20px rgba(240, 128, 128, 0.15);
+  
+  /* ─── États spéciaux ─── */
+  --overlay: rgba(0, 0, 0, 0.3);
+  --skeleton: linear-gradient(90deg, #F0EBE3 25%, #F8F5F0 50%, #F0EBE3 75%);
+  
+  /* ─── Typographie ─── */
+  --font-family: 'Nunito', -apple-system, BlinkMacSystemFont, sans-serif;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MODE NUIT - "Cocon Nocturne"
+   Couleurs profondes mais chaleureuses, jamais noir pur
+   ═══════════════════════════════════════════════════════════════════════════ */
+[data-theme="dark"] {
+  /* ─── Palette Principale (ajustée pour le dark) ─── */
+  --soft-coral: #E8847F;       /* Plus doux sur fond sombre */
+  --soft-coral-hover: #F09590;
+  --sage-green: #9DC49D;
+  --sage-green-dark: #B5D4B5;
+  
+  /* ─── Fonds & Surfaces (bleu nuit chaud) ─── */
+  --bg-primary: #1A2332;       /* Fond page - Bleu nuit profond */
+  --bg-secondary: #222D3D;     /* Cartes alternatives */
+  --bg-card: #263141;          /* Cartes - Légèrement élevé */
+  --bg-elevated: #2D3A4D;      /* Modals, popovers */
+  --bg-input: #1E2938;         /* Inputs */
+  
+  /* ─── Textes ─── */
+  --text-primary: #F0EDE8;     /* Crème doux - pas de blanc pur */
+  --text-secondary: #B8C5D4;   /* Bleu gris clair */
+  --text-muted: #7A8A9A;       /* Placeholders */
+  --text-inverse: #1A2332;
+  
+  /* ─── Bordures & Séparateurs ─── */
+  --border-light: rgba(255, 255, 255, 0.06);
+  --border-medium: rgba(255, 255, 255, 0.12);
+  --border-input: #3A4A5C;
+  
+  /* ─── Ombres (plus profondes en dark) ─── */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.2);
+  --shadow-md: 0 4px 24px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.4);
+  --shadow-glow: 0 0 25px rgba(232, 132, 127, 0.2);
+  
+  /* ─── États spéciaux ─── */
+  --overlay: rgba(0, 0, 0, 0.6);
+  --skeleton: linear-gradient(90deg, #222D3D 25%, #2D3A4D 50%, #222D3D 75%);
+}
+
+/* ─── Application Globale ─── */
+body {
+  font-family: var(--font-family);
+  background-color: var(--bg-primary);
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  transition: background-color 0.3s ease, color 0.3s ease;
+}
+
+/* ─── Transition douce pour le changement de thème ─── */
+*, *::before, *::after {
+  transition: background-color 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   CLASSES UTILITAIRES - Digital Cocooning (compatibles Light/Dark)
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* ─── Fonds adaptatifs ─── */
+.bg-page { background-color: var(--bg-primary); }
+.bg-card { background-color: var(--bg-card); }
+.bg-elevated { background-color: var(--bg-elevated); }
+.bg-input { background-color: var(--bg-input); }
+
+/* ─── Textes adaptatifs ─── */
+.text-primary { color: var(--text-primary); }
+.text-secondary { color: var(--text-secondary); }
+.text-muted { color: var(--text-muted); }
+
+/* ─── Bordures adaptatives ─── */
+.border-subtle { border-color: var(--border-light); }
+.border-medium { border-color: var(--border-medium); }
+
+/* ─── Bouton Principal (Pill Coral) ─── */
+.btn-coral {
+  @apply px-6 py-3 font-semibold rounded-full transition-all duration-200 ease-out;
+  background-color: var(--soft-coral);
+  color: var(--text-inverse);
+  box-shadow: var(--shadow-md);
+}
+.btn-coral:hover {
+  background-color: var(--soft-coral-hover);
+  box-shadow: var(--shadow-lg), var(--shadow-glow);
+  transform: translateY(-2px);
+}
+.btn-coral:active {
+  transform: translateY(0);
+}
+
+/* ─── Bouton Secondaire (Sage Green) ─── */
+.btn-sage {
+  @apply px-6 py-3 font-semibold rounded-full transition-all duration-200 ease-out;
+  background-color: var(--sage-green);
+  color: var(--text-inverse);
+  box-shadow: var(--shadow-md);
+}
+.btn-sage:hover {
+  background-color: var(--sage-green-dark);
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+/* ─── Bouton Outline Élégant ─── */
+.btn-outline {
+  @apply px-6 py-3 bg-transparent border-2 font-semibold rounded-full transition-all duration-200 ease-out;
+  border-color: var(--text-primary);
+  color: var(--text-primary);
+}
+.btn-outline:hover {
+  background-color: var(--text-primary);
+  color: var(--bg-card);
+  transform: translateY(-2px);
+}
+
+/* ─── Carte Flottante (Cocon) ─── */
+.card-cocon {
+  @apply rounded-3xl p-6 transition-all duration-300 ease-out;
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-light);
+  box-shadow: var(--shadow-md);
+}
+.card-cocon:hover {
+  box-shadow: var(--shadow-lg);
+  transform: translateY(-2px);
+}
+
+/* ─── Input Doux ─── */
+.input-soft {
+  @apply w-full px-4 py-3 rounded-2xl font-medium text-lg transition-all duration-200;
+  background-color: var(--bg-input);
+  border: 2px solid var(--border-input);
+  color: var(--text-primary);
+}
+.input-soft::placeholder {
+  color: var(--text-muted);
+}
+.input-soft:focus {
+  @apply outline-none;
+  border-color: var(--sage-green);
+  box-shadow: 0 0 0 4px rgba(167, 201, 167, 0.2);
+}
+
+/* ─── Badge Sage ─── */
+.badge-sage {
+  @apply inline-flex items-center px-3 py-1 text-sm font-semibold rounded-full;
+  background-color: rgba(167, 201, 167, 0.2);
+  color: var(--sage-green);
+}
+
+/* ─── Badge Coral ─── */
+.badge-coral {
+  @apply inline-flex items-center px-3 py-1 text-sm font-semibold rounded-full;
+  background-color: rgba(240, 128, 128, 0.2);
+  color: var(--soft-coral);
+}
+
+/* ─── Titre Principal ─── */
+.title-twilight {
+  @apply font-bold;
+  color: var(--text-primary);
+}
+
+/* ─── Micro-interactions globales ─── */
+.hover-lift {
+  @apply transition-all duration-200 ease-out;
+}
+.hover-lift:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-lg);
+}
+
+/* ─── Switch de thème (harmonisé: 12x7 outer, 5x5 inner) ─── */
+.theme-switch {
+  @apply relative w-12 h-7 rounded-full cursor-pointer transition-all duration-300;
+  background-color: var(--border-input);
+}
+.theme-switch::after {
+  content: '';
+  @apply absolute top-1 left-1 w-5 h-5 rounded-full transition-all duration-300;
+  background-color: var(--bg-elevated);
+  box-shadow: var(--shadow-sm);
+}
+[data-theme="dark"] .theme-switch {
+  background-color: var(--soft-coral);
+}
+[data-theme="dark"] .theme-switch::after {
+  transform: translateX(10px);
+}
+
+/* ─── Scrollbar personnalisée ─── */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: var(--bg-secondary);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-medium);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-muted);
+}

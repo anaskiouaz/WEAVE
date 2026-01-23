@@ -46,10 +46,25 @@ export const initSocket = (server) => {
       console.log(`➡️ [SOCKET] ${socket.id} rejoint ${room}`);
     });
 
-    socket.on('send_message', (data) => {
+    socket.on('send_message', async (data) => {
+        // 🛡️ Modération du contenu (import dynamique pour éviter les problèmes de cycle)
+        const { moderateMessage } = await import('../utils/moderation.js');
+        const moderation = moderateMessage(data.contenu || data.content);
+        
+        const moderatedData = {
+            ...data,
+            contenu: moderation.content,
+            content: moderation.content,
+            is_moderated: moderation.isModerated
+        };
+
+        if (moderation.isModerated) {
+            console.log(`⚠️ [SOCKET] Message modéré dans conversation_${data.conversationId}`);
+        }
+
         // Broadcast à la room
         console.log(`📨 [SOCKET] Message dans conversation_${data.conversationId}`);
-        io.to(`conversation_${data.conversationId}`).emit('receive_message', data);
+        io.to(`conversation_${data.conversationId}`).emit('receive_message', moderatedData);
     });
 
     socket.on('disconnect', () => {

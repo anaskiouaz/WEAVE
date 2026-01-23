@@ -55,7 +55,6 @@ export default function CookiePreferences() {
       description: 'Ces cookies sont indispensables au fonctionnement du site. Ils permettent la navigation, l\'authentification sécurisée et la mémorisation de vos préférences de base.',
       examples: ['Session utilisateur', 'Token d\'authentification', 'Préférences de langue'],
       required: true,
-      color: 'green',
     },
     {
       category: COOKIE_CATEGORIES.ANALYTICS,
@@ -64,7 +63,6 @@ export default function CookiePreferences() {
       description: 'Ces cookies nous permettent de mesurer l\'audience et de comprendre comment le site est utilisé. Les données sont anonymisées.',
       examples: ['Nombre de visiteurs', 'Pages visitées', 'Durée de session'],
       required: false,
-      color: 'blue',
     },
     {
       category: COOKIE_CATEGORIES.MARKETING,
@@ -73,43 +71,24 @@ export default function CookiePreferences() {
       description: 'Ces cookies sont utilisés pour vous proposer des contenus et publicités personnalisés en fonction de vos centres d\'intérêt.',
       examples: ['Publicités ciblées', 'Recommandations personnalisées', 'Réseaux sociaux'],
       required: false,
-      color: 'purple',
     },
   ];
 
-  const colorClasses = {
-    green: {
-      bg: 'bg-green-50',
-      text: 'text-green-600',
-      border: 'border-green-200',
-    },
-    blue: {
-      bg: 'bg-blue-50',
-      text: 'text-blue-600',
-      border: 'border-blue-200',
-    },
-    purple: {
-      bg: 'bg-purple-50',
-      text: 'text-purple-600',
-      border: 'border-purple-200',
-    },
-  };
-
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-in fade-in duration-200">
-      <div className="w-full max-w-2xl max-h-[90vh] bg-white rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 animate-in fade-in duration-200" style={{ backgroundColor: 'rgba(0, 0, 0, 0.5)', backdropFilter: 'blur(4px)' }}>
+      <div className="w-full max-w-2xl max-h-[90vh] rounded-2xl shadow-2xl overflow-hidden flex flex-col animate-in zoom-in-95 duration-200" style={{ backgroundColor: 'var(--bg-card)' }}>
         {/* Header */}
-        <div className="px-6 py-5 border-b border-gray-100 flex items-center justify-between bg-gradient-to-r from-blue-50 to-white">
+        <div className="px-6 py-5 flex items-center justify-between" style={{ borderBottom: '1px solid var(--border-light)', background: 'linear-gradient(135deg, var(--bg-secondary), var(--bg-card))' }}>
           <div className="flex items-center gap-3">
-            <div className="p-2 bg-blue-100 rounded-xl">
-              <Cookie className="w-6 h-6 text-blue-600" />
+            <div className="p-2 rounded-xl" style={{ backgroundColor: 'rgba(240, 128, 128, 0.15)' }}>
+              <Cookie className="w-6 h-6" style={{ color: 'var(--soft-coral)' }} />
             </div>
             <div>
-              <h2 className="text-xl font-semibold text-gray-900">
+              <h2 className="text-xl font-semibold" style={{ color: 'var(--text-primary)' }}>
                 Gérer mes cookies
               </h2>
               {consentDate && (
-                <p className="text-xs text-gray-500 mt-0.5">
+                <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>
                   Dernier choix : {consentDate.toLocaleDateString('fr-FR', { 
                     day: 'numeric', 
                     month: 'long', 
@@ -123,18 +102,19 @@ export default function CookiePreferences() {
           </div>
           <button
             onClick={closePreferences}
-            className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+            className="p-2 rounded-lg transition-colors"
+            style={{ color: 'var(--text-muted)' }}
             aria-label="Fermer"
           >
-            <X className="w-5 h-5 text-gray-500" />
+            <X className="w-5 h-5" />
           </button>
         </div>
 
         {/* Description */}
-        <div className="px-6 py-4 bg-blue-50 border-b border-blue-100">
+        <div className="px-6 py-4" style={{ backgroundColor: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-light)' }}>
           <div className="flex items-start gap-3">
-            <Info className="w-5 h-5 text-blue-600 mt-0.5 flex-shrink-0" />
-            <p className="text-sm text-blue-800">
+            <Info className="w-5 h-5 mt-0.5 flex-shrink-0" style={{ color: 'var(--soft-coral)' }} />
+            <p className="text-sm" style={{ color: 'var(--text-secondary)' }}>
               Conformément au Règlement Général sur la Protection des Données (RGPD), 
               vous pouvez modifier vos préférences de cookies à tout moment. 
               Les cookies essentiels ne peuvent pas être désactivés car ils sont nécessaires 
@@ -144,60 +124,56 @@ export default function CookiePreferences() {
         </div>
 
         {/* Liste des cookies */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4" style={{ backgroundColor: 'var(--bg-card)' }}>
           {cookieInfo.map(({ category, icon: Icon, title, description, examples, required, color }) => {
-            const colors = colorClasses[color];
             const isEnabled = preferences[category];
             
             return (
               <div
                 key={category}
-                className={`p-5 rounded-xl border-2 transition-all ${
-                  isEnabled ? colors.border : 'border-gray-200'
-                } ${isEnabled ? colors.bg : 'bg-gray-50'}`}
+                className="p-5 rounded-xl transition-all"
+                style={{ 
+                  backgroundColor: isEnabled ? 'var(--bg-secondary)' : 'var(--bg-card)',
+                  border: isEnabled ? '2px solid var(--soft-coral)' : '2px solid var(--border-light)'
+                }}
               >
                 <div className="flex items-start gap-4">
-                  <div className={`p-2.5 rounded-lg ${isEnabled ? colors.bg : 'bg-gray-100'}`}>
-                    <Icon className={`w-5 h-5 ${isEnabled ? colors.text : 'text-gray-400'}`} />
+                  <div className="p-2.5 rounded-lg" style={{ backgroundColor: isEnabled ? 'rgba(240, 128, 128, 0.15)' : 'var(--bg-secondary)' }}>
+                    <Icon className="w-5 h-5" style={{ color: isEnabled ? 'var(--soft-coral)' : 'var(--text-muted)' }} />
                   </div>
                   
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center justify-between gap-4 mb-2">
-                      <h3 className={`font-semibold ${isEnabled ? 'text-gray-900' : 'text-gray-600'}`}>
+                      <h3 className="font-semibold" style={{ color: isEnabled ? 'var(--text-primary)' : 'var(--text-secondary)' }}>
                         {title}
                       </h3>
                       {required ? (
-                        <span className="text-xs font-medium text-green-700 bg-green-100 px-3 py-1.5 rounded-full flex items-center gap-1">
+                        <span className="text-xs font-medium px-3 py-1.5 rounded-full flex items-center gap-1" style={{ backgroundColor: 'var(--sage-green)', color: 'white' }}>
                           <Check className="w-3 h-3" />
                           Requis
                         </span>
                       ) : (
                         <button
                           onClick={() => handleToggle(category)}
-                          className={`relative inline-flex h-7 w-12 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 ${
-                            isEnabled ? 'bg-blue-600' : 'bg-gray-300'
-                          }`}
+                          className="w-12 h-7 flex items-center rounded-full p-1 transition-colors duration-300 focus:outline-none"
+                          style={{ backgroundColor: isEnabled ? 'var(--soft-coral)' : 'var(--border-input)' }}
                         >
-                          <span
-                            className={`inline-block h-5 w-5 transform rounded-full bg-white shadow-md transition-transform ${
-                              isEnabled ? 'translate-x-6' : 'translate-x-1'
-                            }`}
-                          />
+                          <div className="w-5 h-5 rounded-full shadow-md transform transition-transform duration-300" style={{ backgroundColor: 'white', transform: isEnabled ? 'translateX(10px)' : 'translateX(0)' }}></div>
                         </button>
                       )}
                     </div>
                     
-                    <p className="text-sm text-gray-600 mb-3">{description}</p>
+                    <p className="text-sm mb-3" style={{ color: 'var(--text-secondary)' }}>{description}</p>
                     
                     <div className="flex flex-wrap gap-2">
                       {examples.map((example, idx) => (
                         <span
                           key={idx}
-                          className={`text-xs px-2 py-1 rounded-md ${
-                            isEnabled 
-                              ? `${colors.bg} ${colors.text}` 
-                              : 'bg-gray-100 text-gray-500'
-                          }`}
+                          className="text-xs px-2 py-1 rounded-md"
+                          style={{ 
+                            backgroundColor: isEnabled ? 'rgba(240, 128, 128, 0.1)' : 'var(--bg-secondary)',
+                            color: isEnabled ? 'var(--soft-coral)' : 'var(--text-muted)'
+                          }}
                         >
                           {example}
                         </span>
@@ -211,16 +187,18 @@ export default function CookiePreferences() {
         </div>
 
         {/* Actions */}
-        <div className="px-6 py-4 border-t border-gray-100 bg-gray-50 flex flex-col sm:flex-row gap-3">
+        <div className="px-6 py-4 flex flex-col sm:flex-row gap-3" style={{ borderTop: '1px solid var(--border-light)', backgroundColor: 'var(--bg-secondary)' }}>
           <button
             onClick={closePreferences}
-            className="flex-1 px-4 py-3 text-sm font-medium text-gray-700 bg-white border border-gray-300 hover:bg-gray-50 rounded-xl transition-colors"
+            className="flex-1 px-4 py-3 text-sm font-medium rounded-xl transition-colors"
+            style={{ backgroundColor: 'var(--bg-card)', border: '2px solid var(--border-input)', color: 'var(--text-primary)' }}
           >
             Annuler
           </button>
           <button
             onClick={handleSave}
-            className="flex-1 px-4 py-3 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-md flex items-center justify-center gap-2"
+            className="flex-1 px-4 py-3 text-sm font-medium rounded-xl transition-colors shadow-md flex items-center justify-center gap-2"
+            style={{ backgroundColor: 'var(--soft-coral)', color: 'white', boxShadow: '0 4px 12px rgba(240, 128, 128, 0.3)' }}
           >
             <Check className="w-4 h-4" />
             Enregistrer mes préférences
@@ -228,10 +206,10 @@ export default function CookiePreferences() {
         </div>
 
         {/* Footer */}
-        <div className="px-6 py-3 bg-gray-50 border-t border-gray-100 text-center">
-          <p className="text-xs text-gray-500">
+        <div className="px-6 py-3 text-center" style={{ backgroundColor: 'var(--bg-secondary)', borderTop: '1px solid var(--border-light)' }}>
+          <p className="text-xs" style={{ color: 'var(--text-muted)' }}>
             Pour plus d'informations, consultez notre{' '}
-            <a href="/politique-confidentialite" className="text-blue-600 hover:underline">
+            <a href="/politique-confidentialite" className="hover:underline" style={{ color: 'var(--soft-coral)' }}>
               politique de confidentialité
             </a>
           </p>

@@ -52,7 +52,7 @@ const Sidebar = ({
     useEffect(() => {
         if (!showModal) return;
         console.log('Sidebar: modal opened; user.circles=', user?.circles, 'auth.circleId=', circleId);
-        const resolved = circleId || (user && user.circles && user.circles.length > 0 ? user.circles[0].id : localStorage.getItem('circle_id'));
+        const resolved = circleId || (user && user.circles && user.circles.length > 0 ? user.circles[0].id : null);
         const targetCircleId = resolved;
         console.log('Sidebar: resolved targetCircleId=', targetCircleId);
         if (!targetCircleId) { setLoadingMembers(false); return; }
@@ -89,7 +89,7 @@ const Sidebar = ({
                 </button>
             </div>
 
-            {/* --- LISTE DES CONVERSATIONS --- */}
+            {/* Liste des conversations */}
             <div className="flex-1 overflow-y-auto">
                 <h3 className="text-xs font-semibold text-gray-400 uppercase tracking-wider p-4 pb-2">
                     Vos conversations
@@ -133,7 +133,7 @@ const Sidebar = ({
                 </ul>
             </div>
 
-            {/* --- MODALE DE CRÉATION (Popup) --- */}
+            {/* Modal de création de conversation */}
             {showModal && (
                 <div className="absolute inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white p-6 rounded shadow-lg w-96">

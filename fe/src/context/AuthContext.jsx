@@ -25,6 +25,7 @@ export const AuthProvider = ({ children }) => {
   // si local storage est vide, ce sera null par défaut
 
   const [loading, setLoading] = useState(false);
+  const [unreadMessages, setUnreadMessages] = useState(0);
 
   // 2. FONCTION UTILITAIRE (Pour éviter de répéter le code)
   // Sert à sauvegarder les infos du cercle partout en même temps
@@ -77,8 +78,17 @@ export const AuthProvider = ({ children }) => {
       if (!res.ok) return null;
       const data = await res.json();
       if (data && data.user) {
+        // Mettre à jour l'utilisateur avec ses cercles mis à jour
         setUser(data.user);
         try { localStorage.setItem('weave_user', JSON.stringify(data.user)); } catch { }
+        
+        // Ne mettre à jour le cercle principal QUE s'il n'y a pas déjà un cercle sélectionné
+        const currentCircleId = localStorage.getItem('circle_id');
+        if (!currentCircleId && data.circle_id) {
+          setCircleId(data.circle_id);
+          try { localStorage.setItem('circle_id', data.circle_id); } catch { }
+        }
+        
         return data.user;
       }
     } catch (err) {
@@ -141,6 +151,7 @@ export const AuthProvider = ({ children }) => {
     <AuthContext.Provider value={{
       user, token, circleId, circleNom,
       login, register, logout, loading,
+      unreadMessages, setUnreadMessages,
       // Expose a combined setter that updates both values atomically
       setCircle: (id, nom) => {
         if (id) {

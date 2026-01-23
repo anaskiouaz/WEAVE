@@ -1,14 +1,15 @@
 import { useState } from 'react';
 import { useCookieConsent, COOKIE_CATEGORIES } from '../context/CookieContext';
-import { Cookie, Shield, BarChart3, Megaphone, ChevronDown, ChevronUp, X } from 'lucide-react';
+import { Cookie, Shield, BarChart3, Megaphone, ChevronDown, ChevronUp, Check } from 'lucide-react';
 
 /**
  * Bannière de consentement aux cookies conforme RGPD
- * S'affiche en bas de l'écran jusqu'à ce que l'utilisateur fasse un choix
  */
 export default function CookieBanner() {
-  const { showBanner, acceptAll, rejectAll, savePreferences, consent } = useCookieConsent();
+  const { showBanner, acceptAll, rejectAll, savePreferences } = useCookieConsent();
   const [showDetails, setShowDetails] = useState(false);
+
+  // État local pour l'interface avant sauvegarde
   const [preferences, setPreferences] = useState({
     [COOKIE_CATEGORIES.ESSENTIAL]: true,
     [COOKIE_CATEGORIES.ANALYTICS]: false,
@@ -18,7 +19,7 @@ export default function CookieBanner() {
   if (!showBanner) return null;
 
   const handleToggle = (category) => {
-    if (category === COOKIE_CATEGORIES.ESSENTIAL) return; // Toujours activé
+    if (category === COOKIE_CATEGORIES.ESSENTIAL) return;
     setPreferences(prev => ({
       ...prev,
       [category]: !prev[category]
@@ -34,134 +35,126 @@ export default function CookieBanner() {
       category: COOKIE_CATEGORIES.ESSENTIAL,
       icon: Shield,
       title: 'Cookies essentiels',
-      description: 'Nécessaires au fonctionnement du site. Ils permettent l\'authentification, la sécurité et la mémorisation de vos préférences.',
+      description: 'Nécessaires au fonctionnement du site (sécurité, connexion).',
       required: true,
     },
     {
       category: COOKIE_CATEGORIES.ANALYTICS,
       icon: BarChart3,
       title: 'Cookies analytiques',
-      description: 'Nous aident à comprendre comment vous utilisez le site pour améliorer votre expérience. Données anonymisées.',
+      description: 'Nous aident à améliorer le site via des statistiques anonymes.',
       required: false,
     },
     {
       category: COOKIE_CATEGORIES.MARKETING,
       icon: Megaphone,
       title: 'Cookies marketing',
-      description: 'Utilisés pour vous proposer des contenus personnalisés et mesurer l\'efficacité de nos communications.',
+      description: 'Pour vous proposer du contenu pertinent.',
       required: false,
     },
   ];
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-end justify-center bg-black/30 backdrop-blur-sm p-4 animate-in fade-in duration-300">
-      <div className="w-full max-w-3xl bg-white rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-500">
-        {/* Header */}
-        <div className="px-6 pt-6 pb-4 border-b border-gray-100">
-          <div className="flex items-start gap-4">
-            <div className="p-3 bg-blue-50 rounded-xl">
-              <Cookie className="w-6 h-6 text-blue-600" />
-            </div>
-            <div className="flex-1">
-              <h2 className="text-xl font-semibold text-gray-900">
-                Nous respectons votre vie privée
-              </h2>
-              <p className="mt-1 text-gray-600 text-sm leading-relaxed">
-                Weave utilise des cookies pour améliorer votre expérience. Vous pouvez choisir les cookies que vous acceptez. 
-                Les cookies essentiels sont nécessaires au fonctionnement du site.
-              </p>
-            </div>
+    <div className="fixed inset-0 z-[9999] flex items-end justify-center p-4 animate-in fade-in duration-300" style={{ backgroundColor: 'rgba(0, 0, 0, 0.4)', backdropFilter: 'blur(4px)' }}>
+      <div className="w-full max-w-3xl rounded-2xl shadow-2xl overflow-hidden animate-in slide-in-from-bottom duration-500" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
+
+        {/* Header simplifié */}
+        <div className="p-6 flex gap-4 items-start" style={{ borderBottom: '1px solid var(--border-light)' }}>
+          <div className="p-3 rounded-xl shrink-0" style={{ backgroundColor: 'rgba(240, 128, 128, 0.15)' }}>
+            <Cookie className="w-6 h-6" style={{ color: 'var(--soft-coral)' }} />
+          </div>
+          <div>
+            <h2 className="text-lg font-bold" style={{ color: 'var(--text-primary)' }}>Gestion des cookies</h2>
+            <p className="mt-1 text-sm leading-relaxed" style={{ color: 'var(--text-secondary)' }}>
+              Nous utilisons des cookies pour optimiser votre expérience. Les cookies essentiels sont obligatoires pour le fonctionnement de l'application.
+            </p>
           </div>
         </div>
 
-        {/* Toggle détails */}
+        {/* Bouton Toggle détails */}
         <button
           onClick={() => setShowDetails(!showDetails)}
-          className="w-full px-6 py-3 flex items-center justify-between text-sm font-medium text-gray-700 hover:bg-gray-50 transition-colors"
+          className="w-full px-6 py-3 flex items-center justify-between text-sm font-medium transition-colors"
+          style={{ color: 'var(--text-primary)', backgroundColor: 'var(--bg-secondary)', borderBottom: '1px solid var(--border-light)' }}
         >
           <span>Personnaliser mes choix</span>
-          {showDetails ? (
-            <ChevronUp className="w-5 h-5 text-gray-400" />
-          ) : (
-            <ChevronDown className="w-5 h-5 text-gray-400" />
-          )}
+          {showDetails ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
         </button>
 
-        {/* Détails des cookies */}
+        {/* Liste des préférences (CheckBox) */}
         {showDetails && (
-          <div className="px-6 py-4 bg-gray-50 border-t border-gray-100 space-y-4 max-h-64 overflow-y-auto">
+          <div className="max-h-64 overflow-y-auto p-4 space-y-3" style={{ backgroundColor: 'var(--bg-secondary)' }}>
             {cookieInfo.map(({ category, icon: Icon, title, description, required }) => (
               <div
                 key={category}
-                className="flex items-start gap-4 p-4 bg-white rounded-xl border border-gray-200"
+                className="flex items-center gap-4 p-4 rounded-xl shadow-sm"
+                style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-light)' }}
               >
-                <div className={`p-2 rounded-lg ${required ? 'bg-green-50' : 'bg-gray-50'}`}>
-                  <Icon className={`w-5 h-5 ${required ? 'text-green-600' : 'text-gray-600'}`} />
+                {/* Icône catégorie */}
+                <div className="p-2 rounded-lg shrink-0" style={{ backgroundColor: required ? 'rgba(167, 201, 167, 0.2)' : 'rgba(240, 128, 128, 0.15)', color: required ? 'var(--sage-green)' : 'var(--soft-coral)' }}>
+                  <Icon className="w-5 h-5" />
                 </div>
-                <div className="flex-1 min-w-0">
-                  <div className="flex items-center justify-between gap-4">
-                    <h3 className="font-medium text-gray-900">{title}</h3>
-                    {required ? (
-                      <span className="text-xs font-medium text-green-600 bg-green-50 px-2 py-1 rounded-full whitespace-nowrap">
-                        Toujours actif
-                      </span>
-                    ) : (
-                      <button
-                        onClick={() => handleToggle(category)}
-                        className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors ${
-                          preferences[category] ? 'bg-blue-600' : 'bg-gray-300'
-                        }`}
-                      >
-                        <span
-                          className={`inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform ${
-                            preferences[category] ? 'translate-x-6' : 'translate-x-1'
-                          }`}
-                        />
-                      </button>
-                    )}
-                  </div>
-                  <p className="mt-1 text-sm text-gray-600">{description}</p>
+
+                {/* Texte */}
+                <div className="flex-1">
+                  <h3 className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{title}</h3>
+                  <p className="text-xs mt-0.5" style={{ color: 'var(--text-muted)' }}>{description}</p>
+                </div>
+
+                {/* --- NOUVEAU BOUTON : CHECKBOX SIMPLE --- */}
+                <div className="shrink-0">
+                  {required ? (
+                    <div className="flex items-center gap-1.5 text-xs font-bold px-2 py-1 rounded-md" style={{ backgroundColor: 'var(--sage-green)', color: 'white' }}>
+                      <Check className="w-3 h-3" />
+                      Requis
+                    </div>
+                  ) : (
+                    <button
+                      onClick={() => handleToggle(category)}
+                      className="w-12 h-7 flex items-center rounded-full p-1 transition-colors duration-300 focus:outline-none"
+                      style={{ backgroundColor: preferences[category] ? 'var(--soft-coral)' : 'var(--border-input)' }}
+                    >
+                      <div
+                        className="w-5 h-5 rounded-full shadow-md transform transition-transform duration-300"
+                        style={{ backgroundColor: 'white', transform: preferences[category] ? 'translateX(10px)' : 'translateX(0)' }}
+                      ></div>
+                    </button>
+                  )}
                 </div>
               </div>
             ))}
           </div>
         )}
 
-        {/* Actions */}
-        <div className="px-6 py-4 bg-white border-t border-gray-100 flex flex-col sm:flex-row gap-3">
+        {/* Footer Actions */}
+        <div className="p-4 flex flex-col sm:flex-row gap-3" style={{ backgroundColor: 'var(--bg-card)' }}>
           <button
             onClick={rejectAll}
-            className="flex-1 px-4 py-3 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 rounded-xl transition-colors"
+            className="flex-1 px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors"
+            style={{ backgroundColor: 'var(--bg-secondary)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}
           >
-            Refuser tout
+            Refuser
           </button>
-          
+
           {showDetails && (
             <button
               onClick={handleSavePreferences}
-              className="flex-1 px-4 py-3 text-sm font-medium text-blue-600 bg-blue-50 hover:bg-blue-100 rounded-xl transition-colors"
+              className="flex-1 px-4 py-2.5 text-sm font-semibold rounded-lg transition-colors"
+              style={{ backgroundColor: 'rgba(240, 128, 128, 0.15)', color: 'var(--soft-coral)' }}
             >
-              Sauvegarder mes choix
+              Enregistrer
             </button>
           )}
-          
+
           <button
             onClick={acceptAll}
-            className="flex-1 px-4 py-3 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-xl transition-colors shadow-md"
+            className="flex-1 px-4 py-2.5 text-sm font-semibold rounded-lg shadow-sm transition-colors"
+            style={{ backgroundColor: 'var(--soft-coral)', color: 'white', boxShadow: '0 4px 12px rgba(240, 128, 128, 0.3)' }}
           >
             Accepter tout
           </button>
         </div>
 
-        {/* Lien politique de confidentialité */}
-        <div className="px-6 pb-4 text-center">
-          <a
-            href="/politique-confidentialite"
-            className="text-xs text-gray-500 hover:text-blue-600 underline"
-          >
-            Politique de confidentialité
-          </a>
-        </div>
       </div>
     </div>
   );

@@ -15,6 +15,7 @@ router.post('/register', async (req, res) => {
   const { name, email, password, onboarding_role, phone, birth_date } = req.body;
 
   try {
+    // Vérifie que l'email n'existe pas déjà
     // A. Check if user exists
     const userCheck = await db.query('SELECT * FROM users WHERE email = $1', [email]);
     if (userCheck.rows.length > 0) {
@@ -71,6 +72,7 @@ router.post('/register', async (req, res) => {
   }
 });
 
+// Authentifie un utilisateur et retourne un token JWT
 // ============================================================
 // 2. CONNEXION (LOGIN)
 // ============================================================
@@ -78,6 +80,7 @@ router.post('/login', async (req, res) => {
   const { email, password } = req.body;
   
   try {
+    // Recherche l'utilisateur par email
     const result = await db.query('SELECT * FROM users WHERE email = $1', [email]);
     if (result.rows.length === 0) {
       return res.status(404).json({ success: false, error: "Compte inexistant." });
@@ -85,11 +88,13 @@ router.post('/login', async (req, res) => {
 
     const user = result.rows[0];
 
+    // Valide le mot de passe contre le hash stocké
     const isMatch = await bcrypt.compare(password, user.password_hash);
     if (!isMatch) {
       return res.status(401).json({ success: false, error: "Mot de passe incorrect." });
     }
 
+    // Récupère les cercles de soin associés à l'utilisateur
     // Block login if the user's email is not verified
     if (user.is_verified === false) {
       return res.status(403).json({ success: false, error: "Compte non activé. Vérifiez votre boîte mail." });
@@ -104,6 +109,17 @@ router.post('/login', async (req, res) => {
       WHERE ur.user_id = $1
     `, [user.id]);
 
+    const circles = circlesResult.rows;
+    let mainCircleId = null;
+    let mainCircleNom = null;
+
+    if (circles.length > 0) {
+        mainCircleId = circles[0].id;           
+        mainCircleNom = circles[0].senior_name; 
+    }
+
+    // Génère un token JWT d'authentification
+    // On utilise role_global s'il existe, sinon onboarding_role
     const activeRole = user.role_global || user.onboarding_role;
     const token = jwt.sign(
         { id: user.id, role: activeRole }, 

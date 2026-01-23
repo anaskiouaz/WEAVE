@@ -1,9 +1,11 @@
 import { RotateCcw } from 'lucide-react';
 import { Button } from './ui/button';
 import { useAuth } from '../context/AuthContext';
+import { useNavigate } from 'react-router-dom';
 
 export default function RestartOnboardingButton() {
   const { user } = useAuth();
+  const navigate = useNavigate();
 
   const handleRestartTour = () => {
     // Réinitialiser le flag du tour pour l'utilisateur courant
@@ -13,7 +15,8 @@ export default function RestartOnboardingButton() {
     if (key !== 'weave_onboarding_seen') {
       localStorage.removeItem('weave_onboarding_seen');
     }
-    // Recharger la page pour que le tour redémarre
+    // Rediriger vers la page d'accueil pour que le tour se lance automatiquement
+    navigate('/dashboard');
     window.location.reload();
   };
 

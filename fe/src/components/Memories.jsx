@@ -4,33 +4,35 @@ import { jsPDF } from 'jspdf';
 import { Camera, CameraResultType } from '@capacitor/camera';
 import { apiGet, apiPost, apiDelete } from '../api/client'; // Import du client API
 import { useAuth } from '../context/AuthContext'; // Import du hook d'authentification
+import MobileMemories from './ui-mobile/MobileMemories'; // Import du composant mobile
 
 export default function Memories() {
-  // CONST PHOTO
+  // State pour la capture photo via Capacitor (mobile)
   const [tempPhoto, setTempPhoto] = useState(null);
-  const [newContent, setNewContent] = useState('');
 
-  const { user, circleId } = useAuth(); // Récupération de l'utilisateur connecté ET du circleId
+  const { user, circleId } = useAuth();
+  
+  // Data et UI state
   const [memories, setMemories] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
-  // --- ÉTATS POUR LE NOUVEAU SOUVENIR ---
+  // Nouveau souvenir
   const [newText, setNewText] = useState("");
-  const [newMood, setNewMood] = useState(5); // Valeur par défaut
+  const [newMood, setNewMood] = useState(5);
   const [newPhotoUrl, setNewPhotoUrl] = useState("");
   const [newPhotoFile, setNewPhotoFile] = useState(null);
   const [isPublishing, setIsPublishing] = useState(false);
 
-  // --- ÉTATS AJOUTÉS POUR LES COMMENTAIRES ---
+  // Commentaires
   const [activeCommentId, setActiveCommentId] = useState(null);
   const [commentText, setCommentText] = useState("");
   const [isSending, setIsSending] = useState(false);
 
-  // ID du cercle - utilise le circleId du contexte (sélectionné par l'utilisateur)
+  // ID du cercle actuel (depuis le contexte utilisateur)
   const CIRCLE_ID = circleId || user?.circles?.[0]?.id || "d0eebc99-9c0b-4ef8-bb6d-6bb9bd380d44";
 
-  // Récupération des données depuis la base de données
+  // Récupère tous les souvenirs du cercle
   const fetchMemories = async () => {
     try {
       setLoading(true);
@@ -56,7 +58,7 @@ export default function Memories() {
     fetchMemories();
   }, [CIRCLE_ID]);
 
-  // Nettoyer les URLs d'objet lors du démontage du composant
+  // Nettoie les URLs blob au démontage pour éviter les fuites mémoire
   useEffect(() => {
     return () => {
       if (newPhotoUrl && newPhotoUrl.startsWith('blob:')) {
@@ -65,7 +67,7 @@ export default function Memories() {
     };
   }, [newPhotoUrl]);
 
-  // --- FONCTION POUR PUBLIER UN SOUVENIR ---
+  // Publie un nouveau souvenir avec texte et photo optionnelle
   const handleAddMemory = async () => {
     if (!newText.trim() || !user) return;
 
@@ -78,15 +80,19 @@ export default function Memories() {
         const formData = new FormData();
         formData.append('image', newPhotoFile);
 
-        // 1. On définit l'URL de base de l'API (Port 4000)
-        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+        // Construit l'URL API en évitant les doublons /api/api
+        const buildApiUrl = (p) => {
+          const raw = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
+          let host = raw.replace(/\/$/, '');
+          if (host.endsWith('/api')) host = host.slice(0, -4);
+          const path = p.startsWith('/') ? p.slice(1) : p;
+          return `${host}/api/${path}`;
+        };
 
-        // 2. On fait l'appel vers la bonne route (avec /api)
-        const uploadResponse = await fetch(`${API_BASE_URL}/api/upload/image`, {
+        // Upload l'image vers le backend
+        const uploadResponse = await fetch(buildApiUrl('/upload/image'), {
           method: 'POST',
           body: formData,
-          // Note : Ne JAMAIS mettre de header 'Content-Type' manuellement avec FormData
-          // Le navigateur le fait tout seul avec le "boundary" correct.
         });
 
         if (!uploadResponse.ok) {
@@ -94,14 +100,14 @@ export default function Memories() {
           throw new Error(errorData.message || 'Erreur lors de l\'upload de l\'image');
         }
 
-  const uploadData = await uploadResponse.json();
-  if (uploadData.status !== 'ok') {
-    throw new Error(uploadData.message || 'Erreur upload');
-  }
+        const uploadData = await uploadResponse.json();
+        if (uploadData.status !== 'ok') {
+          throw new Error(uploadData.message || 'Erreur upload');
+        }
 
-  // 3. On récupère le nom du blob renvoyé par le backend
-  photoBlobName = uploadData.data.blobName;
-}
+        // Récupère le nom du blob pour stocker en BDD
+        photoBlobName = uploadData.data.blobName;
+      }
 
       await apiPost('/souvenirs', {
         circle_id: CIRCLE_ID,
@@ -132,27 +138,21 @@ export default function Memories() {
     }
   };
 
-// --- NOUVELLE FONCTION CAPACITOR ---
+  // Déclenche la caméra pour une prise de photo (Capacitor)
   const prendrePhoto = async () => {
     try {
       const image = await Camera.getPhoto({
         quality: 90,
-        allowEditing: true, // Permet de recadrer après la prise
-        resultType: CameraResultType.Uri // Récupère un chemin web affichable
+        allowEditing: true,
+        resultType: CameraResultType.Uri
       });
-
-      // image.webPath contient l'URL locale de l'image pour l'affichage
       setTempPhoto(image.webPath);
     } catch (error) {
       console.log('Prise de photo annulée ou erreur:', error);
     }
   };
-
-  const clearPhoto = () => {
-    setTempPhoto(null);
-  };
   
-  // --- FONCTION AJOUTÉE POUR ENVOYER UN COMMENTAIRE ---
+  // Envoie un commentaire sur un souvenir
   const handleSendComment = async (entryId) => {
     if (!commentText.trim()) return;
     
@@ -172,17 +172,15 @@ export default function Memories() {
     }
   };
 
-  // --- FONCTION AJOUTÉE POUR SUPPRIMER UN COMMENTAIRE ---
+  // Supprime un commentaire (seulement si l'utilisateur en est l'auteur)
   const handleDeleteComment = async (memoryId, commentId, commentAuthor, memoryAuthor) => {
     if (!user) return;
 
-    // Vérifier que l'utilisateur est l'auteur du commentaire
     if (commentAuthor !== user.name && memoryAuthor !== user.name) {
       alert("Vous ne pouvez pas supprimer les commentaires des autres.");
       return;
     }
 
-    // Demander confirmation avant suppression
     const confirmDelete = window.confirm("Êtes-vous sûr de vouloir supprimer ce commentaire ?");
     if (!confirmDelete) return;
 
@@ -199,11 +197,10 @@ export default function Memories() {
     }
   };
 
-  // --- FONCTION POUR SUPPRIMER UN SOUVENIR ---
+  // Supprime un souvenir (seulement son auteur peut le faire)
   const handleDeleteMemory = async (memoryId) => {
     if (!user) return;
 
-    // Demander confirmation avant suppression
     const confirmDelete = window.confirm("Êtes-vous sûr de vouloir supprimer ce souvenir ? Cette action est irréversible.");
     if (!confirmDelete) return;
 
@@ -214,353 +211,426 @@ export default function Memories() {
 
       // Rafraîchir la liste après suppression
       await fetchMemories();
-      alert("Souvenir supprimé avec succès");
     } catch (err) {
       console.error("Erreur lors de la suppression:", err);
       alert("Erreur lors de la suppression du souvenir: " + err.message);
     }
   };
 
-  // 🔹 Construire l'URL complète de l'image
+  // Construit l'URL complète pour charger une image depuis le stockage
   const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '';
-  // Si la variable inclut /api, on le retire pour servir les fichiers statiques
   const FILES_BASE_URL = API_BASE_URL.replace(/\/api\/?$/, '');
 
-const getPhotoUrl = (photo) => {
-  if (!photo) return null;
-  if (photo.startsWith('http')) return photo;
-  return `${FILES_BASE_URL}/uploads/${photo}`;
-};
+  const getPhotoUrl = (photo) => {
+    if (!photo) return null;
+    if (photo.startsWith('http')) return photo;
+    return `${FILES_BASE_URL}/uploads/${photo}`;
+  };
 
-// 🔹 Charger une image en base64 pour jsPDF
-// Fallback proxy pour les images Azure afin d'éviter les erreurs CORS/canvas
-const loadImageAsBase64 = async (url) => {
-  try {
-    // Si c'est une URL Azure, passer par le proxy backend
-    if (url.includes('.blob.core.windows.net')) {
-      let blobName = null;
-      try {
-        const u = new URL(url);
-        const parts = u.pathname.split('/');
-        blobName = parts[parts.length - 1];
-      } catch {}
+  // Charge une image en base64 pour l'export PDF (gère Azure via proxy)
+  const loadImageAsBase64 = async (url) => {
+    try {
+      if (url.includes('.blob.core.windows.net')) {
+        let blobName = null;
+        try {
+          const u = new URL(url);
+          const parts = u.pathname.split('/');
+          blobName = parts[parts.length - 1];
+        } catch {}
 
-      if (blobName) {
-        const API_BASE_URL_FULL = import.meta.env.VITE_API_BASE_URL || '';
-        const proxyUrl = `${API_BASE_URL_FULL}/upload/blob/${blobName}`;
-        const resp = await fetch(proxyUrl);
-        if (!resp.ok) throw new Error('Proxy image fetch failed');
-        const blob = await resp.blob();
-        const reader = new FileReader();
-        const base64 = await new Promise((resolve, reject) => {
-          reader.onloadend = () => resolve(reader.result);
-          reader.onerror = reject;
-          reader.readAsDataURL(blob);
-        });
-        return base64;
+        if (blobName) {
+          const API_BASE_URL_FULL = import.meta.env.VITE_API_BASE_URL || '';
+          const proxyUrl = `${API_BASE_URL_FULL}/upload/blob/${blobName}`;
+          const resp = await fetch(proxyUrl);
+          if (!resp.ok) throw new Error('Proxy image fetch failed');
+          const blob = await resp.blob();
+          const reader = new FileReader();
+          const base64 = await new Promise((resolve, reject) => {
+            reader.onloadend = () => resolve(reader.result);
+            reader.onerror = reject;
+            reader.readAsDataURL(blob);
+          });
+          return base64;
+        }
       }
+
+      const img = new window.Image();
+      img.crossOrigin = 'anonymous';
+      await new Promise((resolve, reject) => {
+        img.onload = resolve;
+        img.onerror = reject;
+        img.src = url;
+      });
+      const canvas = document.createElement('canvas');
+      canvas.width = img.width;
+      canvas.height = img.height;
+      const ctx = canvas.getContext('2d');
+      ctx.drawImage(img, 0, 0);
+      return canvas.toDataURL('image/jpeg', 0.9);
+    } catch (e) {
+      console.error('loadImageAsBase64 failed:', e);
+      throw e;
     }
+  };
 
-    // Par défaut: charger via Image + canvas (pour fichiers locaux)
-    const img = new window.Image();
-    img.crossOrigin = 'anonymous';
-    await new Promise((resolve, reject) => {
-      img.onload = resolve;
-      img.onerror = reject;
-      img.src = url;
-    });
-    const canvas = document.createElement('canvas');
-    canvas.width = img.width;
-    canvas.height = img.height;
-    const ctx = canvas.getContext('2d');
-    ctx.drawImage(img, 0, 0);
-    return canvas.toDataURL('image/jpeg', 0.9);
-  } catch (e) {
-    console.error('loadImageAsBase64 failed:', e);
-    throw e;
-  }
-};
-
-  // Fonction d'export PDF avec les données réelles
+  // Génère et télécharge un PDF du journal de bord
   const handleDownloadPDF = async () => {
-  const doc = new jsPDF();
+    const doc = new jsPDF();
   doc.setFontSize(20);
   doc.text('Journal de bord - Souvenirs Partagés', 20, 20);
 
   let yPosition = 40;
 
-  for (let index = 0; index < memories.length; index++) {
-    const memory = memories[index];
+    for (let index = 0; index < memories.length; index++) {
+      const memory = memories[index];
 
-    if (yPosition > 260) {
-      doc.addPage();
-      yPosition = 20;
-    }
+      if (yPosition > 260) {
+        doc.addPage();
+        yPosition = 20;
+      }
 
-    const dateStr = new Date(memory.created_at).toLocaleDateString('fr-FR');
-    const authorStr = memory.author_name || "Auteur inconnu";
+      const dateStr = new Date(memory.created_at).toLocaleDateString('fr-FR');
+      const authorStr = memory.author_name || "Auteur inconnu";
 
-    doc.setFontSize(10);
-    doc.setTextColor(100);
-    doc.text(`${dateStr} - Par ${authorStr}`, 20, yPosition);
-    yPosition += 7;
+      doc.setFontSize(10);
+      doc.setTextColor(100);
+      doc.text(`${dateStr} - Par ${authorStr}`, 20, yPosition);
+      yPosition += 7;
 
-    doc.setFontSize(11);
-    doc.setTextColor(0);
-    const lines = doc.splitTextToSize(memory.text_content || '', 170);
-    doc.text(lines, 20, yPosition);
-    yPosition += lines.length * 7 + 5;
+      doc.setFontSize(11);
+      doc.setTextColor(0);
+      const lines = doc.splitTextToSize(memory.text_content || '', 170);
+      doc.text(lines, 20, yPosition);
+      yPosition += lines.length * 7 + 5;
 
-    // ✅ AJOUT DE LA PHOTO DANS LE PDF
-    if (memory.photo_data) {
-      try {
-        const imageUrl = getPhotoUrl(memory.photo_data);
-        const imageBase64 = await loadImageAsBase64(imageUrl);
+      // Ajoute la photo si présente
+      if (memory.photo_data) {
+        try {
+          const imageUrl = getPhotoUrl(memory.photo_data);
+          const imageBase64 = await loadImageAsBase64(imageUrl);
 
-        const imgWidth = 170;
-        const imgHeight = 100;
+          const imgWidth = 170;
+          const imgHeight = 100;
 
-        if (yPosition + imgHeight > 280) {
-          doc.addPage();
-          yPosition = 20;
+          if (yPosition + imgHeight > 280) {
+            doc.addPage();
+            yPosition = 20;
+          }
+
+          doc.addImage(imageBase64, 'JPEG', 20, yPosition, imgWidth, imgHeight);
+          yPosition += imgHeight + 10;
+        } catch (err) {
+          console.error("Erreur image PDF :", err);
         }
+      }
 
-        doc.addImage(imageBase64, 'JPEG', 20, yPosition, imgWidth, imgHeight);
-        yPosition += imgHeight + 10;
-      } catch (err) {
-        console.error("Erreur image PDF :", err);
+      if (index < memories.length - 1) {
+        doc.setDrawColor(200);
+        doc.line(20, yPosition, 190, yPosition);
+        yPosition += 10;
       }
     }
 
-    if (index < memories.length - 1) {
-      doc.setDrawColor(200);
-      doc.line(20, yPosition, 190, yPosition);
-      yPosition += 10;
+    doc.save(`journal-souvenirs-${new Date().toISOString().split('T')[0]}.pdf`);
+  };
+
+  // Synchro photo Capacitor vers affichage
+  useEffect(() => {
+    if (tempPhoto) {
+      setNewPhotoUrl(tempPhoto);
     }
-  }
+  }, [tempPhoto]);
 
-  doc.save(`journal-souvenirs-${new Date().toISOString().split('T')[0]}.pdf`);
-};
+  // Sélection de photo sur mobile
+  const handleMobilePhotoSelect = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      setNewPhotoFile(file);
+      setNewPhotoUrl(URL.createObjectURL(file));
+    }
+  };
 
+  // Supprime la photo sélectionnée
+  const handleMobilePhotoClear = () => {
+    setNewPhotoFile(null);
+    setNewPhotoUrl("");
+    setTempPhoto(null);
+  };
+
+  // Envoie un commentaire depuis l'interface mobile
+  const handleMobileSendComment = async (id, text) => {
+    setCommentText(text);
+    try {
+      await apiPost(`/souvenirs/${id}/comments`, {
+        author_name: user?.name || "Utilisateur",
+        content: text
+      });
+      setCommentText("");
+      await fetchMemories();
+    } catch (err) {
+      console.error("Erreur commentaire mobile:", err);
+    }
+  };
 
   if (loading) {
     return (
-      <div className="flex flex-col items-center justify-center h-64">
-        <Loader2 className="w-8 h-8 animate-spin text-blue-600 mb-2" />
-        <p className="text-gray-600">Chargement du journal de bord...</p>
+      <div className="flex flex-col items-center justify-center h-64" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <Loader2 className="w-8 h-8 animate-spin mb-3" style={{ color: 'var(--soft-coral)' }} />
+        <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>Chargement du journal de bord...</p>
       </div>
     );
   }
 
   return (
-    <div className="p-8">
-      <div className="max-w-4xl mx-auto">
-        <div className="flex justify-between items-center mb-8">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Journal de bord</h1>
-            <p className="text-gray-600">Les moments précieux partagés au sein du cercle</p>
-          </div>
-          <button
-            onClick={handleDownloadPDF}
-            className="flex items-center gap-2 px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors shadow-sm"
-          >
-            <Download className="w-5 h-5" />
-            Télécharger PDF
-          </button>
-        </div>
+    <>
+      {/* Version mobile */}
+      <div className="md:hidden">
+        <MobileMemories 
+          memories={memories}
+          user={user}
+          loading={loading}
+          
+          // Formulaire States
+          newText={newText}
+          setNewText={setNewText}
+          newMood={newMood}
+          setNewMood={setNewMood}
+          newPhotoUrl={newPhotoUrl}
+          isPublishing={isPublishing}
 
-        {error && (
-          <div className="p-4 mb-6 bg-red-50 text-red-600 rounded-lg border border-red-100">
-            {error}
-                </div>
-              )}
-              
-        {/* --- FORMULAIRE D'AJOUT DYNAMISÉ --- */}
-        <div className="mb-8 bg-white rounded-lg shadow-sm border p-6">
-          <div className="flex gap-4">
-            <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center flex-shrink-0">
-              <span className="text-blue-600 font-bold">{user?.name?.charAt(0) || 'U'}</span>
+          // Actions
+          onTakePhoto={prendrePhoto}
+          onSelectFile={handleMobilePhotoSelect}
+          onDeletePhoto={handleMobilePhotoClear}
+          onSubmitMemory={handleAddMemory}
+          
+          onDeleteMemory={handleDeleteMemory}
+          onSendComment={handleMobileSendComment}
+          onDeleteComment={handleDeleteComment}
+        />
+      </div>
+
+      {/* Version desktop */}
+      <div className="hidden md:block p-8 min-h-screen" style={{ backgroundColor: 'var(--bg-primary)' }}>
+        <div className="max-w-4xl mx-auto">
+          <div className="flex justify-between items-center mb-8">
+            <div>
+              <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--text-primary)' }}>Journal de bord</h1>
+              <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>Les moments précieux partagés au sein du cercle</p>
             </div>
-            <div className="flex-1">
-              <textarea
-                value={newText}
-                onChange={(e) => setNewText(e.target.value)}
-                placeholder="Partagez une nouvelle ou un souvenir..."
-                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 resize-none"
-                rows={3}
-              />
+            <button
+              onClick={handleDownloadPDF}
+              className="flex items-center gap-2 px-6 py-3 text-white rounded-full transition-all duration-200 hover:-translate-y-0.5 font-semibold"
+              style={{ backgroundColor: 'var(--soft-coral)', boxShadow: '0 4px 16px rgba(240, 128, 128, 0.25)' }}
+            >
+              <Download className="w-5 h-5" />
+              Télécharger PDF
+            </button>
+          </div>
+
+          {error && (
+            <div className="p-4 mb-6 bg-red-50/50 text-red-600 rounded-2xl border border-red-100/50 font-medium">
+              {error}
+            </div>
+          )}
               
-              {/* Aperçu de l'image sélectionnée */}
-              {newPhotoUrl && (
-                <div className="mt-3">
-                  <img 
-                    src={newPhotoUrl} 
-                    alt="Aperçu" 
-                    className="w-full max-h-48 object-cover rounded-lg border"
-                  />
-                </div>
-              )}
-
-              {/* Input caché pour la capture d'image */}
-              <input
-                type="file"
-                accept="image/*"
-                capture="environment"
-                onChange={(e) => {
-                  const file = e.target.files[0];
-                  if (file) {
-                    setNewPhotoFile(file);
-                    setNewPhotoUrl(URL.createObjectURL(file)); // Aperçu temporaire
-                  }
-                }}
-                className="hidden"
-                id="photo-input"
-                  />
-
-              <div className="flex justify-between items-center mt-3">
-                <div className="flex gap-4">
-                  <button 
-                    onClick={() => document.getElementById('photo-input').click()}
-                    className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors text-sm"
-                  >
-                    <ImageIcon className="w-5 h-5" />
-                    <span>{newPhotoFile ? "Photo sélectionnée" : "Ajouter une photo"}</span>
-                  </button>
-                  
-                  <div className="flex items-center gap-2 text-gray-600 text-sm">
-                    <Smile className="w-4 h-4" />
-                    <select 
-                      value={newMood} 
-                      onChange={(e) => setNewMood(parseInt(e.target.value))}
-                      className="bg-transparent outline-none cursor-pointer border-b border-gray-300"
-                    >
-                      {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>Humeur: {n}/10</option>)}
-                    </select>
-                  </div>
-                </div>
-
-                <button 
-                  onClick={handleAddMemory}
-                  disabled={isPublishing || !newText.trim() || !user}
-                  className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors font-medium disabled:opacity-50"
-                >
-                  {isPublishing ? "Publication..." : "Publier"}
-                </button>
+          {/* Formulaire pour créer un nouveau souvenir */}
+          <div className="mb-8 rounded-3xl p-6" style={{ backgroundColor: 'var(--bg-card)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--border-light)' }}>
+            <div className="flex gap-4">
+              <div className="w-12 h-12 rounded-2xl flex items-center justify-center flex-shrink-0" style={{ background: 'linear-gradient(135deg, var(--text-primary), var(--sage-green))' }}>
+                <span className="text-white font-bold text-lg">{user?.name?.charAt(0) || 'U'}</span>
               </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Flux des souvenirs réels */}
-        <div className="space-y-6">
-          {memories.length === 0 ? (
-            <div className="text-center py-12 bg-gray-50 rounded-lg border-2 border-dashed">
-              <p className="text-gray-500">Aucun souvenir n'a encore été partagé.</p>
-            </div>
-          ) : (
-            memories.map((memory) => (
-              <div key={memory.id} className="bg-white rounded-lg shadow-sm border p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 bg-blue-100 rounded-full flex items-center justify-center">
-                    <span className="text-blue-600 font-bold">
-                      {memory.author_name ? memory.author_name.charAt(0).toUpperCase() : '?'}
-                    </span>
-                  </div>
-                  <div>
-                    <p className="text-gray-900 font-semibold">{memory.author_name || "Membre du cercle"}</p>
-                    <div className="flex items-center gap-2 text-gray-500 text-sm">
-                      <Calendar className="w-4 h-4" />
-                      <span>{new Date(memory.created_at).toLocaleDateString('fr-FR')}</span>
-                    </div>
-                  </div>
-                </div>
-
-                <p className="text-gray-700 mb-4 whitespace-pre-wrap">{memory.text_content}</p>
-
-                {memory.photo_data && (
-                  <div className="mb-4 rounded-lg overflow-hidden border">
-                    <img src={getPhotoUrl(memory.photo_data)} alt="Souvenir" className="w-full h-auto max-h-96 object-cover"/>
+              <div className="flex-1">
+                <textarea
+                  value={newText}
+                  onChange={(e) => setNewText(e.target.value)}
+                  placeholder="Partagez une nouvelle ou un souvenir..."
+                  className="w-full px-4 py-3 border-2 rounded-2xl focus:outline-none focus:ring-2 resize-none transition-all"
+                  style={{ 
+                    backgroundColor: 'var(--bg-input)', 
+                    borderColor: 'var(--border-input)', 
+                    color: 'var(--text-primary)',
+                    '--tw-ring-color': 'rgba(167, 201, 167, 0.3)'
+                  }}
+                  rows={3}
+                />
+                
+                {newPhotoUrl && (
+                  <div className="mt-3">
+                    <img 
+                      src={newPhotoUrl} 
+                      alt="Aperçu" 
+                      className="w-full max-h-48 object-cover rounded-2xl border-2 border-gray-100"
+                    />
                   </div>
                 )}
 
-                <div className="flex items-center gap-6 pt-4 border-t border-gray-100">
-                  <button className="flex items-center gap-2 text-gray-600 hover:text-pink-600 transition-colors">
-                    <Heart className="w-5 h-5" />
-                    <span>{memory.mood ? `Humeur: ${memory.mood}/10` : 'Aimer'}</span>
-                  </button>
-                  {/* BOUTON MODIFIÉ POUR ACTIVER LA SECTION COMMENTAIRE */}
-                  <button 
-                    onClick={() => setActiveCommentId(activeCommentId === memory.id ? null : memory.id)}
-                    className="flex items-center gap-2 text-gray-600 hover:text-blue-600 transition-colors"
-                  >
-                    <MessageCircle className="w-5 h-5" />
-                    <span>Commenter ({memory.comments?.length || 0})</span>
-                  </button>
-                  {/* BOUTON DE SUPPRESSION - UNIQUEMENT POUR L'AUTEUR */}
-                  {user && memory.author_id === user.id && (
+                <input
+                  type="file"
+                  accept="image/*"
+                  capture="environment"
+                  onChange={(e) => {
+                    const file = e.target.files[0];
+                    if (file) {
+                      setNewPhotoFile(file);
+                      setNewPhotoUrl(URL.createObjectURL(file)); 
+                    }
+                  }}
+                  className="hidden"
+                  id="photo-input"
+                />
+
+                <div className="flex justify-between items-center mt-4">
+                  <div className="flex gap-4">
                     <button 
-                      onClick={() => handleDeleteMemory(memory.id)}
-                      className="flex items-center gap-2 text-gray-600 hover:text-red-600 transition-colors"
-                      title="Supprimer ce souvenir"
+                      onClick={() => document.getElementById('photo-input').click()}
+                      className="flex items-center gap-2 transition-colors text-sm font-medium"
+                      style={{ color: 'var(--text-secondary)' }}
                     >
-                      <Trash2 className="w-5 h-5" />
-                      <span>Supprimer</span>
+                      <ImageIcon className="w-5 h-5" />
+                      <span>{newPhotoFile ? "Photo sélectionnée" : "Ajouter une photo"}</span>
                     </button>
+                    
+                    <div className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+                      <Smile className="w-4 h-4" />
+                      <select 
+                        value={newMood} 
+                        onChange={(e) => setNewMood(parseInt(e.target.value))}
+                        className="bg-transparent outline-none cursor-pointer border-b-2 font-medium"
+                        style={{ borderColor: 'rgba(167, 201, 167, 0.3)', color: 'var(--text-primary)' }}
+                      >
+                        {[1,2,3,4,5,6,7,8,9,10].map(n => <option key={n} value={n}>Humeur: {n}/10</option>)}
+                      </select>
+                    </div>
+                  </div>
+
+                  <button 
+                    onClick={handleAddMemory}
+                    disabled={isPublishing || !newText.trim() || !user}
+                    className="px-6 py-2.5 text-white rounded-full transition-all duration-200 font-semibold disabled:opacity-50 hover:-translate-y-0.5"
+                    style={{ backgroundColor: 'var(--soft-coral)', boxShadow: '0 4px 16px rgba(240, 128, 128, 0.25)' }}
+                  >
+                    {isPublishing ? "Publication..." : "Publier"}
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Affichage des souvenirs */}
+          <div className="space-y-6">
+            {memories.length === 0 ? (
+              <div className="text-center py-12 rounded-3xl border-2 border-dashed" style={{ backgroundColor: 'rgba(var(--bg-card-rgb), 0.5)', borderColor: 'var(--border-light)' }}>
+                <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>Aucun souvenir n'a encore été partagé.</p>
+              </div>
+            ) : (
+              memories.map((memory) => (
+                <div key={memory.id} className="rounded-3xl p-6 hover:-translate-y-1 transition-all duration-200" style={{ backgroundColor: 'var(--bg-card)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--border-light)' }}>
+                  <div className="flex items-center gap-3 mb-4">
+                    <div className="w-12 h-12 rounded-2xl flex items-center justify-center" style={{ background: 'linear-gradient(135deg, var(--text-primary), var(--sage-green))' }}>
+                      <span className="text-white font-bold text-lg">
+                        {memory.author_name ? memory.author_name.charAt(0).toUpperCase() : '?'}
+                      </span>
+                    </div>
+                    <div>
+                      <p className="font-bold" style={{ color: 'var(--text-primary)' }}>{memory.author_name || "Membre du cercle"}</p>
+                      <div className="flex items-center gap-2 text-sm font-medium" style={{ color: 'var(--text-secondary)' }}>
+                        <Calendar className="w-4 h-4" />
+                        <span>{new Date(memory.created_at).toLocaleDateString('fr-FR')}</span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <p className="mb-4 whitespace-pre-wrap font-medium leading-relaxed" style={{ color: 'var(--text-primary)' }}>{memory.text_content}</p>
+
+                  {memory.photo_data && (
+                    <div className="mb-4 rounded-2xl overflow-hidden border-2 border-gray-100">
+                      <img src={getPhotoUrl(memory.photo_data)} alt="Souvenir" className="w-full h-auto max-h-96 object-cover"/>
+                    </div>
+                  )}
+
+                  <div className="flex items-center gap-6 pt-4" style={{ borderTop: '1px solid var(--border-light)' }}>
+                    <button className="flex items-center gap-2 transition-colors font-medium" style={{ color: 'var(--text-secondary)' }}>
+                      <Heart className="w-5 h-5" />
+                      <span>{memory.mood ? `Humeur: ${memory.mood}/10` : 'Aimer'}</span>
+                    </button>
+                    
+                    <button 
+                      onClick={() => setActiveCommentId(activeCommentId === memory.id ? null : memory.id)}
+                      className="flex items-center gap-2 transition-colors font-medium"
+                      style={{ color: 'var(--text-secondary)' }}
+                    >
+                      <MessageCircle className="w-5 h-5" />
+                      <span>Commenter ({memory.comments?.length || 0})</span>
+                    </button>
+                    
+                    {user && memory.author_id === user.id && (
+                      <button 
+                        onClick={() => handleDeleteMemory(memory.id)}
+                        className="flex items-center gap-2 transition-colors font-medium"
+                        style={{ color: 'var(--text-secondary)' }}
+                        title="Supprimer ce souvenir"
+                      >
+                        <Trash2 className="w-5 h-5" />
+                        <span>Supprimer</span>
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Commentaires */}
+                  {activeCommentId === memory.id && (
+                    <div className="mt-4 pt-4" style={{ borderTop: '1px solid var(--border-light)' }}>
+                      <div className="space-y-3 mb-4 max-h-60 overflow-y-auto pr-2">
+                        {memory.comments && memory.comments.length > 0 ? (
+                          memory.comments.map((comment, idx) => (
+                            <div key={idx} className="p-4 rounded-2xl text-sm" style={{ backgroundColor: 'var(--bg-secondary)', border: '1px solid var(--border-light)' }}>
+                              <div className="flex justify-between items-start mb-1">
+                                <p className="font-bold" style={{ color: 'var(--text-primary)' }}>{comment.author}</p>
+                                {user && (comment.author === user.name || memory.author_name === user.name) && (
+                                  <button 
+                                    onClick={() => handleDeleteComment(memory.id, comment.id, comment.author, memory.author_name)}
+                                    className="transition-colors p-1"
+                                    style={{ color: 'var(--text-muted)' }}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                )}
+                              </div>
+                              <p className="font-medium" style={{ color: 'var(--text-secondary)' }}>{comment.content}</p>
+                            </div>
+                          ))
+                        ) : (
+                          <p className="text-center text-sm py-2 font-medium" style={{ color: 'var(--text-secondary)' }}>Soyez le premier à commenter ce souvenir.</p>
+                        )}
+                      </div>
+                      
+                      <div className="flex gap-3">
+                        <input
+                          type="text"
+                          value={commentText}
+                          onChange={(e) => setCommentText(e.target.value)}
+                          placeholder="Écrire un message..."
+                          className="flex-1 px-4 py-3 border-2 rounded-2xl text-sm focus:outline-none focus:ring-2 transition-all"
+                          style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-input)', color: 'var(--text-primary)' }}
+                          onKeyDown={(e) => e.key === 'Enter' && handleSendComment(memory.id)}
+                        />
+                        <button 
+                          onClick={() => handleSendComment(memory.id)}
+                          disabled={isSending || !commentText.trim()}
+                          className="p-3 text-white rounded-xl disabled:opacity-50 transition-all duration-200 hover:-translate-y-0.5"
+                          style={{ backgroundColor: 'var(--soft-coral)', boxShadow: '0 4px 16px rgba(240, 128, 128, 0.25)' }}
+                        >
+                          <Send className="w-5 h-5" />
+                        </button>
+                      </div>
+                    </div>
                   )}
                 </div>
-
-                {/* --- SECTION DES COMMENTAIRES AJOUTÉE --- */}
-                {activeCommentId === memory.id && (
-                  <div className="mt-4 pt-4 border-t border-gray-50">
-                    <div className="space-y-3 mb-4 max-h-60 overflow-y-auto pr-2">
-                      {memory.comments && memory.comments.length > 0 ? (
-                        memory.comments.map((comment, idx) => (
-                          <div key={idx} className="bg-gray-50 p-3 rounded-lg text-sm shadow-sm border border-gray-100">
-                            <div className="flex justify-between items-start mb-1">
-                              <p className="font-semibold text-blue-700">{comment.author}</p>
-                              {/* Bouton de suppression - seulement si l'utilisateur est l'auteur du commentaire */}
-                              {user && (comment.author === user.name || memory.author_name === user.name) && (
-                                <button 
-                                  onClick={() => handleDeleteComment(memory.id, comment.id, comment.author, memory.author_name)}
-                                  className="text-gray-400 hover:text-red-600 transition-colors p-1"
-                                  title="Supprimer ce commentaire"
-                                >
-                                  <Trash2 className="w-4 h-4" />
-                                </button>
-                              )}
-                            </div>
-                            <p className="text-gray-700">{comment.content}</p>
-                          </div>
-                        ))
-                      ) : (
-                        <p className="text-center text-gray-400 text-sm py-2">Soyez le premier à commenter ce souvenir.</p>
-                      )}
-                    </div>
-                    
-                    <div className="flex gap-2">
-                      <input
-                        type="text"
-                        value={commentText}
-                        onChange={(e) => setCommentText(e.target.value)}
-                        placeholder="Écrire un message..."
-                        className="flex-1 px-3 py-2 bg-white border border-gray-200 rounded-md text-sm focus:outline-none focus:ring-1 focus:ring-blue-500"
-                        onKeyDown={(e) => e.key === 'Enter' && handleSendComment(memory.id)}
-                      />
-                      <button 
-                        onClick={() => handleSendComment(memory.id)}
-                        disabled={isSending || !commentText.trim()}
-                        className="p-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 disabled:opacity-50 transition-colors shadow-sm"
-                      >
-                        <Send className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </div>
-                )}
-              </div>
-            ))
-          )}
+              ))
+            )}
+          </div>
         </div>
       </div>
-    </div>
+    </>
   );
 }

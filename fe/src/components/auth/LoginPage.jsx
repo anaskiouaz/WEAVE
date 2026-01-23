@@ -42,13 +42,13 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-lg shadow-xl border-t-4 border-blue-600">
+    <div className="min-h-screen bg-page flex items-center justify-center p-4" style={{ backgroundColor: 'var(--bg-primary)' }}>
+      <Card className="w-full max-w-lg shadow-xl" style={{ backgroundColor: 'var(--bg-card)', borderTopColor: 'var(--sage-green)' }}>
         <CardHeader className="space-y-2 pb-6">
-          <Link to="/" className="flex items-center text-lg text-gray-600 hover:text-blue-700 mb-4">
+          <Link to="/" className="flex items-center text-lg text-secondary mb-4" style={{ color: 'var(--text-secondary)' }}>
             <ArrowLeft className="w-6 h-6 mr-2" /> Retour
           </Link>
-          <CardTitle className="text-3xl font-bold text-blue-900">Se connecter</CardTitle>
+          <CardTitle className="text-3xl font-bold text-primary" style={{ color: 'var(--text-primary)' }}>Se connecter</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -67,7 +67,8 @@ export default function LoginPage() {
                 name="email"
                 type="email"
                 required
-                className="h-14 text-lg bg-white"
+                className="h-14 text-lg"
+                style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
                 value={formData.email}
                 onChange={handleChange}
               />
@@ -83,14 +84,16 @@ export default function LoginPage() {
                   name="password"
                   type={showPassword ? "text" : "password"}
                   required
-                  className="h-14 text-lg bg-white pr-12"
+                  className="h-14 text-lg pr-12"
+                  style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
                   value={formData.password}
                   onChange={handleChange}
                 />
                 <button
                   type="button"
                   onClick={() => setShowPassword(!showPassword)}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-500 hover:text-gray-700 focus:outline-none"
+                  className="absolute right-3 top-1/2 -translate-y-1/2 focus:outline-none"
+                  style={{ color: 'var(--text-secondary)' }}
                 >
                   {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
                 </button>
@@ -101,7 +104,8 @@ export default function LoginPage() {
               type="submit"
               size="lg"
               disabled={loading}
-              className="w-full h-16 text-xl font-bold bg-blue-700 hover:bg-blue-800 mt-4 shadow-md text-white"
+              className="w-full h-16 text-xl font-bold mt-4 shadow-md"
+              style={{ backgroundColor: 'var(--soft-coral)', color: 'var(--text-inverse)' }}
             >
               {loading ? <Loader2 className="animate-spin mr-2" /> : "Me connecter"}
             </Button>
@@ -115,8 +119,8 @@ export default function LoginPage() {
 
           </form>
         </CardContent>
-        <CardFooter className="justify-center py-6 bg-gray-50/50 rounded-b-xl">
-          <p className="text-lg">Pas de compte ? <Link to="/register" className="font-bold text-blue-700 hover:underline">S'inscrire</Link></p>
+        <CardFooter className="justify-center py-6 rounded-b-xl" style={{ backgroundColor: 'var(--bg-secondary)' }}>
+          <p className="text-lg" style={{ color: 'var(--text-secondary)' }}>Pas de compte ? <Link to="/register" className="font-bold" style={{ color: 'var(--soft-coral)' }}>S'inscrire</Link></p>
         </CardFooter>
       </Card>
     </div>

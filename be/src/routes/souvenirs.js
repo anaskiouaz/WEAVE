@@ -4,8 +4,10 @@ import crypto from 'crypto';
 import { generateBlobSASUrl } from '../utils/azureStorage.js';
 import { BlobServiceClient } from '@azure/storage-blob';
 import admin from '../config/firebase.js';
+import { notifyCircle } from '../utils/notifications.js';
 import { logAudit, AUDIT_ACTIONS } from '../utils/audits.js';
 import { Router } from 'express';
+import { moderateMessage } from '../utils/moderation.js';
 
 // Configuration Azure pour la suppression
 const connectionString = process.env.AZURE_STORAGE_CONNECTION_STRING;
@@ -87,124 +89,76 @@ export async function getJournalEntries(req, res) {
 }
 
 // Créer un souvenir
-// Créer un souvenir
 export async function createJournalEntry(req, res) {
   try {
-    // 1. On récupère les champs nécessaires
     const { circle_id, author_id, text_content, mood, photo_data } = req.body;
 
-    // Validation basique
     if (!author_id || !text_content) {
-      return res.status(400).json({
-        status: 'error',
-        message: 'Missing required fields (author_id, text_content)',
-      });
+      return res.status(400).json({ status: 'error', message: 'Author and content required' });
+    }
+
+    // 🛡️ Modération du contenu
+    const moderation = moderateMessage(text_content);
+    const contenuFinal = moderation.content;
+    const isModerated = moderation.isModerated;
+
+    if (isModerated) {
+      console.log(`⚠️ Souvenir modéré de l'utilisateur ${author_id}`);
     }
 
     let resolvedCircleId = circle_id;
 
-    // 2. Logique de résolution du Cercle
-    if (circle_id) {
-      const specificCircle = await db.query(
-        `SELECT id FROM care_circles WHERE id = $1`,
-        [circle_id]
-      );
-
-      if (!specificCircle.rows.length) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'Care circle not found',
-        });
-      }
-    } else {
-      const defaultCircle = await db.query(
-        `SELECT id FROM care_circles ORDER BY created_at ASC LIMIT 1`
-      );
-
-      if (!defaultCircle.rows.length) {
-        return res.status(400).json({
-          status: 'error',
-          message: 'No care circle available. Please create one first.',
-        });
-      }
-      resolvedCircleId = defaultCircle.rows[0].id;
+    // Résolution Cercle par défaut si manquant
+    if (!resolvedCircleId) {
+       const defaultCircle = await db.query(`SELECT id FROM care_circles ORDER BY created_at ASC LIMIT 1`);
+       resolvedCircleId = defaultCircle.rows[0]?.id;
     }
+    
+    if (!resolvedCircleId) return res.status(400).json({ status: 'error', message: 'No circle found' });
 
-    // 3. Insertion en base de données
+    // Insertion (avec le contenu modéré si nécessaire)
     const result = await db.query(
-      `INSERT INTO journal_entries (circle_id, author_id, mood, text_content, photo_data, comments)
-       VALUES ($1, $2, $3, $4, $5, $6)
-       RETURNING id, circle_id, author_id, mood, text_content, photo_data, created_at`,
-      [
-        resolvedCircleId,
-        author_id,
-        mood || null,
-        text_content,
-        photo_data || null,
-        '[]'
-      ]
+      `INSERT INTO journal_entries (circle_id, author_id, mood, text_content, photo_data, comments, is_moderated)
+       VALUES ($1, $2, $3, $4, $5, $6, $7)
+       RETURNING *`, // On retourne tout pour récupérer l'ID et la date
+      [resolvedCircleId, author_id, mood || null, contenuFinal, photo_data || null, '[]', isModerated]
     );
 
-    // Récupérer le nom de l'auteur
+    // DÉFINITION DE LA VARIABLE MANQUANTE
+    const newSouvenir = result.rows[0];
+
+    // Info Auteur
     const authorResult = await db.query(`SELECT name FROM users WHERE id = $1`, [author_id]);
-    const authorName = authorResult.rows.length ? authorResult.rows[0].name : 'Inconnu';
+    const authorName = authorResult.rows[0]?.name || 'Inconnu';
 
-    // 📝 Log de l'action
-    await logAudit(
-      author_id,
-      AUDIT_ACTIONS.SOUVENIR_CREATED,
-      `${authorName} a ajouté un souvenir`,
-      resolvedCircleId
-    );
+    // Log Audit
+    await logAudit(author_id, AUDIT_ACTIONS.SOUVENIR_CREATED, `${authorName} a ajouté un souvenir`, resolvedCircleId);
 
-    // ✅ Réponse envoyée au client (Succès)
+    // Réponse Client
     res.status(201).json({
       status: 'ok',
       message: 'Journal entry created',
-      data: {
-        ...result.rows[0],
-        author_name: authorName
-      },
+      data: { ...newSouvenir, author_name: authorName },
     });
 
-    // --- 🔔 NOTIFICATIONS (Maintenant à l'intérieur du try) ---
-    // On met ça dans un try/catch séparé pour ne pas crasher si la notif échoue
-    try {
-        const userTokens = await db.query("SELECT fcm_token FROM users WHERE fcm_token IS NOT NULL AND fcm_token != ''");
-        const tokens = [...new Set(userTokens.rows.map(r => r.fcm_token))];
-        console.log(`Préparation notif. Tokens trouvés en DB : ${tokens.length}`);
-
-        if (tokens.length > 0) {
-            const message = {
-                notification: {
-                    title: `Nouveau souvenir ajouté par : ${authorName}`, // On utilise authorName qu'on a déjà récupéré plus haut
-                    body: `Souvenir ajouté : ${text_content.substring(0, 100)}...`,
-                },
-                data: { 
-                    taskId: result.rows[0].id.toString(), // "result" est accessible ici !
-                    type: 'souvenir_created' // J'ai changé "task_created" en "souvenir_created" pour la cohérence
-                },
-                tokens: tokens
-            };
+    // Notifications
+    const previewText = text_content.length > 50 ? text_content.substring(0, 50) + '...' : text_content;
     
-            console.log("Envoi à Firebase en cours...");
-            const response = await admin.messaging().sendEachForMulticast(message);
-            console.log(`Bilan Firebase : ${response.successCount} succès, ${response.failureCount} échecs.`);
-        }
-    } catch (notifError) {
-        console.error("Erreur lors de l'envoi de la notification (non bloquant) :", notifError);
-    }
-    // ---------------------------------------------------------
+    await notifyCircle(
+        resolvedCircleId,
+        `📸 Souvenir de ${authorName}`, 
+        `${previewText} (Humeur : ${mood}/10)`,
+        { 
+            type: 'souvenir_created', 
+            souvenirId: newSouvenir.id.toString(),
+            circleId: resolvedCircleId.toString()
+        },
+        author_id // Exclure l'auteur
+    );
 
   } catch (err) {
     console.error('Error creating journal entry:', err);
-    // On vérifie que la réponse n'a pas déjà été envoyée avant d'envoyer l'erreur
-    if (!res.headersSent) {
-        res.status(500).json({
-            status: 'error',
-            message: err.message,
-        });
-    }
+    if (!res.headersSent) res.status(500).json({ status: 'error', message: err.message });
   }
 }
 
@@ -217,11 +171,20 @@ export async function addCommentToEntry(req, res) {
       return res.status(400).json({ status: 'error', message: 'Author and content required' });
     }
 
+    // 🛡️ Modération du commentaire
+    const moderation = moderateMessage(content);
+    const contenuFinal = moderation.content;
+
+    if (moderation.isModerated) {
+      console.log(`⚠️ Commentaire modéré de ${author_name} sur le souvenir ${id}`);
+    }
+
     const newMessage = {
       id: crypto.randomUUID(),
       author: author_name,
-      content: content,
-      created_at: new Date().toISOString()
+      content: contenuFinal,
+      created_at: new Date().toISOString(),
+      is_moderated: moderation.isModerated
     };
 
     // On utilise l'opérateur || pour ajouter l'objet au tableau JSONB existant
@@ -235,7 +198,7 @@ export async function addCommentToEntry(req, res) {
 
     // 📝 Log de l'action
     const circleId = result.rows[0]?.circle_id;
-    const truncatedContent = content.length > 100 ? content.substring(0, 100) + '...' : content;
+    const truncatedContent = contenuFinal.length > 100 ? contenuFinal.substring(0, 100) + '...' : contenuFinal;
     await logAudit(
       null, // On n'a pas l'ID utilisateur ici, juste le nom
       AUDIT_ACTIONS.COMMENT_ADDED,
@@ -383,7 +346,7 @@ export async function deleteJournalEntry(req, res) {
   }
 }
 
-// --- Router Express pour exposer les endpoints ---
+// Routes Express pour exposer les endpoints des souvenirs/journal
 const router = Router();
 
 router.get('/', getJournalEntries);
