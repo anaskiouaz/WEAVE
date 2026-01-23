@@ -36,10 +36,10 @@ export default function ResetPasswordPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 flex items-center justify-center p-4">
-      <Card className="w-full max-w-md shadow-xl border-t-4 border-blue-600">
+    <div className="min-h-screen flex items-center justify-center p-4" style={{ backgroundColor: 'var(--bg-primary)' }}>
+      <Card className="w-full max-w-md shadow-xl" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-light)', borderTop: '4px solid var(--soft-coral)' }}>
         <CardHeader>
-          <CardTitle className="text-2xl font-bold text-center">Nouveau mot de passe</CardTitle>
+          <CardTitle className="text-2xl font-bold text-center" style={{ color: 'var(--text-primary)' }}>Nouveau mot de passe</CardTitle>
         </CardHeader>
         <CardContent>
           <form onSubmit={handleSubmit} className="space-y-4">
@@ -50,8 +50,9 @@ export default function ResetPasswordPage() {
                 required 
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
+                style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
               />
-              <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-3 text-gray-400">
+              <button type="button" onClick={() => setShowPass(!showPass)} className="absolute right-3 top-3" style={{ color: 'var(--text-secondary)' }}>
                 {showPass ? <EyeOff size={16}/> : <Eye size={16}/>}
               </button>
             </div>
@@ -61,11 +62,12 @@ export default function ResetPasswordPage() {
               required 
               value={confirm}
               onChange={(e) => setConfirm(e.target.value)}
+              style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)' }}
             />
-            {error && <p className="text-sm text-red-600 bg-red-50 p-2 rounded">{error}</p>}
-            <Button type="submit" className="w-full bg-blue-600 text-white" disabled={loading}>
+            {error && <p className="text-sm p-2 rounded" style={{ color: 'var(--danger)', backgroundColor: 'rgba(240,128,128,0.06)' }}>{error}</p>}
+            <button type="submit" className="w-full rounded-md py-3 font-semibold" style={{ backgroundColor: 'var(--soft-coral)', color: 'white', border: 'none' }} disabled={loading}>
               {loading ? <Loader2 className="animate-spin" /> : "Réinitialiser"}
-            </Button>
+            </button>
           </form>
         </CardContent>
       </Card>

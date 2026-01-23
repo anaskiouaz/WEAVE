@@ -315,6 +315,8 @@ export default function Profile() {
     setIsDeleting(true);
     try {
       await apiDelete(`/users/${USER_ID}`);
+      // Notify the user that the account was deleted
+      try { alert('Compte supprimé'); } catch (e) { /* ignore */ }
       logout();
       navigate('/login');
     } catch (error) {

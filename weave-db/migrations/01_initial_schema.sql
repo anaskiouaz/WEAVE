@@ -1,6 +1,7 @@
 -- ============================================================
--- SCHEMA COMPLET FUSIONNÉ (CARE CIRCLES)
--- SÉCURISÉ, COMPLET ET SANS DOUBLONS
+-- SCHEMA COMPLET CENTRALISÉ (CARE CIRCLES)
+-- Inclus : Authentification, Cercles, Tâches, Messagerie, 
+-- Modération et Audit.
 -- ============================================================
 
 CREATE EXTENSION IF NOT EXISTS "pgcrypto";
@@ -50,19 +51,28 @@ CREATE TABLE users (
     address TEXT,
     birth_date DATE,
     skills TEXT[],
-    medical_info TEXT,                      
+    medical_info TEXT,                     
     privacy_consent BOOLEAN DEFAULT FALSE,   
     notifications_enabled BOOLEAN DEFAULT FALSE,  
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     role_global global_role_type DEFAULT 'USER',
     fcm_token TEXT,
-    -- Colonnes issues de la fusion (Gestion Mail/Sécurité)
+    
+    -- Champs de vérification et Reset (MIGRATION INTEGRÉE)
     is_verified BOOLEAN DEFAULT FALSE,
     verification_token TEXT,
     verification_token_expires TIMESTAMP,
     reset_password_token TEXT,
-    reset_password_expires TIMESTAMP
+    reset_password_expires TIMESTAMP,
+    
+    -- Disponibilités rapides (MIGRATION INTEGRÉE)
+    availability_start TIMESTAMP,
+    availability_end TIMESTAMP
 );
+
+-- Index pour la sécurité/auth
+CREATE INDEX idx_users_verification_token ON users(verification_token);
+CREATE INDEX idx_users_reset_password_token ON users(reset_password_token);
 
 CREATE TABLE care_circles (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -106,9 +116,9 @@ CREATE TABLE tasks (
     date DATE,                  
     time TIME,                  
     required_helpers INT DEFAULT 1,
-    helper_name VARCHAR(100), -- Optionnel si on utilise assigned_to
+    helper_name VARCHAR(100),
     assigned_to UUID[] DEFAULT '{}'::uuid[],
-    due_date TIMESTAMP,             
+    due_date TIMESTAMP,              
     completed BOOLEAN DEFAULT FALSE, 
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     reminder_sent BOOLEAN DEFAULT FALSE,
@@ -147,17 +157,21 @@ CREATE TABLE message (
     conversation_id UUID REFERENCES conversation(id) ON DELETE CASCADE,
     auteur_id UUID REFERENCES users(id) ON DELETE SET NULL,
     contenu TEXT NOT NULL,
-    is_moderated BOOLEAN DEFAULT FALSE,
-    date_envoi TIMESTAMP DEFAULT NOW()
+    date_envoi TIMESTAMP DEFAULT NOW(),
+    -- Modération (MIGRATION INTEGRÉE)
+    is_moderated BOOLEAN DEFAULT FALSE
 );
 
--- Index pour la performance
+-- Index messagerie
 CREATE INDEX idx_message_conversation ON message(conversation_id);
 CREATE INDEX idx_message_date ON message(date_envoi);
+CREATE INDEX idx_message_is_moderated ON message(is_moderated);
 CREATE INDEX idx_participant_user ON participant_conversation(utilisateur_id);
 
 -- 5. AUTRES (JOURNAL, AUDIT, INCIDENTS, RATINGS)
 -- ============================================================
+
+-- Journal intime / de bord
 CREATE TABLE journal_entries (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     circle_id UUID NOT NULL,
@@ -165,23 +179,32 @@ CREATE TABLE journal_entries (
     mood INT CHECK (mood BETWEEN 1 AND 10),
     text_content TEXT,
     photo_data VARCHAR, 
-    is_moderated BOOLEAN DEFAULT FALSE, -- Inclus de la 2ème version
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     comments JSONB DEFAULT '[]'::jsonb,
+    -- Modération (MIGRATION INTEGRÉE)
+    is_moderated BOOLEAN DEFAULT FALSE,
     CONSTRAINT fk_journal_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE,
     CONSTRAINT fk_journal_author FOREIGN KEY (author_id) REFERENCES users(id) ON DELETE SET NULL
 );
+CREATE INDEX idx_journal_entries_is_moderated ON journal_entries(is_moderated);
 
+-- Logs d'audit (MIGRATION INTEGRÉE)
 CREATE TABLE audit_logs (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    user_id UUID,                       
-    action VARCHAR(50) NOT NULL,                   
+    user_id UUID,                                       
+    circle_id UUID, -- Ajouté via migration
+    action VARCHAR(50) NOT NULL,                    
     details TEXT,                                         
     ip_address VARCHAR(45),                       
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+    CONSTRAINT fk_audit_user FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL,
+    CONSTRAINT fk_audit_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE
 );
 
+CREATE INDEX idx_audit_logs_circle ON audit_logs(circle_id);
+CREATE INDEX idx_audit_logs_created_at ON audit_logs(created_at DESC);
+
+-- Incidents
 CREATE TABLE incidents (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     circle_id UUID NOT NULL,
@@ -190,10 +213,11 @@ CREATE TABLE incidents (
     description TEXT NOT NULL,
     status incident_status_type DEFAULT 'OPEN',
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    CONSTRAINT fk_incident_reporter FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE, 
-    CONSTRAINT fk_incident_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE
+    CONSTRAINT fk_incidents_user FOREIGN KEY (reporter_id) REFERENCES users(id) ON DELETE CASCADE, 
+    CONSTRAINT fk_incidents_circle FOREIGN KEY (circle_id) REFERENCES care_circles(id) ON DELETE CASCADE
 );
 
+-- Évaluations (Ratings)
 CREATE TABLE helper_ratings (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     rated_user_id UUID NOT NULL, 
@@ -210,11 +234,8 @@ CREATE TABLE helper_ratings (
     CONSTRAINT chk_no_self_rating CHECK (rated_user_id != rater_user_id)
 );
 
--- Vue pour les statistiques de notation
+-- 6. VUES
+-- ============================================================
 CREATE OR REPLACE VIEW helper_rating_averages AS
-SELECT 
-    rated_user_id, 
-    ROUND(AVG(rating)::numeric, 2) as average_rating, 
-    COUNT(*) as total_ratings
-FROM helper_ratings 
-GROUP BY rated_user_id;
+SELECT rated_user_id, ROUND(AVG(rating)::numeric, 2) as average_rating, COUNT(*) as total_ratings
+FROM helper_ratings GROUP BY rated_user_id;

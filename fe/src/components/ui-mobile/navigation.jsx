@@ -23,7 +23,7 @@ export default function MobileNavigation() {
   ];
 
   return (
-    <nav className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 z-40 pb-[max(12px,env(safe-area-inset-bottom))] shadow-[0_-2px_10px_rgba(0,0,0,0.05)]">
+    <nav className="fixed bottom-0 left-0 right-0 z-40 pb-[max(12px,env(safe-area-inset-bottom))]" style={{ backgroundColor: 'var(--bg-card)', borderTop: '1px solid var(--border-light)', boxShadow: '0 -2px 10px rgba(0,0,0,0.05)' }}>
       <div className="flex justify-around items-center h-16 px-2">
         {navItems.map((item) => {
           const active = isActive(item.path);
@@ -40,10 +40,11 @@ export default function MobileNavigation() {
                 {/* 1. FOND ANIMÉ (Le carré bleu qui glisse) */}
                 {active && (
                   <motion.div
-                    layoutId="nav-background" // C'est cette prop magique qui crée le glissement
-                    className="absolute inset-0 bg-blue-50 rounded-xl"
+                    layoutId="nav-background"
+                    className="absolute inset-0 rounded-xl"
                     initial={false}
                     transition={{ type: "spring", stiffness: 300, damping: 30 }}
+                    style={{ backgroundColor: 'var(--bg-notice)' }}
                   />
                 )}
 
@@ -54,13 +55,12 @@ export default function MobileNavigation() {
                   className="relative z-10" // z-10 pour être au-dessus du fond bleu
                 >
                   <item.icon 
-                    className={`w-6 h-6 transition-colors duration-200 ${
-                      active ? 'text-blue-600 stroke-[2.5px]' : 'text-gray-400 stroke-2'
-                    }`} 
+                    className="w-6 h-6 transition-transform duration-200"
+                    style={{ color: active ? 'var(--accent-blue)' : 'var(--text-secondary)', strokeWidth: active ? 2.5 : 2 }}
                   />
                   {/* Badge de messages non lus */}
                   {item.label === 'Messages' && unreadMessages > 0 && (
-                    <span className="absolute -top-1 -right-1 w-4 h-4 bg-red-500 rounded-full flex items-center justify-center text-white text-[10px] font-bold">
+                    <span className="absolute -top-1 -right-1 w-4 h-4 rounded-full flex items-center justify-center text-white text-[10px] font-bold" style={{ backgroundColor: 'var(--danger)' }}>
                       {unreadMessages > 9 ? '9+' : unreadMessages}
                     </span>
                   )}
@@ -68,9 +68,7 @@ export default function MobileNavigation() {
               </div>
 
               {/* Label */}
-              <span className={`text-[10px] font-medium transition-colors duration-200 ${
-                active ? 'text-blue-600 font-bold' : 'text-gray-400'
-              }`}>
+              <span className="text-[10px] font-medium transition-colors duration-200" style={{ color: active ? 'var(--accent-blue)' : 'var(--text-secondary)', fontWeight: active ? 700 : 500 }}>
                 {item.label}
               </span>
             </Link>

@@ -41,12 +41,32 @@ export default function MobileMemories({
 
   return (
     // AJUSTEMENT 1 : Gros padding-bottom (pb-28) pour que le scroll aille plus bas que la nav bar
-    <div className="min-h-screen bg-gray-50 pb-28 relative">
+    <div className="min-h-screen pb-28 relative" style={{ backgroundColor: 'var(--bg-primary)' }}>
       
       {/* --- HEADER FIXE --- */}
-      <div className="sticky top-0 z-20 bg-white/90 backdrop-blur-md border-b px-4 py-3 flex justify-between items-center shadow-sm">
-        <h1 className="text-xl font-bold text-blue-600">Souvenirs</h1>
-        <div className="text-xs text-gray-500 bg-gray-100 px-2 py-1 rounded-full">
+      <div className="sticky top-0 z-20 px-4 py-3 flex justify-between items-center shadow-sm" style={{ backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-light)' }}>
+        <div className="flex items-center gap-3">
+          {user && user.circles && user.circles.length > 0 && (
+            (() => {
+              const circles = user.circles;
+              const storageId = (typeof window !== 'undefined' && localStorage.getItem('circle_id')) || (circles[0]?.id ?? circles[0]?.circle_id) || '';
+              const currentId = String(storageId);
+              const onChangeCircle = (e) => {
+                try { localStorage.setItem('circle_id', e.target.value); } catch (err) {}
+                window.location.reload();
+              };
+              return (
+                <select value={currentId} onChange={onChangeCircle} className="text-sm rounded px-2 py-1" style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}>
+                  {circles.map((c) => (
+                    <option key={String(c.id ?? c.circle_id)} value={String(c.id ?? c.circle_id)}>{c.senior_name || c.name || `Cercle ${c.id ?? c.circle_id}`}</option>
+                  ))}
+                </select>
+              );
+            })()
+          )}
+          <h1 className="text-xl font-bold" style={{ color: 'var(--text-primary)' }}>Souvenirs</h1>
+        </div>
+        <div className="text-xs px-2 py-1 rounded-full" style={{ color: 'var(--text-secondary)', backgroundColor: 'var(--bg-input)' }}>
           {memories.length} moments
         </div>
       </div>
@@ -62,7 +82,7 @@ export default function MobileMemories({
           </div>
         ) : (
           memories.map((memory) => (
-            <div key={memory.id} className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
+            <div key={memory.id} className="rounded-2xl overflow-hidden" style={{ backgroundColor: 'var(--bg-card)', boxShadow: 'var(--shadow-md)', border: '1px solid var(--border-light)' }}>
               {/* En-tête Carte */}
               <div className="p-3 flex items-center justify-between">
                 <div className="flex items-center gap-3">
@@ -70,8 +90,8 @@ export default function MobileMemories({
                     {memory.author_name ? memory.author_name.charAt(0).toUpperCase() : '?'}
                   </div>
                   <div>
-                    <p className="font-semibold text-sm text-gray-900">{memory.author_name}</p>
-                    <p className="text-xs text-gray-400">
+                    <p className="font-semibold text-sm" style={{ color: 'var(--text-primary)' }}>{memory.author_name}</p>
+                    <p className="text-xs" style={{ color: 'var(--text-secondary)' }}>
                       {new Date(memory.created_at).toLocaleDateString('fr-FR')}
                     </p>
                   </div>
@@ -87,7 +107,7 @@ export default function MobileMemories({
               {/* Contenu Texte */}
               {memory.text_content && (
                 <div className="px-3 pb-2">
-                  <p className="text-gray-800 text-sm whitespace-pre-wrap leading-relaxed">
+                  <p className="text-sm whitespace-pre-wrap leading-relaxed" style={{ color: 'var(--text-primary)' }}>
                     {memory.text_content}
                   </p>
                 </div>
@@ -95,7 +115,7 @@ export default function MobileMemories({
 
               {/* Photo */}
               {memory.photo_data && (
-                <div className="w-full bg-gray-100">
+                <div className="w-full" style={{ backgroundColor: 'var(--bg-card)' }}>
                   <img 
                     src={getPhotoUrl(memory.photo_data)} 
                     alt="Souvenir" 
@@ -106,10 +126,10 @@ export default function MobileMemories({
               )}
 
               {/* Actions Barre */}
-              <div className="px-3 py-2 flex items-center gap-4 border-t border-gray-50">
-                <div className="flex items-center gap-1 text-gray-600 text-xs font-medium">
-                  <Heart className={`w-4 h-4 ${memory.mood > 5 ? 'text-pink-500 fill-pink-50' : ''}`} />
-                  <span>{memory.mood}/10</span>
+              <div className="px-3 py-2 flex items-center gap-4" style={{ borderTop: '1px solid var(--border-light)' }}>
+                <div className="flex items-center gap-1 text-xs font-medium">
+                  <Heart className="w-4 h-4" style={{ color: memory.mood > 5 ? 'var(--soft-coral)' : 'var(--text-secondary)' }} />
+                  <span style={{ color: 'var(--text-secondary)' }}>{memory.mood}/10</span>
                 </div>
                 <button 
                   onClick={() => setActiveCommentId(activeCommentId === memory.id ? null : memory.id)}
@@ -122,12 +142,12 @@ export default function MobileMemories({
 
               {/* Section Commentaires */}
               {activeCommentId === memory.id && (
-                <div className="bg-gray-50 px-3 py-3 border-t border-gray-100 animate-in slide-in-from-top-2">
+                <div className="px-3 py-3" style={{ backgroundColor: 'var(--bg-secondary)', borderTop: '1px solid var(--border-light)' }}>
                   <div className="space-y-3 mb-3 max-h-40 overflow-y-auto">
                     {memory.comments?.map((comment, idx) => (
                       <div key={idx} className="flex gap-2 text-xs">
-                        <span className="font-bold text-gray-700 shrink-0">{comment.author}:</span>
-                        <span className="text-gray-600 break-words flex-1">{comment.content}</span>
+                        <span className="font-bold shrink-0" style={{ color: 'var(--text-primary)' }}>{comment.author}:</span>
+                        <span className="break-words flex-1" style={{ color: 'var(--text-secondary)' }}>{comment.content}</span>
                         {user && (comment.author === user.name || memory.author_name === user.name) && (
                           <button onClick={() => onDeleteComment(memory.id, comment.id, comment.author, memory.author_name)}>
                              <X className="w-3 h-3 text-gray-300 hover:text-red-500" />
@@ -142,12 +162,14 @@ export default function MobileMemories({
                       value={commentText}
                       onChange={(e) => setCommentText(e.target.value)}
                       placeholder="Ajouter un commentaire..."
-                      className="flex-1 px-3 py-2 rounded-full border border-gray-200 text-sm focus:outline-none focus:border-blue-500"
+                      className="flex-1 px-3 py-2 rounded-full text-sm"
+                      style={{ backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', border: '1px solid var(--border-light)' }}
                     />
                     <button 
                       onClick={() => handleLocalSendComment(memory.id)}
                       disabled={!commentText.trim()}
-                      className="bg-blue-600 text-white p-2 rounded-full disabled:opacity-50"
+                      className="p-2 rounded-full disabled:opacity-50"
+                      style={{ backgroundColor: 'var(--soft-coral)', color: '#fff' }}
                     >
                       <Send className="w-4 h-4" />
                     </button>
@@ -163,7 +185,8 @@ export default function MobileMemories({
       {/* AJUSTEMENT 2 : bottom-24 remonte le bouton au-dessus de la nav bar (qui fait ~60px) */}
       <button
         onClick={() => setIsAddModalOpen(true)}
-        className="fixed bottom-24 right-4 w-14 h-14 bg-blue-600 text-white rounded-full shadow-lg flex items-center justify-center hover:bg-blue-700 hover:scale-105 transition-all z-40"
+        className="fixed bottom-24 right-4 w-14 h-14 rounded-full shadow-lg flex items-center justify-center hover:scale-105 transition-all z-40"
+        style={{ backgroundColor: 'var(--soft-coral)', color: '#fff' }}
       >
         <Plus className="w-8 h-8" />
       </button>
@@ -171,18 +194,19 @@ export default function MobileMemories({
       {/* --- MODAL D'AJOUT --- */}
       {isAddModalOpen && (
         // AJUSTEMENT 3 : z-[100] force le modal à être AU-DESSUS de la nav bar (souvent z-50)
-        <div className="fixed inset-0 z-[100] bg-white flex flex-col animate-in slide-in-from-bottom duration-300">
+        <div className="fixed inset-0 z-[100] flex flex-col animate-in slide-in-from-bottom duration-300" style={{ backgroundColor: 'var(--bg-primary)' }}>
           
           {/* Header Modal */}
-          <div className="px-4 py-3 border-b flex justify-between items-center bg-gray-50">
-            <button onClick={() => setIsAddModalOpen(false)} className="p-2 hover:bg-gray-200 rounded-full">
-              <X className="w-6 h-6 text-gray-600" />
+          <div className="px-4 py-3 border-b flex justify-between items-center" style={{ backgroundColor: 'var(--bg-card)', borderBottom: '1px solid var(--border-light)' }}>
+            <button onClick={() => setIsAddModalOpen(false)} className="p-2 rounded-full">
+              <X className="w-6 h-6" style={{ color: 'var(--text-primary)' }} />
             </button>
-            <span className="font-bold text-gray-800">Nouveau souvenir</span>
+            <span className="font-bold" style={{ color: 'var(--text-primary)' }}>Nouveau souvenir</span>
             <button 
               onClick={() => { onSubmitMemory(); setIsAddModalOpen(false); }}
               disabled={isPublishing || !newText.trim()}
-              className="text-blue-600 font-bold disabled:opacity-50"
+              className="font-bold disabled:opacity-50"
+              style={{ color: 'var(--soft-coral)' }}
             >
               Publier
             </button>
@@ -195,15 +219,17 @@ export default function MobileMemories({
               onChange={(e) => setNewText(e.target.value)}
               placeholder="Racontez votre souvenir..."
               className="w-full flex-1 text-lg resize-none outline-none placeholder:text-gray-400"
+              style={{ backgroundColor: 'var(--bg-card)', color: 'var(--text-primary)', border: '1px solid var(--border-light)', padding: '12px', borderRadius: '8px' }}
               autoFocus
             />
 
             {newPhotoUrl && (
-              <div className="relative mt-4 rounded-xl overflow-hidden border border-gray-200">
+              <div className="relative mt-4 rounded-xl overflow-hidden" style={{ border: '1px solid var(--border-light)' }}>
                 <img src={newPhotoUrl} alt="Preview" className="w-full max-h-60 object-cover" />
                 <button 
                   onClick={onDeletePhoto}
-                  className="absolute top-2 right-2 bg-black/50 text-white p-1 rounded-full"
+                  className="absolute top-2 right-2 p-1 rounded-full"
+                  style={{ backgroundColor: 'rgba(0,0,0,0.5)', color: '#fff' }}
                 >
                   <X className="w-4 h-4" />
                 </button>
@@ -213,22 +239,22 @@ export default function MobileMemories({
 
           {/* Toolbar Bas de Modal (Les 3 boutons) */}
           {/* AJUSTEMENT 4 : pb-safe ou un bon padding en bas pour décoller du bord */}
-          <div className="p-4 border-t bg-gray-50 flex items-center justify-between pb-8">
+          <div className="p-4 flex items-center justify-between pb-8" style={{ backgroundColor: 'var(--bg-card)', borderTop: '1px solid var(--border-light)' }}>
             <div className="flex items-center gap-4">
               
               {/* 1. Camera */}
-              <button onClick={onTakePhoto} className="p-2 bg-white border rounded-full text-blue-600 shadow-sm active:scale-95 transition-transform">
+              <button onClick={onTakePhoto} className="p-2 border rounded-full shadow-sm active:scale-95 transition-transform" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}>
                 <CameraIcon className="w-6 h-6" />
               </button>
               
               {/* 2. Galerie */}
-              <label className="p-2 bg-white border rounded-full text-blue-600 shadow-sm cursor-pointer active:scale-95 transition-transform">
+              <label className="p-2 border rounded-full shadow-sm cursor-pointer active:scale-95 transition-transform" style={{ backgroundColor: 'var(--bg-card)', borderColor: 'var(--border-light)', color: 'var(--text-primary)' }}>
                 <ImageIcon className="w-6 h-6" />
-                <input type="file" accept="image/*" onChange={onSelectFile} className="hidden" />
+                <input name="image" capture="environment" type="file" accept="image/*" onChange={(e) => onSelectFile && onSelectFile(e)} className="hidden" />
               </label>
 
               {/* 3. Humeur */}
-              <div className="flex items-center gap-2 bg-white px-3 py-2 rounded-full border shadow-sm">
+              <div className="flex items-center gap-2 px-3 py-2 rounded-full" style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-light)' }}>
                 <Smile className="w-5 h-5 text-yellow-500" />
                 <select 
                   value={newMood} 

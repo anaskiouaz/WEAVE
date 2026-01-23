@@ -221,6 +221,8 @@ export default function Admin() {
     }
   };
 
+  
+
   // Si aucun cercle sélectionné ou disponible
   if (!currentCircle) {
     return (
@@ -481,27 +483,32 @@ export default function Admin() {
       </div>
 
       {isAdmin && (
-        <div className="bg-white rounded-3xl shadow-[0_4px_24px_rgba(74,106,138,0.08)] border border-red-100/50 overflow-hidden">
-          <div className="p-6 border-b border-red-100/50 bg-red-50/50">
-            <h2 className="text-lg font-bold text-red-600 flex items-center gap-2">
-              <AlertTriangle className="w-5 h-5" />
+        <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: 20, boxShadow: '0 4px 24px rgba(74,106,138,0.08)', border: '1px solid var(--border-light)', overflow: 'hidden' }}>
+          <div style={{ padding: 24, borderBottom: '1px solid var(--border-light)', backgroundColor: 'rgba(var(--danger-rgb,240,128,128),0.06)' }}>
+            <h2 style={{ fontSize: 18, fontWeight: 700, color: 'var(--danger)', display: 'flex', alignItems: 'center', gap: 8 }}>
+              <AlertTriangle className="w-5 h-5" style={{ color: 'var(--danger)' }} />
               Zone de danger
             </h2>
-            <p className="text-sm text-red-500/80 mt-1 font-medium">Ces actions sont irréversibles</p>
+            <p style={{ fontSize: 14, color: 'var(--danger-muted)', marginTop: 6, fontWeight: 500 }}>Ces actions sont irréversibles</p>
           </div>
 
-          <div className="p-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div style={{ padding: 24 }}>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }} className="md:flex-row md:items-center md:justify-between">
               <div>
-                <h3 className="font-bold text-[#4A6A8A]">Supprimer le cercle</h3>
-                <p className="text-sm text-[#6B8AAA] mt-1">
-                  Cette action supprimera définitivement le cercle, tous ses membres, souvenirs, messages et tâches. 
+                <h3 style={{ fontWeight: 700, color: '#ff0000' }}>Supprimer le cercle</h3>
+                <p style={{ fontSize: 14, color: 'var(--text-secondary)', marginTop: 6 }}>
+                  Cette action supprimera définitivement le cercle, tous ses membres, souvenirs, messages et tâches.
                   Cette action est irréversible.
                 </p>
               </div>
               <button
                 onClick={() => setShowDeleteModal(true)}
-                className="px-5 py-2.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-all duration-200 font-semibold flex items-center gap-2 whitespace-nowrap shadow-md hover:-translate-y-0.5"
+                style={{ padding: '10px 20px', backgroundColor: '#ff0000', color: '#fff', borderRadius: 9999, fontWeight: 700, display: 'flex', alignItems: 'center', gap: 8, border: 'none', boxShadow: '0 6px 20px rgba(255,0,0,0.18)' }}
+                className="whitespace-nowrap"
+                onMouseEnter={(e) => { e.currentTarget.style.backgroundColor = '#c94b4b'; }}
+                onMouseLeave={(e) => { e.currentTarget.style.backgroundColor = '#ff0000'; }}
+                onFocus={(e) => { e.currentTarget.style.backgroundColor = '#c94b4b'; }}
+                onBlur={(e) => { e.currentTarget.style.backgroundColor = '#ff0000'; }}
               >
                 <Trash2 className="w-4 h-4" />
                 Supprimer le cercle
@@ -513,28 +520,28 @@ export default function Admin() {
 
       {/* --- MODAL DE CONFIRMATION --- */}
       {isAdmin && showDeleteModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4">
-          <div className="bg-white rounded-3xl shadow-xl max-w-md w-full overflow-hidden animate-in zoom-in-95 duration-200">
-            <div className="p-6 bg-red-50/50 border-b border-red-100/50">
-              <div className="flex items-center gap-3">
-                <div className="w-12 h-12 bg-red-100/70 rounded-2xl flex items-center justify-center">
-                  <AlertTriangle className="w-6 h-6 text-red-500" />
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ backgroundColor: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(6px)', padding: 16 }}>
+          <div style={{ backgroundColor: 'var(--bg-card)', borderRadius: 20, boxShadow: '0 10px 30px rgba(0,0,0,0.12)', maxWidth: 680, width: '100%', overflow: 'hidden', animation: 'zoom-in 200ms ease' }}>
+            <div style={{ padding: 24, borderBottom: '1px solid var(--border-light)', backgroundColor: 'rgba(var(--danger-rgb,240,128,128),0.06)' }}>
+              <div style={{ display: 'flex', gap: 12, alignItems: 'center' }}>
+                <div style={{ width: 48, height: 48, borderRadius: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(var(--danger-rgb,240,128,128),0.12)' }}>
+                  <AlertTriangle className="w-6 h-6" style={{ color: 'var(--danger)' }} />
                 </div>
                 <div>
-                  <h3 className="text-lg font-bold text-red-600">Supprimer le cercle ?</h3>
-                  <p className="text-sm text-red-500/80 font-medium">Cette action est définitive</p>
+                  <h3 style={{ fontSize: 18, fontWeight: 700, color: 'var(--danger)' }}>Supprimer le cercle ?</h3>
+                  <p style={{ fontSize: 14, color: 'var(--danger-muted)', fontWeight: 500 }}>Cette action est définitive</p>
                 </div>
               </div>
             </div>
 
-            <div className="p-6 space-y-4">
-              <div className="bg-red-50/50 border border-red-100 rounded-2xl p-4">
-                <p className="text-sm text-red-700">
+            <div style={{ padding: 24, display: 'block', gap: 16 }}>
+              <div style={{ backgroundColor: 'rgba(var(--danger-rgb,240,128,128),0.06)', border: '1px solid rgba(var(--danger-rgb,240,128,128),0.12)', borderRadius: 16, padding: 16 }}>
+                <p style={{ fontSize: 14, color: 'var(--danger)', margin: 0 }}>
                   <strong>Attention :</strong> Vous êtes sur le point de supprimer définitivement le cercle 
-                  <span className="font-bold"> "{currentCircleName}"</span>. 
+                  <span style={{ fontWeight: 700 }}> "{currentCircleName}"</span>. 
                   Toutes les données seront perdues :
                 </p>
-                <ul className="text-sm text-red-600 mt-2 list-disc list-inside space-y-1">
+                <ul style={{ fontSize: 14, color: 'var(--danger)', marginTop: 8, paddingLeft: 20, listStyleType: 'disc' }}>
                   <li>Tous les membres seront retirés</li>
                   <li>Tous les souvenirs et commentaires</li>
                   <li>Toutes les conversations et messages</li>
@@ -543,37 +550,41 @@ export default function Admin() {
               </div>
 
               <div>
-                <label className="block text-sm font-semibold text-[#4A6A8A] mb-2">
-                  Pour confirmer, tapez <span className="font-bold text-red-500">"{currentCircleName}"</span>
+                <label style={{ display: 'block', fontSize: 14, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 8 }}>
+                  Pour confirmer, tapez <span style={{ fontWeight: 700, color: 'var(--danger)' }}>"{currentCircleName}"</span>
                 </label>
                 <input
                   type="text"
                   value={deleteConfirmText}
                   onChange={(e) => setDeleteConfirmText(e.target.value)}
                   placeholder="Nom du cercle"
-                  className="w-full px-4 py-3 border-2 border-gray-200 rounded-2xl focus:ring-2 focus:ring-red-200 focus:border-red-300 outline-none transition-all text-[#4A6A8A]"
+                  style={{ width: '100%', padding: '12px 16px', borderRadius: 12, border: '1px solid var(--border-light)', backgroundColor: 'var(--bg-input)', color: 'var(--text-primary)', outline: 'none' }}
                 />
               </div>
             </div>
 
-            <div className="p-6 bg-[#FDFBF7] border-t border-gray-100/50 flex gap-3">
+            <div style={{ padding: 24, backgroundColor: 'var(--bg-primary)', borderTop: '1px solid var(--border-light)', display: 'flex', gap: 12 }}>
               <button
                 onClick={() => {
                   setShowDeleteModal(false);
                   setDeleteConfirmText('');
                 }}
-                className="flex-1 px-4 py-2.5 border-2 border-gray-200 text-[#4A6A8A] rounded-full hover:bg-white transition-all duration-200 font-semibold"
+                style={{ flex: 1, padding: '12px 16px', border: '1px solid var(--border-light)', color: 'var(--text-primary)', borderRadius: 9999, backgroundColor: 'var(--bg-card)', fontWeight: 700 }}
               >
                 Annuler
               </button>
               <button
                 onClick={handleDeleteCircle}
                 disabled={deleteConfirmText !== currentCircleName || deleting}
-                className="flex-1 px-4 py-2.5 bg-red-500 text-white rounded-full hover:bg-red-600 transition-all duration-200 font-semibold disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2"
+                style={{ flex: 1, padding: '12px 16px', backgroundColor: '#ff0000', color: '#fff', borderRadius: 9999, fontWeight: 700, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 8, opacity: deleteConfirmText !== currentCircleName || deleting ? 0.6 : 1, cursor: deleteConfirmText !== currentCircleName || deleting ? 'not-allowed' : 'pointer', border: 'none', boxShadow: '0 6px 20px rgba(255,0,0,0.18)' }}
+                onMouseEnter={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = '#c94b4b'; }}
+                onMouseLeave={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = '#ff0000'; }}
+                onFocus={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = '#c94b4b'; }}
+                onBlur={(e) => { if (!e.currentTarget.disabled) e.currentTarget.style.backgroundColor = '#ff0000'; }}
               >
                 {deleting ? (
                   <>
-                    <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                    <div style={{ width: 16, height: 16, border: '2px solid #fff', borderTopColor: 'transparent', borderRadius: '50%', animation: 'spin 1s linear infinite' }} />
                     Suppression...
                   </>
                 ) : (

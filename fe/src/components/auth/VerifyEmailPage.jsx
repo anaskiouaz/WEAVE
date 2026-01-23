@@ -128,11 +128,7 @@ export default function VerifyEmail() {
                         if (!response.ok) throw new Error(data.error || 'Erreur');
                         setStatus('success');
                         const token = localStorage.getItem('weave_token');
-                        if (token) {
-                          navigate('/select-circle');
-                        } else {
-                          navigate('/login?next=/select-circle');
-                        }
+                      navigate('/login');
                       } catch (err) {
                         console.error(err);
                         setStatus('error');
