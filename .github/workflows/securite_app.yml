@@ -1,0 +1,65 @@
+name: Security Audit - Application
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  audit-api-security:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:14
+        env:
+          POSTGRES_USER: weave_user
+          POSTGRES_PASSWORD: toto
+          POSTGRES_DB: weave_local
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd pg_isready
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Installation & Démarrage Backend
+        working-directory: ./be
+        env:
+          PORT: 4000
+          DATABASE_URL: "postgres://weave_user:toto@localhost:5432/weave_local"
+          JWT_SECRET: "test-secret"
+        run: |
+          npm ci
+          npm start &
+          npx wait-on http://localhost:4000/api/health || sleep 15
+
+      - name: Test 1 - CORS Policy (Origine Interdite)
+        run: |
+          # On teste l'appel avec une origine malveillante
+          RESPONSE=$(curl -s -I -H "Origin: http://evil-hacker.com" http://localhost:4000/api/health)
+          if echo "$RESPONSE" | grep -iq "Access-Control-Allow-Origin: http://evil-hacker.com"; then
+            echo "FAILURE : CORS laisse passer 'evil-hacker.com' !"
+            exit 1
+          fi
+          echo "PASS : CORS bloque les origines inconnues."
+
+      - name: Test 2 - Headers de Sécurité (Helmet)
+        run: |
+          HEADERS=$(curl -s -I http://localhost:4000/api/health)
+          
+          if echo "$HEADERS" | grep -q "X-Powered-By: Express"; then
+            echo "FAILURE : 'X-Powered-By: Express' est visible !"
+            exit 1
+          fi
+          
+          if ! echo "$HEADERS" | grep -q "X-DNS-Prefetch-Control"; then
+            echo "FAILURE : Headers Helmet non détectés."
+            exit 1
+          fi
+          echo "PASS : Headers de sécurité conformes."

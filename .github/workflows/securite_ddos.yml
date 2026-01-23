@@ -1,0 +1,24 @@
+- name: Simulation d'attaque (Burst Request)
+      run: |
+        # On envoie 50 requêtes très vite. 
+        # Si PAS de rate-limit, toutes passent (HTTP 200/404) -> ÉCHEC.
+        # Si rate-limit actif, on devrait voir des HTTP 429.
+        
+        echo "Envoi de 50 requêtes en rafale..."
+        COUNT_429=0
+        for i in {1..50}; do
+          HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" https://weave-be-server.azurewebsites.net/api/health)
+          if [ "$HTTP_CODE" == "429" ]; then
+            COUNT_429=$((COUNT_429+1))
+          fi
+        done
+        
+        echo "Résultat : $COUNT_429 requêtes bloquées sur 50."
+        
+        if [ "$COUNT_429" -eq 0 ]; then
+          echo "FAILURE : Aucune limite de débit détectée !"
+          echo "Conseil : Installe 'express-rate-limit' dans app.js"
+          exit 1 
+        else
+          echo "PASS : Le Rate Limiter est actif."
+        fi
