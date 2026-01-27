@@ -341,7 +341,13 @@ MIT License - voir [LICENSE](LICENSE)
 
 ##  Équipe
 
-- **Anas Kiouaz**  Founder & Lead Developer
+- **Anas Kiouaz** Founder & Lead Developer
+- **Redon Brahimi**
+- **Abdessalam Khattri**
+- **Gabriel Schoenfelder**
+- **Yanis Debbal**
+- **Rayan Nyabi**
+- **Kilian Nauleau**
 - Merci à tous les contributeurs ! 
 
 ---
