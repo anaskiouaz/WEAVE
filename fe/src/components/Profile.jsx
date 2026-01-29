@@ -83,6 +83,7 @@ export default function Profile() {
         const userData = data.user;
         const createdDate = new Date(userData.created_at);
 
+        const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000';
         setUserInfo({
           name: userData.name,
           email: userData.email,
@@ -90,7 +91,7 @@ export default function Profile() {
           address: userData.address || '',
           joinDate: createdDate.toLocaleDateString('fr-FR', { month: 'long', year: 'numeric' }),
           yearsActive: 0,  // Sera mis à jour par les stats
-          photoUrl: userData.profile_photo ? `${import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000'}/uploads/${userData.profile_photo}` : null
+          photoUrl: userData.profile_photo ? `${API_BASE_URL}/api/upload/blob/${userData.profile_photo}` : null
         });
 
         // Formatage des disponibilités
@@ -365,8 +366,8 @@ export default function Profile() {
       }, options);
 
       if (saveResponse.success) {
-        // 5. Mettre à jour l'URL avec le blob Azure
-        const photoUrl = `${API_BASE_URL}/uploads/${uploadData.data.blobName}`;
+        // 5. Mettre à jour l'URL via le proxy backend qui sert le blob
+        const photoUrl = `${API_BASE_URL}/api/upload/blob/${uploadData.data.blobName}`;
         setUserInfo({ ...userInfo, photoUrl });
         alert('Photo de profil mise à jour avec succès!');
       }

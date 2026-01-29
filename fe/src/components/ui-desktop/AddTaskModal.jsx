@@ -36,6 +36,14 @@ export default function AddTaskModal({ isOpen, onClose, onSave, prefillDate, ski
         }
     }, [isOpen, skills]);
 
+    // Add validation to prevent selecting past dates
+    useEffect(() => {
+        const today = new Date().toISOString().split('T')[0];
+        if (formData.date < today) {
+            setFormData(prev => ({ ...prev, date: today }));
+        }
+    }, [formData.date]);
+
     const handleSubmit = (e) => {
         e.preventDefault();
         if (!formData.title.trim() || !formData.date) return;
@@ -191,6 +199,7 @@ export default function AddTaskModal({ isOpen, onClose, onSave, prefillDate, ski
                                     style={{ backgroundColor: 'var(--bg-card)', border: '1px solid var(--border-input)', color: 'var(--text-primary)', '--tw-ring-color': 'var(--soft-coral)' }}
                                     value={formData.date}
                                     onChange={e => setFormData({ ...formData, date: e.target.value })}
+                                    min={new Date().toISOString().split('T')[0]} // Prevent past dates
                                 />
                             </div>
                         </div>
