@@ -96,7 +96,7 @@ export default function LandingPage() {
                 "Accès rapide aux souvenirs partagés",
                 "Notifications de messages en temps réel"
               ]}
-              image="/public/Capture Ecran1.png"
+              image="/Capture Ecran1.png"
               reverse={false}
               icon={ClipboardList}
             />
@@ -111,7 +111,7 @@ export default function LandingPage() {
                 "Synchronisation en temps réel",
                 "Rappels automatiques pour les événements"
               ]}
-              image="/public/Capture Ecran2.png"
+              image="/Capture Ecran2.png"
               reverse={true}
               icon={Calendar}
             />
@@ -126,7 +126,7 @@ export default function LandingPage() {
                 "Vue complète des membres actifs",
                 "Historique des actions récentes"
               ]}
-              image="/public/Capture Ecran3.png"
+              image="/Capture Ecran3.png"
               reverse={false}
               icon={Users}
             />
